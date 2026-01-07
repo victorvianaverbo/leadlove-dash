@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +47,8 @@ serve(async (req) => {
       JSON.stringify({ campaigns: campaigns || [] }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error;
     console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message, campaigns: [] }),
