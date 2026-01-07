@@ -10,6 +10,8 @@ import Dashboard from "./pages/Dashboard";
 import ProjectNew from "./pages/ProjectNew";
 import ProjectEdit from "./pages/ProjectEdit";
 import ProjectView from "./pages/ProjectView";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
             <Route path="/projects/new" element={<ProjectNew />} />
             <Route path="/projects/:id" element={<ProjectView />} />
             <Route path="/projects/:id/edit" element={<ProjectEdit />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
