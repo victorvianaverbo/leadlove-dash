@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +28,6 @@ serve(async (req) => {
     const { project_id } = await req.json();
     if (!project_id) throw new Error('project_id required');
 
-    // Get project
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
@@ -37,24 +36,21 @@ serve(async (req) => {
       .single();
     if (projectError || !project) throw new Error('Project not found');
 
-    // Get integrations
     const { data: integrations } = await supabase
       .from('integrations')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true);
 
-    const kiwify = integrations?.find(i => i.type === 'kiwify');
-    const meta = integrations?.find(i => i.type === 'meta_ads');
+    const kiwify = integrations?.find((i: { type: string }) => i.type === 'kiwify');
+    const meta = integrations?.find((i: { type: string }) => i.type === 'meta_ads');
 
     let salesSynced = 0;
     let adsSynced = 0;
 
-    // Sync Kiwify sales
     if (kiwify && project.kiwify_product_ids?.length > 0) {
       const creds = kiwify.credentials as { client_id: string; client_secret: string };
       
-      // Get access token
       const tokenRes = await fetch('https://api.kiwify.com.br/v1/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +64,6 @@ serve(async (req) => {
       if (tokenRes.ok) {
         const { access_token } = await tokenRes.json();
         
-        // Fetch sales
         const salesRes = await fetch('https://api.kiwify.com.br/v1/sales?limit=100', {
           headers: { Authorization: `Bearer ${access_token}` },
         });
@@ -106,7 +101,6 @@ serve(async (req) => {
       }
     }
 
-    // Sync Meta Ads spend
     if (meta && project.meta_campaign_ids?.length > 0) {
       const creds = meta.credentials as { access_token: string; ad_account_id: string };
       const today = new Date().toISOString().split('T')[0];
@@ -143,7 +137,8 @@ serve(async (req) => {
       JSON.stringify({ success: true, salesSynced, adsSynced }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error;
     console.error('Sync error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
