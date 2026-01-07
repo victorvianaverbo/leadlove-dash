@@ -117,13 +117,14 @@ export default function ProjectEdit() {
 
   // Save integration mutation
   const saveIntegration = useMutation({
-    mutationFn: async ({ type, credentials }: { type: string; credentials: Record<string, string> }) => {
+    mutationFn: async ({ type, credentials }: { type: string; credentials: { client_id?: string; client_secret?: string; access_token?: string; ad_account_id?: string } }) => {
       const existing = integrations?.find(i => i.type === type);
+      const credentialsJson = JSON.parse(JSON.stringify(credentials));
       
       if (existing) {
         const { error } = await supabase
           .from('integrations')
-          .update({ credentials: credentials as unknown as Record<string, unknown>, is_active: true })
+          .update({ credentials: credentialsJson, is_active: true })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
@@ -133,7 +134,7 @@ export default function ProjectEdit() {
             user_id: user!.id,
             project_id: id,
             type,
-            credentials: credentials as unknown as Record<string, unknown>,
+            credentials: credentialsJson,
             is_active: true,
           }]);
         if (error) throw error;
