@@ -1,35 +1,39 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link, useParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Package, Megaphone } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
+  // Kiwify credentials
+  const [kiwifyClientId, setKiwifyClientId] = useState("");
+  const [kiwifyClientSecret, setKiwifyClientSecret] = useState("");
+  const [showKiwifySecret, setShowKiwifySecret] = useState(false);
 
+  // Meta credentials
+  const [metaAccessToken, setMetaAccessToken] = useState("");
+  const [metaAdAccountId, setMetaAdAccountId] = useState("");
+  const [showMetaToken, setShowMetaToken] = useState(false);
+
+  // Fetch project data
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
     queryFn: async () => {
@@ -41,60 +45,137 @@ export default function ProjectEdit() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !!id,
+    enabled: !!id && !!user,
   });
 
-  const { data: integrations } = useQuery({
-    queryKey: ['integrations', user?.id],
+  // Fetch project integrations
+  const { data: integrations, isLoading: integrationsLoading } = useQuery({
+    queryKey: ['project-integrations', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('integrations')
         .select('*')
-        .eq('user_id', user!.id);
+        .eq('project_id', id);
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!id && !!user,
   });
 
-  // Fetch products from Kiwify (via edge function)
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['kiwify-products', user?.id],
+  const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify' && i.is_active);
+  const metaIntegration = integrations?.find(i => i.type === 'meta_ads' && i.is_active);
+
+  // Fetch Kiwify products
+  const { data: kiwifyProducts, isLoading: productsLoading } = useQuery({
+    queryKey: ['kiwify-products', id],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('kiwify-products');
+      const { data, error } = await supabase.functions.invoke('kiwify-products', {
+        body: { project_id: id }
+      });
       if (error) throw error;
       return data?.products || [];
     },
-    enabled: !!integrations?.find(i => i.type === 'kiwify' && i.is_active),
+    enabled: !!kiwifyIntegration,
   });
 
-  // Fetch campaigns from Meta (via edge function)
-  const { data: campaigns, isLoading: campaignsLoading } = useQuery({
-    queryKey: ['meta-campaigns', user?.id],
+  // Fetch Meta campaigns
+  const { data: metaCampaigns, isLoading: campaignsLoading } = useQuery({
+    queryKey: ['meta-campaigns', id],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('meta-campaigns');
+      const { data, error } = await supabase.functions.invoke('meta-campaigns', {
+        body: { project_id: id }
+      });
       if (error) throw error;
       return data?.campaigns || [];
     },
-    enabled: !!integrations?.find(i => i.type === 'meta_ads' && i.is_active),
+    enabled: !!metaIntegration,
   });
 
+  // Load project data into form
   useEffect(() => {
     if (project) {
       setName(project.name);
-      setDescription(project.description || '');
+      setDescription(project.description || "");
       setSelectedProducts(project.kiwify_product_ids || []);
       setSelectedCampaigns(project.meta_campaign_ids || []);
     }
   }, [project]);
 
+  // Load integration credentials
+  useEffect(() => {
+    if (kiwifyIntegration) {
+      const creds = kiwifyIntegration.credentials as { client_id?: string; client_secret?: string };
+      setKiwifyClientId(creds.client_id || "");
+      setKiwifyClientSecret(creds.client_secret || "");
+    }
+    if (metaIntegration) {
+      const creds = metaIntegration.credentials as { access_token?: string; ad_account_id?: string };
+      setMetaAccessToken(creds.access_token || "");
+      setMetaAdAccountId(creds.ad_account_id || "");
+    }
+  }, [kiwifyIntegration, metaIntegration]);
+
+  // Save integration mutation
+  const saveIntegration = useMutation({
+    mutationFn: async ({ type, credentials }: { type: string; credentials: Record<string, string> }) => {
+      const existing = integrations?.find(i => i.type === type);
+      
+      if (existing) {
+        const { error } = await supabase
+          .from('integrations')
+          .update({ credentials: credentials as unknown as Record<string, unknown>, is_active: true })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('integrations')
+          .insert([{
+            user_id: user!.id,
+            project_id: id,
+            type,
+            credentials: credentials as unknown as Record<string, unknown>,
+            is_active: true,
+          }]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-integrations', id] });
+      queryClient.invalidateQueries({ queryKey: ['kiwify-products', id] });
+      queryClient.invalidateQueries({ queryKey: ['meta-campaigns', id] });
+      toast({ title: "Integração salva com sucesso!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao salvar integração", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Disconnect integration mutation
+  const disconnectIntegration = useMutation({
+    mutationFn: async (type: string) => {
+      const existing = integrations?.find(i => i.type === type);
+      if (existing) {
+        const { error } = await supabase
+          .from('integrations')
+          .update({ is_active: false })
+          .eq('id', existing.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-integrations', id] });
+      toast({ title: "Integração desconectada!" });
+    },
+  });
+
+  // Update project mutation
   const updateProject = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
         .from('projects')
         .update({
           name,
-          description: description || null,
+          description,
           kiwify_product_ids: selectedProducts,
           meta_campaign_ids: selectedCampaigns,
         })
@@ -102,173 +183,291 @@ export default function ProjectEdit() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
-      toast({ title: 'Projeto atualizado!' });
-      navigate(`/projects/${id}`);
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast({ title: "Projeto atualizado com sucesso!" });
     },
-    onError: (error) => {
-      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar projeto", description: error.message, variant: "destructive" });
     },
   });
 
+  const handleSaveKiwify = () => {
+    if (!kiwifyClientId || !kiwifyClientSecret) {
+      toast({ title: "Preencha todas as credenciais do Kiwify", variant: "destructive" });
+      return;
+    }
+    saveIntegration.mutate({
+      type: 'kiwify',
+      credentials: { client_id: kiwifyClientId, client_secret: kiwifyClientSecret },
+    });
+  };
+
+  const handleSaveMeta = () => {
+    if (!metaAccessToken || !metaAdAccountId) {
+      toast({ title: "Preencha todas as credenciais do Meta Ads", variant: "destructive" });
+      return;
+    }
+    saveIntegration.mutate({
+      type: 'meta_ads',
+      credentials: { access_token: metaAccessToken, ad_account_id: metaAdAccountId },
+    });
+  };
+
   const toggleProduct = (productId: string) => {
-    setSelectedProducts(prev => 
-      prev.includes(productId) 
+    setSelectedProducts(prev =>
+      prev.includes(productId)
         ? prev.filter(p => p !== productId)
         : [...prev, productId]
     );
   };
 
   const toggleCampaign = (campaignId: string) => {
-    setSelectedCampaigns(prev => 
-      prev.includes(campaignId) 
+    setSelectedCampaigns(prev =>
+      prev.includes(campaignId)
         ? prev.filter(c => c !== campaignId)
         : [...prev, campaignId]
     );
   };
 
-  if (loading || !user || projectLoading) {
+  if (authLoading || projectLoading || integrationsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
-  const hasKiwify = integrations?.find(i => i.type === 'kiwify' && i.is_active);
-  const hasMeta = integrations?.find(i => i.type === 'meta_ads' && i.is_active);
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Link>
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
           </Button>
+          <h1 className="text-2xl font-bold">Editar Projeto</h1>
         </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
         {/* Basic Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Informações do Projeto</CardTitle>
+            <CardTitle>Informações Básicas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome *</Label>
+            <div>
+              <label className="text-sm font-medium">Nome do Projeto</label>
               <Input
-                id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
+                placeholder="Ex: Curso de Marketing Digital"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
+            <div>
+              <label className="text-sm font-medium">Descrição</label>
               <Textarea
-                id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={2}
+                placeholder="Descrição do projeto..."
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Kiwify Products */}
+        {/* Kiwify Integration */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Produtos Kiwify
-            </CardTitle>
-            <CardDescription>
-              Selecione os produtos que pertencem a este projeto
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Kiwify
+                  {kiwifyIntegration ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Conecte a conta Kiwify deste projeto para importar vendas
+                </CardDescription>
+              </div>
+              {kiwifyIntegration && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnectIntegration.mutate('kiwify')}
+                >
+                  Desconectar
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent>
-            {!hasKiwify ? (
-              <p className="text-sm text-muted-foreground">
-                Conecte sua conta Kiwify nas configurações para ver seus produtos.
-              </p>
-            ) : productsLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando produtos...
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Client ID</label>
+              <Input
+                value={kiwifyClientId}
+                onChange={(e) => setKiwifyClientId(e.target.value)}
+                placeholder="Seu Client ID do Kiwify"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Client Secret</label>
+              <div className="relative">
+                <Input
+                  type={showKiwifySecret ? "text" : "password"}
+                  value={kiwifyClientSecret}
+                  onChange={(e) => setKiwifyClientSecret(e.target.value)}
+                  placeholder="Seu Client Secret do Kiwify"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowKiwifySecret(!showKiwifySecret)}
+                >
+                  {showKiwifySecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
-            ) : products?.length > 0 ? (
-              <div className="space-y-3">
-                {products.map((product: { id: string; name: string }) => (
-                  <div key={product.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`product-${product.id}`}
-                      checked={selectedProducts.includes(product.id)}
-                      onCheckedChange={() => toggleProduct(product.id)}
-                    />
-                    <Label htmlFor={`product-${product.id}`} className="cursor-pointer">
-                      {product.name}
-                    </Label>
+            </div>
+            <Button onClick={handleSaveKiwify} disabled={saveIntegration.isPending}>
+              {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salvar Credenciais Kiwify
+            </Button>
+
+            {/* Kiwify Products */}
+            {kiwifyIntegration && (
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-3">Produtos para Monitorar</h4>
+                {productsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando produtos...
                   </div>
-                ))}
+                ) : kiwifyProducts?.length > 0 ? (
+                  <div className="space-y-2">
+                    {kiwifyProducts.map((product: { id: string; name: string }) => (
+                      <div key={product.id} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedProducts.includes(product.id)}
+                          onCheckedChange={() => toggleProduct(product.id)}
+                        />
+                        <span>{product.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Nenhum produto encontrado</p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Nenhum produto encontrado.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Meta Campaigns */}
+        {/* Meta Ads Integration */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Megaphone className="h-5 w-5" />
-              Campanhas Meta Ads
-            </CardTitle>
-            <CardDescription>
-              Selecione as campanhas relacionadas a este projeto
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Meta Ads
+                  {metaIntegration ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Conecte a conta Meta Ads deste projeto para importar gastos
+                </CardDescription>
+              </div>
+              {metaIntegration && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnectIntegration.mutate('meta_ads')}
+                >
+                  Desconectar
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent>
-            {!hasMeta ? (
-              <p className="text-sm text-muted-foreground">
-                Conecte sua conta Meta Ads nas configurações para ver suas campanhas.
-              </p>
-            ) : campaignsLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando campanhas...
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Access Token</label>
+              <div className="relative">
+                <Input
+                  type={showMetaToken ? "text" : "password"}
+                  value={metaAccessToken}
+                  onChange={(e) => setMetaAccessToken(e.target.value)}
+                  placeholder="Seu Access Token do Meta"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowMetaToken(!showMetaToken)}
+                >
+                  {showMetaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
-            ) : campaigns?.length > 0 ? (
-              <div className="space-y-3">
-                {campaigns.map((campaign: { id: string; name: string }) => (
-                  <div key={campaign.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`campaign-${campaign.id}`}
-                      checked={selectedCampaigns.includes(campaign.id)}
-                      onCheckedChange={() => toggleCampaign(campaign.id)}
-                    />
-                    <Label htmlFor={`campaign-${campaign.id}`} className="cursor-pointer">
-                      {campaign.name}
-                    </Label>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Ad Account ID</label>
+              <Input
+                value={metaAdAccountId}
+                onChange={(e) => setMetaAdAccountId(e.target.value)}
+                placeholder="Ex: act_123456789"
+              />
+            </div>
+            <Button onClick={handleSaveMeta} disabled={saveIntegration.isPending}>
+              {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salvar Credenciais Meta
+            </Button>
+
+            {/* Meta Campaigns */}
+            {metaIntegration && (
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-3">Campanhas para Monitorar</h4>
+                {campaignsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando campanhas...
                   </div>
-                ))}
+                ) : metaCampaigns?.length > 0 ? (
+                  <div className="space-y-2">
+                    {metaCampaigns.map((campaign: { id: string; name: string }) => (
+                      <div key={campaign.id} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedCampaigns.includes(campaign.id)}
+                          onCheckedChange={() => toggleCampaign(campaign.id)}
+                        />
+                        <span>{campaign.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Nenhuma campanha encontrada</p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Nenhuma campanha encontrada.</p>
             )}
           </CardContent>
         </Card>
 
-        <Button onClick={() => updateProject.mutate()} className="w-full" disabled={updateProject.isPending}>
-          {updateProject.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Salvar Projeto
-        </Button>
-      </main>
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <Button
+            size="lg"
+            onClick={() => updateProject.mutate()}
+            disabled={updateProject.isPending}
+          >
+            {updateProject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar Projeto
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
