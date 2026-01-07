@@ -79,6 +79,7 @@ export type Database = {
           credentials: Json
           id: string
           is_active: boolean
+          project_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -88,6 +89,7 @@ export type Database = {
           credentials?: Json
           id?: string
           is_active?: boolean
+          project_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -97,11 +99,20 @@ export type Database = {
           credentials?: Json
           id?: string
           is_active?: boolean
+          project_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "integrations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
