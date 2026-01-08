@@ -147,6 +147,7 @@ export type Database = {
           description: string | null
           id: string
           kiwify_product_ids: string[] | null
+          last_sync_at: string | null
           meta_campaign_ids: string[] | null
           name: string
           updated_at: string
@@ -157,6 +158,7 @@ export type Database = {
           description?: string | null
           id?: string
           kiwify_product_ids?: string[] | null
+          last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name: string
           updated_at?: string
@@ -167,6 +169,7 @@ export type Database = {
           description?: string | null
           id?: string
           kiwify_product_ids?: string[] | null
+          last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name?: string
           updated_at?: string

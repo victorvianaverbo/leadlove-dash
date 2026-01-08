@@ -71,10 +71,14 @@ Deno.serve(async (req) => {
 
     // Sync Kiwify sales
     if (kiwifyIntegration && project.kiwify_product_ids?.length > 0) {
-      const { client_id, client_secret } = kiwifyIntegration.credentials as { client_id: string; client_secret: string };
+      const { client_id, client_secret, account_id } = kiwifyIntegration.credentials as { 
+        client_id: string; 
+        client_secret: string; 
+        account_id: string;
+      };
 
       // Get access token
-      const tokenResponse = await fetch('https://api.kiwify.com.br/v1/oauth/token', {
+      const tokenResponse = await fetch('https://public-api.kiwify.com/v1/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,19 +92,39 @@ Deno.serve(async (req) => {
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
 
-        // Fetch sales
-        const salesResponse = await fetch('https://api.kiwify.com.br/v1/sales?limit=100', {
-          headers: { 'Authorization': `Bearer ${accessToken}` },
+        // Determine start date: use last_sync_at or 90 days ago
+        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const startDate = project.last_sync_at 
+          ? new Date(project.last_sync_at) 
+          : ninetyDaysAgo;
+
+        console.log(`Syncing sales from ${startDate.toISOString()}`);
+
+        // Fetch sales with date filter
+        const params = new URLSearchParams({
+          created_at_min: startDate.toISOString(),
+          limit: '100'
+        });
+
+        const salesResponse = await fetch(`https://public-api.kiwify.com/v1/sales?${params}`, {
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'x-kiwify-account-id': account_id
+          },
         });
 
         if (salesResponse.ok) {
           const salesData = await salesResponse.json();
           const sales = salesData.data || [];
 
+          console.log(`Fetched ${sales.length} sales from Kiwify`);
+
           // Filter by selected product IDs
           const filteredSales = sales.filter((sale: { product_id: string }) => 
             project.kiwify_product_ids.includes(sale.product_id)
           );
+
+          console.log(`${filteredSales.length} sales match selected products`);
 
           for (const sale of filteredSales) {
             const tracking = sale.tracking || {};
@@ -127,7 +151,11 @@ Deno.serve(async (req) => {
 
             if (!upsertError) salesSynced++;
           }
+        } else {
+          console.error('Failed to fetch sales:', await salesResponse.text());
         }
+      } else {
+        console.error('Failed to get access token:', await tokenResponse.text());
       }
     }
 
@@ -173,6 +201,12 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    // Update last_sync_at
+    await supabase
+      .from('projects')
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq('id', project_id);
 
     console.log(`Synced ${salesSynced} sales and ${adSpendSynced} ad spend records for project ${project_id}`);
 
