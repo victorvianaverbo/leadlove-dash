@@ -4,8 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FolderOpen, LogOut, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target } from "lucide-react";
+
+const formatCurrency = (value: number) => {
+  return value.toLocaleString('pt-BR', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  });
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -30,6 +37,35 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: projectMetrics } = useQuery({
+    queryKey: ['project-metrics'],
+    queryFn: async () => {
+      const [salesResult, spendResult] = await Promise.all([
+        supabase.from('sales').select('project_id, amount'),
+        supabase.from('ad_spend').select('project_id, spend')
+      ]);
+
+      const metrics: Record<string, { revenue: number; spend: number }> = {};
+
+      salesResult.data?.forEach((sale) => {
+        if (!metrics[sale.project_id]) {
+          metrics[sale.project_id] = { revenue: 0, spend: 0 };
+        }
+        metrics[sale.project_id].revenue += Number(sale.amount) || 0;
+      });
+
+      spendResult.data?.forEach((ad) => {
+        if (!metrics[ad.project_id]) {
+          metrics[ad.project_id] = { revenue: 0, spend: 0 };
+        }
+        metrics[ad.project_id].spend += Number(ad.spend) || 0;
+      });
+
+      return metrics;
+    },
+    enabled: !!user,
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -37,6 +73,12 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const getProjectMetrics = (projectId: string) => {
+    const metrics = projectMetrics?.[projectId] || { revenue: 0, spend: 0 };
+    const roas = metrics.spend > 0 ? metrics.revenue / metrics.spend : 0;
+    return { ...metrics, roas };
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -79,32 +121,51 @@ export default function Dashboard() {
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {projects?.map((project) => (
-                <Card
-                  key={project.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/projects/${project.id}`)}
-                >
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.description || "Sem descrição"}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2 text-xs text-muted-foreground">
-                      {project.kiwify_product_ids?.length > 0 && (
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {project.kiwify_product_ids.length} produto(s)
-                        </span>
-                      )}
-                      {project.meta_campaign_ids?.length > 0 && (
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {project.meta_campaign_ids.length} campanha(s)
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {projects?.map((project) => {
+                const { revenue, spend, roas } = getProjectMetrics(project.id);
+                return (
+                  <Card
+                    key={project.id}
+                    className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center p-2 rounded-lg bg-muted/50">
+                          <div className="flex items-center justify-center mb-1">
+                            <DollarSign className="h-3 w-3 text-green-600" />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Faturamento</p>
+                          <p className="text-sm font-semibold text-green-600">
+                            R$ {formatCurrency(revenue)}
+                          </p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-muted/50">
+                          <div className="flex items-center justify-center mb-1">
+                            <Target className="h-3 w-3 text-blue-600" />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Investimento</p>
+                          <p className="text-sm font-semibold text-blue-600">
+                            R$ {formatCurrency(spend)}
+                          </p>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-muted/50">
+                          <div className="flex items-center justify-center mb-1">
+                            <TrendingUp className={`h-3 w-3 ${roas >= 1 ? 'text-green-600' : 'text-red-500'}`} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">ROAS</p>
+                          <p className={`text-sm font-bold ${roas >= 1 ? 'text-green-600' : 'text-red-500'}`}>
+                            {roas.toFixed(2)}x
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
