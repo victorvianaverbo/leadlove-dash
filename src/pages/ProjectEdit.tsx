@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
@@ -117,6 +117,13 @@ export default function ProjectEdit() {
     }
   }, [kiwifyIntegration, metaIntegration]);
 
+  // Auto-select all products when loaded
+  useEffect(() => {
+    if (kiwifyProducts?.length > 0 && selectedProducts.length === 0) {
+      setSelectedProducts(kiwifyProducts.map((p: { id: string }) => p.id));
+    }
+  }, [kiwifyProducts]);
+
   // Save integration mutation
   const saveIntegration = useMutation({
     mutationFn: async ({ type, credentials }: { type: string; credentials: { client_id?: string; client_secret?: string; account_id?: string; access_token?: string; ad_account_id?: string } }) => {
@@ -192,6 +199,24 @@ export default function ProjectEdit() {
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao atualizar projeto", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Sync sales mutation
+  const syncSales = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-project-data', {
+        body: { project_id: id }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({ title: `Sincronizado! ${data.salesSynced || 0} vendas importadas.` });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao sincronizar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -349,28 +374,52 @@ export default function ProjectEdit() {
 
             {/* Kiwify Products */}
             {kiwifyIntegration && (
-              <div className="pt-4 border-t">
-                <h4 className="font-medium mb-3">Produtos para Monitorar</h4>
-                {productsLoading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando produtos...
-                  </div>
-                ) : kiwifyProducts?.length > 0 ? (
-                  <div className="space-y-2">
-                    {kiwifyProducts.map((product: { id: string; name: string }) => (
-                      <div key={product.id} className="flex items-center gap-2">
-                        <Checkbox
-                          checked={selectedProducts.includes(product.id)}
-                          onCheckedChange={() => toggleProduct(product.id)}
-                        />
-                        <span>{product.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">Nenhum produto encontrado</p>
-                )}
+              <div className="pt-4 border-t space-y-4">
+                <div>
+                  <h4 className="font-medium mb-3">Produtos para Monitorar</h4>
+                  {productsLoading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando produtos...
+                    </div>
+                  ) : kiwifyProducts?.length > 0 ? (
+                    <div className="space-y-2">
+                      {kiwifyProducts.map((product: { id: string; name: string }) => (
+                        <div key={product.id} className="flex items-center gap-2">
+                          <Checkbox
+                            checked={selectedProducts.includes(product.id)}
+                            onCheckedChange={() => toggleProduct(product.id)}
+                          />
+                          <span>{product.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Nenhum produto encontrado</p>
+                  )}
+                </div>
+                
+                {/* Sync Button */}
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={() => syncSales.mutate()} 
+                    disabled={syncSales.isPending}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {syncSales.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Sincronizar Vendas (90 dias)
+                  </Button>
+                  {project?.last_sync_at && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Última sincronização: {new Date(project.last_sync_at).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
