@@ -60,14 +60,13 @@ Deno.serve(async (req) => {
     const { client_id, client_secret } = integration.credentials as { client_id: string; client_secret: string };
 
     // Get access token from Kiwify
-    const tokenResponse = await fetch('https://api.kiwify.com.br/v1/oauth/token', {
+    const tokenResponse = await fetch('https://public-api.kiwify.com/v1/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'client_credentials',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
         client_id,
         client_secret,
-      }),
+      }).toString(),
     });
 
     if (!tokenResponse.ok) {
@@ -82,7 +81,7 @@ Deno.serve(async (req) => {
     const accessToken = tokenData.access_token;
 
     // Fetch products from Kiwify
-    const productsResponse = await fetch('https://api.kiwify.com.br/v1/products', {
+    const productsResponse = await fetch('https://public-api.kiwify.com/v1/products', {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
 
