@@ -26,6 +26,7 @@ export default function ProjectEdit() {
   // Kiwify credentials
   const [kiwifyClientId, setKiwifyClientId] = useState("");
   const [kiwifyClientSecret, setKiwifyClientSecret] = useState("");
+  const [kiwifyAccountId, setKiwifyAccountId] = useState("");
   const [showKiwifySecret, setShowKiwifySecret] = useState(false);
 
   // Meta credentials
@@ -104,9 +105,10 @@ export default function ProjectEdit() {
   // Load integration credentials
   useEffect(() => {
     if (kiwifyIntegration) {
-      const creds = kiwifyIntegration.credentials as { client_id?: string; client_secret?: string };
+      const creds = kiwifyIntegration.credentials as { client_id?: string; client_secret?: string; account_id?: string };
       setKiwifyClientId(creds.client_id || "");
       setKiwifyClientSecret(creds.client_secret || "");
+      setKiwifyAccountId(creds.account_id || "");
     }
     if (metaIntegration) {
       const creds = metaIntegration.credentials as { access_token?: string; ad_account_id?: string };
@@ -117,7 +119,7 @@ export default function ProjectEdit() {
 
   // Save integration mutation
   const saveIntegration = useMutation({
-    mutationFn: async ({ type, credentials }: { type: string; credentials: { client_id?: string; client_secret?: string; access_token?: string; ad_account_id?: string } }) => {
+    mutationFn: async ({ type, credentials }: { type: string; credentials: { client_id?: string; client_secret?: string; account_id?: string; access_token?: string; ad_account_id?: string } }) => {
       const existing = integrations?.find(i => i.type === type);
       const credentialsJson = JSON.parse(JSON.stringify(credentials));
       
@@ -194,13 +196,13 @@ export default function ProjectEdit() {
   });
 
   const handleSaveKiwify = () => {
-    if (!kiwifyClientId || !kiwifyClientSecret) {
+    if (!kiwifyClientId || !kiwifyClientSecret || !kiwifyAccountId) {
       toast({ title: "Preencha todas as credenciais do Kiwify", variant: "destructive" });
       return;
     }
     saveIntegration.mutate({
       type: 'kiwify',
-      credentials: { client_id: kiwifyClientId, client_secret: kiwifyClientSecret },
+      credentials: { client_id: kiwifyClientId, client_secret: kiwifyClientSecret, account_id: kiwifyAccountId },
     });
   };
 
@@ -331,6 +333,14 @@ export default function ProjectEdit() {
                   {showKiwifySecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Account ID</label>
+              <Input
+                value={kiwifyAccountId}
+                onChange={(e) => setKiwifyAccountId(e.target.value)}
+                placeholder="Seu Account ID do Kiwify"
+              />
             </div>
             <Button onClick={handleSaveKiwify} disabled={saveIntegration.isPending}>
               {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
