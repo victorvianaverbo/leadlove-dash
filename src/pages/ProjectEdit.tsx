@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search } from "lucide-react";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +24,7 @@ export default function ProjectEdit() {
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [campaignSearch, setCampaignSearch] = useState("");
 
   // Kiwify credentials
   const [kiwifyClientId, setKiwifyClientId] = useState("");
@@ -80,17 +83,19 @@ export default function ProjectEdit() {
   });
 
   // Fetch Meta campaigns
-  const { data: metaCampaigns, isLoading: campaignsLoading } = useQuery({
+  const { data: metaCampaignsData, isLoading: campaignsLoading, refetch: refetchCampaigns, isFetching: campaignsRefetching } = useQuery({
     queryKey: ['meta-campaigns', id],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('meta-campaigns', {
         body: { project_id: id }
       });
       if (error) throw error;
-      return data?.campaigns || [];
+      return data;
     },
     enabled: !!metaIntegration,
   });
+
+  const metaCampaigns = metaCampaignsData?.campaigns || [];
 
   // Load project data into form
   useEffect(() => {
@@ -256,6 +261,36 @@ export default function ProjectEdit() {
         ? prev.filter(c => c !== campaignId)
         : [...prev, campaignId]
     );
+  };
+
+  // Filter campaigns by search
+  const filteredCampaigns = metaCampaigns.filter((c: { name: string }) =>
+    c.name.toLowerCase().includes(campaignSearch.toLowerCase())
+  );
+
+  const selectAllCampaigns = () => {
+    const allIds = filteredCampaigns.map((c: { id: string }) => c.id);
+    setSelectedCampaigns(prev => [...new Set([...prev, ...allIds])]);
+  };
+
+  const clearCampaignSelection = () => {
+    setSelectedCampaigns([]);
+  };
+
+  const handleRefreshCampaigns = () => {
+    refetchCampaigns();
+    toast({ title: "Atualizando campanhas..." });
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'default';
+      case 'PAUSED':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
   };
 
   if (authLoading || projectLoading || integrationsLoading) {
@@ -489,27 +524,90 @@ export default function ProjectEdit() {
 
             {/* Meta Campaigns */}
             {metaIntegration && (
-              <div className="pt-4 border-t">
-                <h4 className="font-medium mb-3">Campanhas para Monitorar</h4>
-                {campaignsLoading ? (
+              <div className="pt-4 border-t space-y-4">
+                {/* Header with refresh button */}
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Campanhas para Monitorar</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshCampaigns}
+                    disabled={campaignsRefetching}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${campaignsRefetching ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </Button>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar campanhas..."
+                    value={campaignSearch}
+                    onChange={(e) => setCampaignSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {/* Selection info and quick actions */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedCampaigns.length} de {metaCampaigns.length} selecionadas
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={selectAllCampaigns}>
+                      Selecionar Todas
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearCampaignSelection}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Campaigns list */}
+                {campaignsLoading || campaignsRefetching ? (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando campanhas...
                   </div>
-                ) : metaCampaigns?.length > 0 ? (
-                  <div className="space-y-2">
-                    {metaCampaigns.map((campaign: { id: string; name: string }) => (
-                      <div key={campaign.id} className="flex items-center gap-2">
-                        <Checkbox
-                          checked={selectedCampaigns.includes(campaign.id)}
-                          onCheckedChange={() => toggleCampaign(campaign.id)}
-                        />
-                        <span>{campaign.name}</span>
-                      </div>
-                    ))}
-                  </div>
+                ) : filteredCampaigns.length > 0 ? (
+                  <ScrollArea className="h-64 rounded-md border p-2">
+                    <div className="space-y-2">
+                      {filteredCampaigns.map((campaign: { id: string; name: string; status: string; had_recent_activity?: boolean }) => (
+                        <div 
+                          key={campaign.id} 
+                          className="flex items-center gap-2 py-2 px-2 rounded-md hover:bg-muted/50"
+                        >
+                          <Checkbox
+                            checked={selectedCampaigns.includes(campaign.id)}
+                            onCheckedChange={() => toggleCampaign(campaign.id)}
+                          />
+                          <span className="flex-1 truncate text-sm">{campaign.name}</span>
+                          <div className="flex items-center gap-2">
+                            {campaign.had_recent_activity && (
+                              <Badge variant="outline" className="text-xs">
+                                90 dias
+                              </Badge>
+                            )}
+                            <Badge variant={getStatusVariant(campaign.status)} className="text-xs">
+                              {campaign.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : metaCampaigns.length > 0 ? (
+                  <p className="text-muted-foreground">Nenhuma campanha encontrada com esse termo</p>
                 ) : (
-                  <p className="text-muted-foreground">Nenhuma campanha encontrada</p>
+                  <p className="text-muted-foreground">Nenhuma campanha encontrada. Verifique as credenciais.</p>
+                )}
+
+                {metaCampaignsData?.date_range && (
+                  <p className="text-xs text-muted-foreground">
+                    Período de atividade: {metaCampaignsData.date_range.since} a {metaCampaignsData.date_range.until}
+                  </p>
                 )}
               </div>
             )}
