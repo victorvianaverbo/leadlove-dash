@@ -163,42 +163,78 @@ Deno.serve(async (req) => {
     if (metaIntegration && project.meta_campaign_ids?.length > 0) {
       const { access_token, ad_account_id } = metaIntegration.credentials as { access_token: string; ad_account_id: string };
 
+      console.log(`Starting Meta Ads sync for project ${project_id}`);
+      console.log(`Ad Account: ${ad_account_id}`);
+      console.log(`Campaign IDs to sync: ${project.meta_campaign_ids.join(', ')}`);
+
       // Calculate date range (last 30 days)
       const today = new Date();
       const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
       const since = thirtyDaysAgo.toISOString().split('T')[0];
       const until = today.toISOString().split('T')[0];
 
+      console.log(`Date range: ${since} to ${until}`);
+
       for (const campaignId of project.meta_campaign_ids) {
-        const insightsResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`
-        );
+        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
+        
+        console.log(`Fetching insights for campaign ${campaignId}`);
+        
+        const insightsResponse = await fetch(insightsUrl);
+        const responseText = await insightsResponse.text();
 
-        if (insightsResponse.ok) {
-          const insightsData = await insightsResponse.json();
-          const insights = insightsData.data || [];
+        if (!insightsResponse.ok) {
+          console.error(`Meta API error for campaign ${campaignId}:`, responseText);
+          continue;
+        }
 
-          for (const insight of insights) {
-            const { error: upsertError } = await supabase
-              .from('ad_spend')
-              .upsert({
-                project_id: project.id,
-                user_id: user.id,
-                campaign_id: insight.campaign_id,
-                campaign_name: insight.campaign_name,
-                adset_id: insight.adset_id,
-                adset_name: insight.adset_name,
-                ad_id: insight.ad_id,
-                ad_name: insight.ad_name,
-                spend: parseFloat(insight.spend || '0'),
-                impressions: parseInt(insight.impressions || '0'),
-                clicks: parseInt(insight.clicks || '0'),
-                date: insight.date_start,
-              }, { onConflict: 'campaign_id,date' });
+        let insightsData;
+        try {
+          insightsData = JSON.parse(responseText);
+        } catch (e) {
+          console.error(`Failed to parse Meta response for campaign ${campaignId}:`, responseText);
+          continue;
+        }
 
-            if (!upsertError) adSpendSynced++;
+        const insights = insightsData.data || [];
+        console.log(`Got ${insights.length} insights for campaign ${campaignId}`);
+
+        if (insights.length === 0) {
+          console.log(`No insights data for campaign ${campaignId} in the date range`);
+        }
+
+        for (const insight of insights) {
+          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}`);
+          
+          const { error: upsertError } = await supabase
+            .from('ad_spend')
+            .upsert({
+              project_id: project.id,
+              user_id: user.id,
+              campaign_id: insight.campaign_id,
+              campaign_name: insight.campaign_name,
+              adset_id: insight.adset_id,
+              adset_name: insight.adset_name,
+              ad_id: insight.ad_id,
+              ad_name: insight.ad_name,
+              spend: parseFloat(insight.spend || '0'),
+              impressions: parseInt(insight.impressions || '0'),
+              clicks: parseInt(insight.clicks || '0'),
+              date: insight.date_start,
+            }, { onConflict: 'campaign_id,date' });
+
+          if (upsertError) {
+            console.error(`Failed to upsert insight:`, upsertError);
+          } else {
+            adSpendSynced++;
           }
         }
+      }
+    } else {
+      if (!metaIntegration) {
+        console.log('No active Meta integration found for this project');
+      } else if (!project.meta_campaign_ids?.length) {
+        console.log('No campaign IDs selected for this project');
       }
     }
 
