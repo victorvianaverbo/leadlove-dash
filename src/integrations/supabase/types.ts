@@ -23,11 +23,17 @@ export type Database = {
           campaign_id: string
           campaign_name: string | null
           clicks: number
+          cpc: number | null
+          cpm: number | null
           created_at: string
           date: string
+          frequency: number | null
           id: string
           impressions: number
+          landing_page_views: number | null
+          link_clicks: number | null
           project_id: string
+          reach: number | null
           spend: number
           user_id: string
         }
@@ -39,11 +45,17 @@ export type Database = {
           campaign_id: string
           campaign_name?: string | null
           clicks?: number
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
           date: string
+          frequency?: number | null
           id?: string
           impressions?: number
+          landing_page_views?: number | null
+          link_clicks?: number | null
           project_id: string
+          reach?: number | null
           spend?: number
           user_id: string
         }
@@ -55,11 +67,17 @@ export type Database = {
           campaign_id?: string
           campaign_name?: string | null
           clicks?: number
+          cpc?: number | null
+          cpm?: number | null
           created_at?: string
           date?: string
+          frequency?: number | null
           id?: string
           impressions?: number
+          landing_page_views?: number | null
+          link_clicks?: number | null
           project_id?: string
+          reach?: number | null
           spend?: number
           user_id?: string
         }
