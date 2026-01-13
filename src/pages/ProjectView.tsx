@@ -122,10 +122,22 @@ export default function ProjectView() {
 
   const syncData = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke('sync-project-data', {
+      // Ensure we have a valid session before calling the edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
+      const { error, data } = await supabase.functions.invoke('sync-project-data', {
         body: { project_id: id },
       });
+      
       if (error) throw error;
+      
+      // Check for error in response body (edge function may return 200 with error)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', id] });
@@ -134,7 +146,10 @@ export default function ProjectView() {
       toast({ title: 'Dados atualizados!', description: 'Vendas e gastos foram sincronizados.' });
     },
     onError: (error) => {
-      toast({ title: 'Erro ao sincronizar', description: error.message, variant: 'destructive' });
+      const message = error.message.includes('Invalid token') 
+        ? 'Sessão expirada. Recarregue a página e tente novamente.'
+        : error.message;
+      toast({ title: 'Erro ao sincronizar', description: message, variant: 'destructive' });
     },
   });
 
