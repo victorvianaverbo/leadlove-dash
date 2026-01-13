@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
               link_clicks: parseInt(insight.inline_link_clicks || '0'),
               landing_page_views: landingPageViews,
               date: insight.date_start,
-            }, { onConflict: 'campaign_id,date' });
+            }, { onConflict: 'campaign_id,date,project_id' });
 
           if (upsertError) {
             console.error(`Failed to upsert insight:`, upsertError);
