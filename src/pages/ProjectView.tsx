@@ -57,6 +57,12 @@ export default function ProjectView() {
       case '7d': return new Date(now.setDate(now.getDate() - 7)).toISOString();
       case '30d': return new Date(now.setDate(now.getDate() - 30)).toISOString();
       case '90d': return new Date(now.setDate(now.getDate() - 90)).toISOString();
+      case 'all': {
+        // Limitar "Todo período" para os últimos 6 meses
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        return sixMonthsAgo.toISOString();
+      }
       default: return null;
     }
   };
