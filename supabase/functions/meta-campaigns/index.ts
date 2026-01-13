@@ -59,24 +59,68 @@ Deno.serve(async (req) => {
 
     const { access_token, ad_account_id } = integration.credentials as { access_token: string; ad_account_id: string };
 
-    // Fetch campaigns from Meta
+    // Calculate date range: last 90 days
+    const today = new Date();
+    const ninetyDaysAgo = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const since = ninetyDaysAgo.toISOString().split('T')[0];
+    const until = today.toISOString().split('T')[0];
+
+    console.log(`Fetching campaigns with activity from ${since} to ${until}`);
+
+    // First, fetch all campaigns to get their names and status
     const campaignsResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${ad_account_id}/campaigns?fields=id,name,status&access_token=${access_token}`
+      `https://graph.facebook.com/v18.0/${ad_account_id}/campaigns?fields=id,name,status,effective_status&limit=500&access_token=${access_token}`
     );
 
     if (!campaignsResponse.ok) {
-      console.error('Meta campaigns error:', await campaignsResponse.text());
+      const errorText = await campaignsResponse.text();
+      console.error('Meta campaigns error:', errorText);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch Meta campaigns', campaigns: [] }),
+        JSON.stringify({ error: 'Failed to fetch Meta campaigns', details: errorText, campaigns: [] }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const campaignsData = await campaignsResponse.json();
-    console.log('Fetched Meta campaigns for project:', project_id);
+    const allCampaigns = campaignsData.data || [];
+
+    // Then, fetch insights to see which campaigns had activity in the last 90 days
+    const insightsResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${ad_account_id}/insights?fields=campaign_id,campaign_name,spend,impressions&time_range={"since":"${since}","until":"${until}"}&level=campaign&limit=500&access_token=${access_token}`
+    );
+
+    let campaignsWithActivity: string[] = [];
+    if (insightsResponse.ok) {
+      const insightsData = await insightsResponse.json();
+      campaignsWithActivity = (insightsData.data || []).map((i: { campaign_id: string }) => i.campaign_id);
+      console.log(`Found ${campaignsWithActivity.length} campaigns with activity in last 90 days`);
+    } else {
+      console.log('Could not fetch insights, returning all campaigns');
+    }
+
+    // Merge: mark campaigns that had activity
+    const enrichedCampaigns = allCampaigns.map((campaign: { id: string; name: string; status: string; effective_status?: string }) => ({
+      ...campaign,
+      had_recent_activity: campaignsWithActivity.includes(campaign.id),
+    }));
+
+    // Sort: campaigns with activity first, then by status (ACTIVE first)
+    enrichedCampaigns.sort((a: { had_recent_activity: boolean; status: string }, b: { had_recent_activity: boolean; status: string }) => {
+      if (a.had_recent_activity !== b.had_recent_activity) {
+        return a.had_recent_activity ? -1 : 1;
+      }
+      if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
+      if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+      return 0;
+    });
+
+    console.log(`Returning ${enrichedCampaigns.length} total campaigns for project: ${project_id}`);
 
     return new Response(
-      JSON.stringify({ campaigns: campaignsData.data || [] }),
+      JSON.stringify({ 
+        campaigns: enrichedCampaigns,
+        date_range: { since, until }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
