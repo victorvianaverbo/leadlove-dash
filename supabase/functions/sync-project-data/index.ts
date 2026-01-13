@@ -176,7 +176,8 @@ Deno.serve(async (req) => {
       console.log(`Date range: ${since} to ${until}`);
 
       for (const campaignId of project.meta_campaign_ids) {
-        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,landing_page_views&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
+        // Removed landing_page_views from direct fields - it comes from actions array
+        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
         
         console.log(`Fetching insights for campaign ${campaignId}`);
         
@@ -204,7 +205,16 @@ Deno.serve(async (req) => {
         }
 
         for (const insight of insights) {
-          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}`);
+          // Extract landing_page_views from actions array
+          const actions = insight.actions || [];
+          const landingPageViewAction = actions.find(
+            (a: { action_type: string }) => a.action_type === 'landing_page_view'
+          );
+          const landingPageViews = landingPageViewAction 
+            ? parseInt(landingPageViewAction.value || '0') 
+            : 0;
+
+          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}, lpViews=${landingPageViews}`);
           
           const { error: upsertError } = await supabase
             .from('ad_spend')
@@ -225,7 +235,7 @@ Deno.serve(async (req) => {
               cpc: parseFloat(insight.cpc || '0'),
               cpm: parseFloat(insight.cpm || '0'),
               link_clicks: parseInt(insight.inline_link_clicks || '0'),
-              landing_page_views: parseInt(insight.landing_page_views || '0'),
+              landing_page_views: landingPageViews,
               date: insight.date_start,
             }, { onConflict: 'campaign_id,date' });
 
