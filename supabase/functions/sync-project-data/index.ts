@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       console.log(`Date range: ${since} to ${until}`);
 
       for (const campaignId of project.meta_campaign_ids) {
-        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
+        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,landing_page_views&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
         
         console.log(`Fetching insights for campaign ${campaignId}`);
         
@@ -220,6 +220,12 @@ Deno.serve(async (req) => {
               spend: parseFloat(insight.spend || '0'),
               impressions: parseInt(insight.impressions || '0'),
               clicks: parseInt(insight.clicks || '0'),
+              reach: parseInt(insight.reach || '0'),
+              frequency: parseFloat(insight.frequency || '0'),
+              cpc: parseFloat(insight.cpc || '0'),
+              cpm: parseFloat(insight.cpm || '0'),
+              link_clicks: parseInt(insight.inline_link_clicks || '0'),
+              landing_page_views: parseInt(insight.landing_page_views || '0'),
               date: insight.date_start,
             }, { onConflict: 'campaign_id,date' });
 
