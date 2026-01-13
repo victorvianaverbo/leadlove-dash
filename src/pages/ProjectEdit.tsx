@@ -24,7 +24,8 @@ export default function ProjectEdit() {
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-  const [campaignSearch, setCampaignSearch] = useState("");
+const [campaignSearch, setCampaignSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
 
   // Kiwify credentials
   const [kiwifyClientId, setKiwifyClientId] = useState("");
@@ -70,7 +71,7 @@ export default function ProjectEdit() {
   const metaIntegration = integrations?.find(i => i.type === 'meta_ads' && i.is_active);
 
   // Fetch Kiwify products
-  const { data: kiwifyProducts, isLoading: productsLoading } = useQuery({
+  const { data: kiwifyProducts, isLoading: productsLoading, refetch: refetchProducts, isFetching: productsRefetching } = useQuery({
     queryKey: ['kiwify-products', id],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('kiwify-products', {
@@ -122,12 +123,19 @@ export default function ProjectEdit() {
     }
   }, [kiwifyIntegration, metaIntegration]);
 
-  // Auto-select all products when loaded
-  useEffect(() => {
-    if (kiwifyProducts?.length > 0 && selectedProducts.length === 0) {
-      setSelectedProducts(kiwifyProducts.map((p: { id: string }) => p.id));
-    }
-  }, [kiwifyProducts]);
+  // Filter products by search
+  const filteredProducts = kiwifyProducts?.filter((p: { name: string }) =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase())
+  ) || [];
+
+  const selectAllProducts = () => {
+    const allIds = filteredProducts.map((p: { id: string }) => p.id);
+    setSelectedProducts(prev => [...new Set([...prev, ...allIds])]);
+  };
+
+  const clearProductSelection = () => {
+    setSelectedProducts([]);
+  };
 
   // Save integration mutation
   const saveIntegration = useMutation({
@@ -410,29 +418,77 @@ export default function ProjectEdit() {
             {/* Kiwify Products */}
             {kiwifyIntegration && (
               <div className="pt-4 border-t space-y-4">
-                <div>
-                  <h4 className="font-medium mb-3">Produtos para Monitorar</h4>
-                  {productsLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Carregando produtos...
-                    </div>
-                  ) : kiwifyProducts?.length > 0 ? (
+                {/* Header with refresh button */}
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Produtos para Monitorar</h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      refetchProducts();
+                      toast({ title: "Atualizando produtos..." });
+                    }}
+                    disabled={productsRefetching}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${productsRefetching ? 'animate-spin' : ''}`} />
+                    Atualizar
+                  </Button>
+                </div>
+
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar produtos..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {/* Selection info and quick actions */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedProducts.length} de {kiwifyProducts?.length || 0} selecionados
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={selectAllProducts}>
+                      Selecionar Todos
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearProductSelection}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Products list */}
+                {productsLoading || productsRefetching ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando produtos...
+                  </div>
+                ) : filteredProducts.length > 0 ? (
+                  <ScrollArea className="h-48 rounded-md border p-2">
                     <div className="space-y-2">
-                      {kiwifyProducts.map((product: { id: string; name: string }) => (
-                        <div key={product.id} className="flex items-center gap-2">
+                      {filteredProducts.map((product: { id: string; name: string }) => (
+                        <div 
+                          key={product.id} 
+                          className="flex items-center gap-2 py-2 px-2 rounded-md hover:bg-muted/50"
+                        >
                           <Checkbox
                             checked={selectedProducts.includes(product.id)}
                             onCheckedChange={() => toggleProduct(product.id)}
                           />
-                          <span>{product.name}</span>
+                          <span className="flex-1 truncate text-sm">{product.name}</span>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground">Nenhum produto encontrado</p>
-                  )}
-                </div>
+                  </ScrollArea>
+                ) : kiwifyProducts?.length > 0 ? (
+                  <p className="text-muted-foreground">Nenhum produto encontrado com esse termo</p>
+                ) : (
+                  <p className="text-muted-foreground">Nenhum produto encontrado. Verifique as credenciais.</p>
+                )}
                 
                 {/* Sync Button */}
                 <div className="pt-4 border-t">
