@@ -22,6 +22,7 @@ export type Database = {
           adset_name: string | null
           campaign_id: string
           campaign_name: string | null
+          checkouts_initiated: number | null
           clicks: number
           cpc: number | null
           cpm: number | null
@@ -36,7 +37,9 @@ export type Database = {
           project_id: string
           reach: number | null
           spend: number
+          thruplays: number | null
           user_id: string
+          video_3s_views: number | null
         }
         Insert: {
           ad_id?: string | null
@@ -45,6 +48,7 @@ export type Database = {
           adset_name?: string | null
           campaign_id: string
           campaign_name?: string | null
+          checkouts_initiated?: number | null
           clicks?: number
           cpc?: number | null
           cpm?: number | null
@@ -59,7 +63,9 @@ export type Database = {
           project_id: string
           reach?: number | null
           spend?: number
+          thruplays?: number | null
           user_id: string
+          video_3s_views?: number | null
         }
         Update: {
           ad_id?: string | null
@@ -68,6 +74,7 @@ export type Database = {
           adset_name?: string | null
           campaign_id?: string
           campaign_name?: string | null
+          checkouts_initiated?: number | null
           clicks?: number
           cpc?: number | null
           cpm?: number | null
@@ -82,7 +89,9 @@ export type Database = {
           project_id?: string
           reach?: number | null
           spend?: number
+          thruplays?: number | null
           user_id?: string
+          video_3s_views?: number | null
         }
         Relationships: [
           {

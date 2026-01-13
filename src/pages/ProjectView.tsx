@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle } from 'lucide-react';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
@@ -164,15 +164,25 @@ export default function ProjectView() {
   // Get daily budget from most recent ad spend record (it's the same for all records of a campaign)
   const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
 
+  // New metrics: checkouts, thruplays, video 3s views
+  const totalCheckoutsInitiated = filteredAdSpend?.reduce((sum, a) => sum + (a.checkouts_initiated || 0), 0) || 0;
+  const totalThruplays = filteredAdSpend?.reduce((sum, a) => sum + (a.thruplays || 0), 0) || 0;
+  const totalVideo3sViews = filteredAdSpend?.reduce((sum, a) => sum + (a.video_3s_views || 0), 0) || 0;
+
   // Calculated funnel metrics
   const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
   const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
   const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+  const ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
 
   // Hybrid metrics (Meta + Kiwify)
   const lpViewRate = totalLinkClicks > 0 ? (totalLandingPageViews / totalLinkClicks) * 100 : 0;
   const custoPerVenda = totalSales > 0 ? totalSpend / totalSales : 0;
   const vendaPerLP = totalLandingPageViews > 0 ? (totalSales / totalLandingPageViews) * 100 : 0;
+
+  // New calculated rates
+  const checkoutConversionRate = totalCheckoutsInitiated > 0 ? (totalSales / totalCheckoutsInitiated) * 100 : 0;
+  const creativeEngagementRate = totalVideo3sViews > 0 ? (totalThruplays / totalVideo3sViews) * 100 : 0;
 
   // Group sales by UTM
   const salesByUtm = filteredSales?.reduce((acc, sale) => {
@@ -377,16 +387,63 @@ export default function ProjectView() {
             </Card>
           </div>
 
+          {/* Video/Creative Metrics */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Gancho Inicial (3s)</CardTitle>
+                <Play className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalVideo3sViews.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Visualizações 3s</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">ThruPlays</CardTitle>
+                <Video className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalThruplays.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Retenção completa</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Tx. Engajamento Criativo</CardTitle>
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{creativeEngagementRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">ThruPlays / Gancho 3s</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">CTR</CardTitle>
+                <MousePointer className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{ctr.toFixed(2)}%</div>
+                <p className="text-xs text-muted-foreground">Cliques / Impressões</p>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Middle of Funnel - Consideration */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Cliques</CardTitle>
+                <CardTitle className="text-sm font-medium">Cliques no Link</CardTitle>
                 <MousePointer className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalLinkClicks.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">No link</p>
+                <p className="text-xs text-muted-foreground">Meta Ads</p>
               </CardContent>
             </Card>
 
@@ -425,7 +482,29 @@ export default function ProjectView() {
           </div>
 
           {/* Bottom of Funnel - Conversion (Hybrid) */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Checkouts Iniciados</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalCheckoutsInitiated.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Meta Ads</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Tx. Conv. Checkout</CardTitle>
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{checkoutConversionRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">Vendas / Checkouts</p>
+              </CardContent>
+            </Card>
+
             <Card className="border-green-200 dark:border-green-800">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Vendas</CardTitle>
