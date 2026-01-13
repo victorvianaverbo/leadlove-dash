@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent } from 'lucide-react';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
@@ -155,6 +155,22 @@ export default function ProjectView() {
   const totalSales = filteredSales?.length || 0;
   const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
+  // Funnel metrics from Meta
+  const totalImpressions = filteredAdSpend?.reduce((sum, a) => sum + a.impressions, 0) || 0;
+  const totalReach = filteredAdSpend?.reduce((sum, a) => sum + (a.reach || 0), 0) || 0;
+  const totalLandingPageViews = filteredAdSpend?.reduce((sum, a) => sum + (a.landing_page_views || 0), 0) || 0;
+  const totalLinkClicks = filteredAdSpend?.reduce((sum, a) => sum + (a.link_clicks || 0), 0) || 0;
+
+  // Calculated funnel metrics
+  const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
+  const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+  const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+
+  // Hybrid metrics (Meta + Kiwify)
+  const lpViewRate = totalLinkClicks > 0 ? (totalLandingPageViews / totalLinkClicks) * 100 : 0;
+  const custoPerVenda = totalSales > 0 ? totalSpend / totalSales : 0;
+  const vendaPerLP = totalLandingPageViews > 0 ? (totalSales / totalLandingPageViews) * 100 : 0;
+
   // Group sales by UTM
   const salesByUtm = filteredSales?.reduce((acc, sale) => {
     const key = `${sale.utm_source || 'direto'}|${sale.utm_medium || '-'}|${sale.utm_campaign || '-'}`;
@@ -292,6 +308,143 @@ export default function ProjectView() {
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Funnel Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            🎯 Funil de Mídia
+          </h2>
+          
+          {/* Top of Funnel - Awareness */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Impressões</CardTitle>
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalImpressions.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Meta Ads</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Alcance</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalReach.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Pessoas únicas</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Frequência</CardTitle>
+                <Repeat className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{avgFrequency.toFixed(2)}x</div>
+                <p className="text-xs text-muted-foreground">Média por pessoa</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">CPM</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(avgCPM)}</div>
+                <p className="text-xs text-muted-foreground">Custo por mil</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Middle of Funnel - Consideration */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Cliques</CardTitle>
+                <MousePointer className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalLinkClicks.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">No link</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">CPC</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(avgCPC)}</div>
+                <p className="text-xs text-muted-foreground">Custo por clique</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Views na LP</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalLandingPageViews.toLocaleString('pt-BR')}</div>
+                <p className="text-xs text-muted-foreground">Landing page</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Taxa LP/Clique</CardTitle>
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{lpViewRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground">Conversão do clique</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Bottom of Funnel - Conversion (Hybrid) */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="border-green-200 dark:border-green-800">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Vendas</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{totalSales}</div>
+                <p className="text-xs text-muted-foreground">Kiwify</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200 dark:border-green-800">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Custo por Venda</CardTitle>
+                <DollarSign className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{formatCurrency(custoPerVenda)}</div>
+                <p className="text-xs text-muted-foreground">Meta ÷ Kiwify</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-200 dark:border-green-800">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Taxa Venda/LP</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{vendaPerLP.toFixed(2)}%</div>
+                <p className="text-xs text-muted-foreground">Conversão final</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* UTM Analysis */}
