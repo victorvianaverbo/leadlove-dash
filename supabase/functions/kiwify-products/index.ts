@@ -41,6 +41,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Verify user owns the project before accessing integrations
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', project_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Fetch Kiwify credentials for this project
     const { data: integration, error: integrationError } = await supabase
       .from('integrations')
