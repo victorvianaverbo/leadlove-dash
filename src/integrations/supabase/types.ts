@@ -26,6 +26,7 @@ export type Database = {
           cpc: number | null
           cpm: number | null
           created_at: string
+          daily_budget: number | null
           date: string
           frequency: number | null
           id: string
@@ -48,6 +49,7 @@ export type Database = {
           cpc?: number | null
           cpm?: number | null
           created_at?: string
+          daily_budget?: number | null
           date: string
           frequency?: number | null
           id?: string
@@ -70,6 +72,7 @@ export type Database = {
           cpc?: number | null
           cpm?: number | null
           created_at?: string
+          daily_budget?: number | null
           date?: string
           frequency?: number | null
           id?: string

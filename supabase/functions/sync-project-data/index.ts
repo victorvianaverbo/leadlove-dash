@@ -175,8 +175,24 @@ Deno.serve(async (req) => {
 
       console.log(`Date range: ${since} to ${until}`);
 
+      // Fetch daily_budget for each campaign
+      const campaignBudgets: Record<string, number> = {};
       for (const campaignId of project.meta_campaign_ids) {
-        // Removed landing_page_views from direct fields - it comes from actions array
+        try {
+          const campaignUrl = `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget&access_token=${access_token}`;
+          const campaignResponse = await fetch(campaignUrl);
+          if (campaignResponse.ok) {
+            const campaignData = await campaignResponse.json();
+            // daily_budget comes in cents from Meta API
+            campaignBudgets[campaignId] = campaignData.daily_budget ? parseFloat(campaignData.daily_budget) / 100 : 0;
+            console.log(`Campaign ${campaignId} daily budget: ${campaignBudgets[campaignId]}`);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch budget for campaign ${campaignId}:`, e);
+        }
+      }
+
+      for (const campaignId of project.meta_campaign_ids) {
         const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
         
         console.log(`Fetching insights for campaign ${campaignId}`);
@@ -236,6 +252,7 @@ Deno.serve(async (req) => {
               cpm: parseFloat(insight.cpm || '0'),
               link_clicks: parseInt(insight.inline_link_clicks || '0'),
               landing_page_views: landingPageViews,
+              daily_budget: campaignBudgets[campaignId] || 0,
               date: insight.date_start,
             }, { onConflict: 'campaign_id,date,project_id' });
 
