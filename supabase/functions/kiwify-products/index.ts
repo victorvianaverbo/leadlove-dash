@@ -28,17 +28,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use anon key client to verify the user token
+    // Use getClaims to verify the user token
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+    const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims(token);
     
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message || 'No user found');
+    if (authError || !claimsData?.claims) {
+      console.error('Auth error:', authError?.message || 'No claims found');
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId = claimsData.claims.sub;
 
     const { project_id } = await req.json();
     if (!project_id) {
@@ -53,7 +55,7 @@ Deno.serve(async (req) => {
       .from('projects')
       .select('id')
       .eq('id', project_id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (projectError || !project) {
