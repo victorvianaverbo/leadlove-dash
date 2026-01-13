@@ -183,6 +183,7 @@ export default function ProjectView() {
   // New calculated rates
   const checkoutConversionRate = totalCheckoutsInitiated > 0 ? (totalSales / totalCheckoutsInitiated) * 100 : 0;
   const creativeEngagementRate = totalVideo3sViews > 0 ? (totalThruplays / totalVideo3sViews) * 100 : 0;
+  const custoPerCheckout = totalCheckoutsInitiated > 0 ? totalSpend / totalCheckoutsInitiated : 0;
 
   // Group sales by UTM
   const salesByUtm = filteredSales?.reduce((acc, sale) => {
@@ -482,7 +483,7 @@ export default function ProjectView() {
           </div>
 
           {/* Bottom of Funnel - Conversion (Hybrid) */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Checkouts Iniciados</CardTitle>
@@ -491,6 +492,17 @@ export default function ProjectView() {
               <CardContent>
                 <div className="text-2xl font-bold">{totalCheckoutsInitiated.toLocaleString('pt-BR')}</div>
                 <p className="text-xs text-muted-foreground">Meta Ads</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Custo p/ Checkout</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(custoPerCheckout)}</div>
+                <p className="text-xs text-muted-foreground">Gasto ÷ Checkouts</p>
               </CardContent>
             </Card>
 
