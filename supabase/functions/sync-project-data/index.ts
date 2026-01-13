@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
       }
 
       for (const campaignId of project.meta_campaign_ids) {
-        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
+        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions,video_thruplay_watched_actions,video_p25_watched_actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
         
         console.log(`Fetching insights for campaign ${campaignId}`);
         
@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
         }
 
         for (const insight of insights) {
-          // Extract landing_page_views from actions array
+          // Extract metrics from actions array
           const actions = insight.actions || [];
           const landingPageViewAction = actions.find(
             (a: { action_type: string }) => a.action_type === 'landing_page_view'
@@ -230,7 +230,33 @@ Deno.serve(async (req) => {
             ? parseInt(landingPageViewAction.value || '0') 
             : 0;
 
-          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}, lpViews=${landingPageViews}`);
+          // Extract initiate_checkout from actions
+          const initiateCheckoutAction = actions.find(
+            (a: { action_type: string }) => a.action_type === 'initiate_checkout'
+          );
+          const checkoutsInitiated = initiateCheckoutAction 
+            ? parseInt(initiateCheckoutAction.value || '0') 
+            : 0;
+
+          // Extract ThruPlays from video_thruplay_watched_actions
+          const thruplayActions = insight.video_thruplay_watched_actions || [];
+          const thruplayAction = thruplayActions.find(
+            (a: { action_type: string }) => a.action_type === 'video_view'
+          );
+          const thruplays = thruplayAction 
+            ? parseInt(thruplayAction.value || '0') 
+            : 0;
+
+          // Extract 3-second video views from video_p25_watched_actions (approximation for hook)
+          const video3sActions = insight.video_p25_watched_actions || [];
+          const video3sAction = video3sActions.find(
+            (a: { action_type: string }) => a.action_type === 'video_view'
+          );
+          const video3sViews = video3sAction 
+            ? parseInt(video3sAction.value || '0') 
+            : 0;
+
+          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}, lpViews=${landingPageViews}, checkouts=${checkoutsInitiated}, thruplays=${thruplays}, 3s=${video3sViews}`);
           
           const { error: upsertError } = await supabase
             .from('ad_spend')
@@ -253,6 +279,9 @@ Deno.serve(async (req) => {
               link_clicks: parseInt(insight.inline_link_clicks || '0'),
               landing_page_views: landingPageViews,
               daily_budget: campaignBudgets[campaignId] || 0,
+              checkouts_initiated: checkoutsInitiated,
+              thruplays: thruplays,
+              video_3s_views: video3sViews,
               date: insight.date_start,
             }, { onConflict: 'campaign_id,date,project_id' });
 
