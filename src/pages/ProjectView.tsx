@@ -29,10 +29,27 @@ export default function ProjectView() {
 
   // Editable project settings
   const [investmentValue, setInvestmentValue] = useState<number>(0);
+  const [investmentDisplay, setInvestmentDisplay] = useState<string>('R$ 0,00');
   const [classDate, setClassDate] = useState<Date | undefined>(undefined);
   const [campaignObjective, setCampaignObjective] = useState<string>('sales');
   const [accountStatus, setAccountStatus] = useState<string>('active');
   const [adType, setAdType] = useState<string>('flex');
+
+  // Currency formatting helpers
+  const formatCurrencyInput = (value: number): string => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const parseCurrencyInput = (value: string): number => {
+    const cleanValue = value
+      .replace(/[R$\s]/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.');
+    return parseFloat(cleanValue) || 0;
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,7 +74,9 @@ export default function ProjectView() {
   // Sync editable fields when project data loads
   useEffect(() => {
     if (project) {
-      setInvestmentValue(Number(project.investment_value) || 0);
+      const value = Number(project.investment_value) || 0;
+      setInvestmentValue(value);
+      setInvestmentDisplay(formatCurrencyInput(value));
       setClassDate(project.class_date ? new Date(project.class_date) : undefined);
       setCampaignObjective(project.campaign_objective || 'sales');
       setAccountStatus(project.account_status || 'active');
@@ -349,10 +368,15 @@ export default function ProjectView() {
                 <Label htmlFor="investment">Investimento</Label>
                 <Input
                   id="investment"
-                  type="number"
+                  type="text"
                   placeholder="R$ 0,00"
-                  value={investmentValue || ''}
-                  onChange={(e) => setInvestmentValue(Number(e.target.value))}
+                  value={investmentDisplay}
+                  onChange={(e) => {
+                    const numericValue = parseCurrencyInput(e.target.value);
+                    setInvestmentValue(numericValue);
+                    setInvestmentDisplay(formatCurrencyInput(numericValue));
+                  }}
+                  onFocus={(e) => e.target.select()}
                 />
               </div>
 
