@@ -25,7 +25,8 @@ export default function ProjectEdit() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
 const [campaignSearch, setCampaignSearch] = useState("");
-  const [productSearch, setProductSearch] = useState("");
+const [productSearch, setProductSearch] = useState("");
+  const [manualProductIds, setManualProductIds] = useState("");
 
   // Kiwify credentials
   const [kiwifyClientId, setKiwifyClientId] = useState("");
@@ -191,15 +192,25 @@ const [campaignSearch, setCampaignSearch] = useState("");
     },
   });
 
+  // Combine selected products with manual IDs
+  const getAllProductIds = () => {
+    const manualIds = manualProductIds
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+    return [...new Set([...selectedProducts, ...manualIds])];
+  };
+
   // Update project mutation
   const updateProject = useMutation({
     mutationFn: async () => {
+      const allProductIds = getAllProductIds();
       const { error } = await supabase
         .from('projects')
         .update({
           name,
           description,
-          kiwify_product_ids: selectedProducts,
+          kiwify_product_ids: allProductIds,
           meta_campaign_ids: selectedCampaigns,
         })
         .eq('id', id);
@@ -487,8 +498,27 @@ const [campaignSearch, setCampaignSearch] = useState("");
                 ) : kiwifyProducts?.length > 0 ? (
                   <p className="text-muted-foreground">Nenhum produto encontrado com esse termo</p>
                 ) : (
-                  <p className="text-muted-foreground">Nenhum produto encontrado. Verifique as credenciais.</p>
+                  <p className="text-muted-foreground text-sm">Nenhum produto encontrado na API.</p>
                 )}
+                
+                {/* Manual Product IDs */}
+                <div className="pt-4 border-t space-y-2">
+                  <h4 className="font-medium text-sm">Adicionar Produtos Manualmente</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Se seus produtos não aparecem na lista acima, cole os IDs separados por vírgula. 
+                    Encontre o ID na URL ao editar um produto no painel Kiwify.
+                  </p>
+                  <Input
+                    placeholder="Ex: abc123, def456, ghi789"
+                    value={manualProductIds}
+                    onChange={(e) => setManualProductIds(e.target.value)}
+                  />
+                  {manualProductIds && (
+                    <p className="text-xs text-muted-foreground">
+                      {manualProductIds.split(',').filter(id => id.trim()).length} ID(s) manual(is) adicionado(s)
+                    </p>
+                  )}
+                </div>
                 
                 {/* Sync Button */}
                 <div className="pt-4 border-t">
