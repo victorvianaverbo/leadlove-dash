@@ -2,95 +2,115 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* 
+ * MetrikaPRO Design System
+ * Paleta de cores roxa vibrante com tipografia Poppins
+ * Todas as cores em formato HSL
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    /* Cores Primárias - Roxo MetrikaPRO */
+    --primary: 262 83% 58%;           /* #8B5CF6 - Purple 600 */
+    --primary-foreground: 0 0% 100%;  /* Branco */
+    
+    /* Variações de Roxo */
+    --primary-dark: 262 83% 45%;      /* #6D28D9 - Purple 900 */
+    --primary-light: 262 83% 74%;     /* #A78BFA - Purple 500 */
+    --primary-muted: 262 83% 95%;     /* #EDE9FE - Purple 100 */
+    --primary-soft: 262 83% 97%;      /* #F5F3FF - Purple 50 */
+    
+    /* Cores Neutras */
+    --background: 220 14% 98%;        /* #F9FAFB - Gray 50 */
+    --foreground: 220 43% 11%;        /* #111827 - Gray 900 */
+    
+    --card: 0 0% 100%;                /* Branco */
+    --card-foreground: 220 43% 11%;   /* #111827 */
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
+    --popover-foreground: 220 43% 11%;
+    
+    /* Secundárias */
+    --secondary: 220 14% 96%;         /* #F3F4F6 - Gray 100 */
+    --secondary-foreground: 220 43% 11%;
+    
+    /* Muted */
+    --muted: 220 14% 96%;             /* #F3F4F6 */
+    --muted-foreground: 220 9% 46%;   /* #6B7280 - Gray 500 */
+    
+    /* Accent */
+    --accent: 262 83% 97%;            /* Purple 50 como accent */
+    --accent-foreground: 262 83% 45%; /* Purple 900 */
+    
+    /* Semânticas */
+    --destructive: 0 84% 60%;         /* #EF4444 - Error Red */
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 160 84% 39%;           /* #10B981 - Success Green */
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;            /* #F59E0B - Warning Yellow */
+    --warning-foreground: 0 0% 100%;
+    
+    --info: 217 91% 60%;              /* #3B82F6 - Info Blue */
+    --info-foreground: 0 0% 100%;
+    
+    /* Bordas e Inputs */
+    --border: 220 13% 91%;            /* #D1D5DB - Gray 300 */
+    --input: 220 13% 91%;
+    --ring: 262 83% 58%;              /* Roxo para focus ring */
+    
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
+    
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 9% 46%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 83% 97%;
+    --sidebar-accent-foreground: 262 83% 45%;
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Dark mode com tema roxo */
+    --background: 222 47% 7%;         /* Roxo muito escuro */
     --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
+    
+    --card: 222 47% 11%;
     --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
+    
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
+    
+    --primary: 262 83% 68%;           /* Roxo mais claro no dark */
+    --primary-foreground: 222 47% 11%;
+    
+    --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 262 50% 20%;
     --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
+    
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 262 83% 68%;
+    
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 262 83% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 262 50% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 262 83% 68%;
   }
 }
 
@@ -100,6 +120,91 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Animações MetrikaPRO */
+@layer utilities {
+  /* Fade In */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Slide Up */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Scale In */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out forwards;
+  }
+  
+  /* Hover Lift Effect */
+  .hover-lift {
+    @apply transition-all duration-200;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-1;
+    box-shadow: 0 8px 24px hsl(262 83% 58% / 0.15);
+  }
+  
+  /* Card Hover */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+  
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+  
+  /* Primary Shadow */
+  .shadow-primary-glow {
+    box-shadow: 0 8px 16px hsl(262 83% 58% / 0.3);
+  }
+  
+  /* Gradient Background for Hero */
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(262 83% 45%) 100%);
+  }
+  
+  /* Soft gradient background */
+  .bg-gradient-soft {
+    background: linear-gradient(180deg, hsl(262 83% 97%) 0%, hsl(0 0% 100%) 100%);
   }
 }

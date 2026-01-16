@@ -365,7 +365,7 @@ export default function ProjectView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+      <header className="border-b bg-card shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" asChild>
@@ -575,11 +575,14 @@ export default function ProjectView() {
         </Card>
 
 
+        {/* Main KPI Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
-          <Card>
+          <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Orçamento Diário</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
+              <div className="w-8 h-8 bg-primary-soft rounded-lg flex items-center justify-center">
+                <Wallet className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(dailyBudget)}</div>
@@ -587,52 +590,60 @@ export default function ProjectView() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-success">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Faturamento</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-success" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(totalRevenue)}</div>
+              <div className="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</div>
               <p className="text-xs text-muted-foreground">
                 {totalSales} vendas
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-destructive">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Gasto em Ads</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
+                <Target className="h-4 w-4 text-destructive" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-500">{formatCurrency(totalSpend)}</div>
+              <div className="text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
               <p className="text-xs text-muted-foreground">
                 {totalClicks} cliques
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className={`border-l-4 ${roas >= 1 ? 'border-l-success' : 'border-l-destructive'}`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">ROAS</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div className={`w-8 h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
+                <TrendingUp className={`h-4 w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{roas.toFixed(2)}x</div>
+              <div className={`text-2xl font-bold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>{roas.toFixed(2)}x</div>
               <p className="text-xs text-muted-foreground">
                 Retorno sobre gasto
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-info">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">CPA</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center">
+                <ShoppingCart className="h-4 w-4 text-info" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-info">
                 {totalSales > 0 ? formatCurrency(totalSpend / totalSales) : 'R$ 0,00'}
               </div>
               <p className="text-xs text-muted-foreground">
