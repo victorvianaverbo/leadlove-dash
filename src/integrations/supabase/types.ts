@@ -181,10 +181,12 @@ export type Database = {
           description: string | null
           id: string
           investment_value: number | null
+          is_public: boolean | null
           kiwify_product_ids: string[] | null
           last_sync_at: string | null
           meta_campaign_ids: string[] | null
           name: string
+          share_token: string | null
           updated_at: string
           user_id: string
         }
@@ -197,10 +199,12 @@ export type Database = {
           description?: string | null
           id?: string
           investment_value?: number | null
+          is_public?: boolean | null
           kiwify_product_ids?: string[] | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name: string
+          share_token?: string | null
           updated_at?: string
           user_id: string
         }
@@ -213,10 +217,12 @@ export type Database = {
           description?: string | null
           id?: string
           investment_value?: number | null
+          is_public?: boolean | null
           kiwify_product_ids?: string[] | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name?: string
+          share_token?: string | null
           updated_at?: string
           user_id?: string
         }
