@@ -121,10 +121,38 @@ Deno.serve(async (req) => {
     }
 
     const productsData = await productsResponse.json();
+    
+    // LOGS DETALHADOS PARA DEBUG
+    console.log('=== KIWIFY DEBUG ===');
+    console.log('Account ID usado:', account_id);
+    console.log('Response status:', productsResponse.status);
+    console.log('Full response data:', JSON.stringify(productsData));
+    console.log('Response keys:', Object.keys(productsData));
+    if (productsData.data) {
+      console.log('productsData.data length:', productsData.data.length);
+    }
+    if (productsData.products) {
+      console.log('productsData.products length:', productsData.products.length);
+    }
+    console.log('=== END DEBUG ===');
+    
     console.log('Fetched Kiwify products for project:', project_id);
 
+    // Tentar diferentes estruturas de resposta
+    const products = productsData.data 
+      || productsData.products 
+      || (Array.isArray(productsData) ? productsData : []);
+
     return new Response(
-      JSON.stringify({ products: productsData.data || [] }),
+      JSON.stringify({ 
+        products,
+        debug: {
+          keys: Object.keys(productsData),
+          hasData: !!productsData.data,
+          hasProducts: !!productsData.products,
+          isArray: Array.isArray(productsData)
+        }
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
