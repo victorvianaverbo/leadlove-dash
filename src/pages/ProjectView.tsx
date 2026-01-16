@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,9 @@ export default function ProjectView() {
   const [campaignObjective, setCampaignObjective] = useState<string>('sales');
   const [accountStatus, setAccountStatus] = useState<string>('active');
   const [adType, setAdType] = useState<string>('flex');
+  const [isPublic, setIsPublic] = useState<boolean>(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Currency formatting helpers
   const formatCurrencyInput = (value: number): string => {
@@ -81,6 +84,8 @@ export default function ProjectView() {
       setCampaignObjective(project.campaign_objective || 'sales');
       setAccountStatus(project.account_status || 'active');
       setAdType(project.ad_type || 'flex');
+      setIsPublic((project as any).is_public || false);
+      setShareToken((project as any).share_token || null);
     }
   }, [project]);
 
@@ -226,6 +231,40 @@ export default function ProjectView() {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
     },
   });
+
+  // Mutation to toggle public sharing
+  const togglePublicSharing = useMutation({
+    mutationFn: async (newIsPublic: boolean) => {
+      const { error } = await supabase
+        .from('projects')
+        .update({ is_public: newIsPublic } as any)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_, newIsPublic) => {
+      setIsPublic(newIsPublic);
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast({ 
+        title: newIsPublic ? 'Link público ativado!' : 'Link público desativado!',
+        description: newIsPublic ? 'O cliente pode acessar o dashboard pelo link.' : 'O link de compartilhamento foi desativado.'
+      });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const getPublicUrl = () => {
+    if (!shareToken) return '';
+    return `${window.location.origin}/public/dashboard/${shareToken}`;
+  };
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(getPublicUrl());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: 'Link copiado!', description: 'O link foi copiado para a área de transferência.' });
+  };
 
   const filteredSales = sales?.filter(s => 
     !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
@@ -468,7 +507,55 @@ export default function ProjectView() {
           </CardContent>
         </Card>
 
-        {/* Metrics Cards */}
+        {/* Share Dashboard Card */}
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Compartilhar Dashboard</CardTitle>
+            </div>
+            <CardDescription>Gere um link para o cliente visualizar o dashboard sem login</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center gap-3">
+                <Label htmlFor="public-toggle" className="text-sm">Link público</Label>
+                <Button
+                  id="public-toggle"
+                  variant={isPublic ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => togglePublicSharing.mutate(!isPublic)}
+                  disabled={togglePublicSharing.isPending}
+                >
+                  {togglePublicSharing.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isPublic ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Ativado
+                    </>
+                  ) : (
+                    'Ativar'
+                  )}
+                </Button>
+              </div>
+              
+              {isPublic && shareToken && (
+                <div className="flex-1 flex gap-2 w-full sm:w-auto">
+                  <div className="flex-1 flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
+                    <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm truncate">{getPublicUrl()}</span>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={copyShareLink}>
+                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
