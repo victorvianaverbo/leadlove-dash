@@ -7,8 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
@@ -19,6 +26,13 @@ export default function ProjectView() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
+
+  // Editable project settings
+  const [investmentValue, setInvestmentValue] = useState<number>(0);
+  const [classDate, setClassDate] = useState<Date | undefined>(undefined);
+  const [campaignObjective, setCampaignObjective] = useState<string>('sales');
+  const [accountStatus, setAccountStatus] = useState<string>('active');
+  const [adType, setAdType] = useState<string>('flex');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -39,6 +53,17 @@ export default function ProjectView() {
     },
     enabled: !!user && !!id,
   });
+
+  // Sync editable fields when project data loads
+  useEffect(() => {
+    if (project) {
+      setInvestmentValue(Number(project.investment_value) || 0);
+      setClassDate(project.class_date ? new Date(project.class_date) : undefined);
+      setCampaignObjective(project.campaign_objective || 'sales');
+      setAccountStatus(project.account_status || 'active');
+      setAdType(project.ad_type || 'flex');
+    }
+  }, [project]);
 
   const getDateFilter = () => {
     const now = new Date();
@@ -159,7 +184,30 @@ export default function ProjectView() {
     },
   });
 
-  // Filter sales by selected products (from project settings)
+  // Mutation to save project settings
+  const updateProjectSettings = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          investment_value: investmentValue,
+          class_date: classDate?.toISOString() || null,
+          campaign_objective: campaignObjective,
+          account_status: accountStatus,
+          ad_type: adType
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast({ title: 'Configurações salvas!', description: 'As configurações do projeto foram atualizadas.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const filteredSales = sales?.filter(s => 
     !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
   );
@@ -288,6 +336,114 @@ export default function ProjectView() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Project Settings - Editable Fields */}
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Configurações do Projeto</CardTitle>
+            <CardDescription>Defina os parâmetros de acompanhamento do cliente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+              {/* Investimento */}
+              <div className="space-y-2">
+                <Label htmlFor="investment">Investimento</Label>
+                <Input
+                  id="investment"
+                  type="number"
+                  placeholder="R$ 0,00"
+                  value={investmentValue || ''}
+                  onChange={(e) => setInvestmentValue(Number(e.target.value))}
+                />
+              </div>
+
+              {/* Data da Aula */}
+              <div className="space-y-2">
+                <Label>Data da Aula</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !classDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {classDate ? format(classDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={classDate}
+                      onSelect={setClassDate}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Objetivo */}
+              <div className="space-y-2">
+                <Label>Objetivo</Label>
+                <Select value={campaignObjective} onValueChange={setCampaignObjective}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sales">Vendas</SelectItem>
+                    <SelectItem value="leads">Leads</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={accountStatus} onValueChange={setAccountStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="inactive">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tipo de Anúncio */}
+              <div className="space-y-2">
+                <Label>Anúncio</Label>
+                <Select value={adType} onValueChange={setAdType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="flex">Flex</SelectItem>
+                    <SelectItem value="image">Imagem</SelectItem>
+                    <SelectItem value="video">Vídeo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Botão Salvar */}
+              <Button 
+                onClick={() => updateProjectSettings.mutate()} 
+                disabled={updateProjectSettings.isPending}
+                className="w-full"
+              >
+                {updateProjectSettings.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Salvar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Metrics Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
           <Card>

@@ -173,9 +173,14 @@ export type Database = {
       }
       projects: {
         Row: {
+          account_status: string | null
+          ad_type: string | null
+          campaign_objective: string | null
+          class_date: string | null
           created_at: string
           description: string | null
           id: string
+          investment_value: number | null
           kiwify_product_ids: string[] | null
           last_sync_at: string | null
           meta_campaign_ids: string[] | null
@@ -184,9 +189,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_status?: string | null
+          ad_type?: string | null
+          campaign_objective?: string | null
+          class_date?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          investment_value?: number | null
           kiwify_product_ids?: string[] | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
@@ -195,9 +205,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_status?: string | null
+          ad_type?: string | null
+          campaign_objective?: string | null
+          class_date?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          investment_value?: number | null
           kiwify_product_ids?: string[] | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
