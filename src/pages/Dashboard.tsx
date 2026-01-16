@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target } from "lucide-react";
+import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { 
@@ -68,8 +68,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -81,14 +81,17 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Gerencie seus projetos e métricas</p>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-primary rounded-xl shadow-primary">
+              <BarChart3 className="h-5 w-5 text-white" />
+            </div>
+            <span className="font-bold text-xl">MetrikaPRO</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button onClick={() => navigate('/projects/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Projeto
@@ -99,20 +102,30 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Gerencie seus projetos e métricas</p>
+        </div>
 
         {/* Projects */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Seus Projetos</h2>
+          <h2 className="text-xl font-semibold mb-6">Seus Projetos</h2>
           {projectsLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Carregando projetos...
             </div>
           ) : projects?.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">Você ainda não tem projetos</p>
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <div className="w-16 h-16 bg-primary-soft rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FolderOpen className="h-8 w-8 text-primary" />
+                </div>
+                <p className="text-muted-foreground mb-6">Você ainda não tem projetos</p>
                 <Button onClick={() => navigate('/projects/new')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeiro Projeto
@@ -120,44 +133,45 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {projects?.map((project) => {
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {projects?.map((project, index) => {
                 const { revenue, spend, roas } = getProjectMetrics(project.id);
                 return (
                   <Card
                     key={project.id}
-                    className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all"
+                    className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group"
                     onClick={() => navigate(`/projects/${project.id}`)}
+                    style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="text-center p-2 rounded-lg bg-muted/50">
-                          <div className="flex items-center justify-center mb-1">
-                            <DollarSign className="h-3 w-3 text-green-600" />
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
+                          <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+                            <DollarSign className="h-4 w-4 text-success" />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Faturamento</p>
-                          <p className="text-sm font-semibold text-green-600">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Faturamento</p>
+                          <p className="text-sm font-bold text-success mt-1">
                             R$ {formatCurrency(revenue)}
                           </p>
                         </div>
-                        <div className="text-center p-2 rounded-lg bg-muted/50">
-                          <div className="flex items-center justify-center mb-1">
-                            <Target className="h-3 w-3 text-blue-600" />
+                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
+                          <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center mx-auto mb-2">
+                            <Target className="h-4 w-4 text-info" />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Investimento</p>
-                          <p className="text-sm font-semibold text-blue-600">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Investimento</p>
+                          <p className="text-sm font-bold text-info mt-1">
                             R$ {formatCurrency(spend)}
                           </p>
                         </div>
-                        <div className="text-center p-2 rounded-lg bg-muted/50">
-                          <div className="flex items-center justify-center mb-1">
-                            <TrendingUp className={`h-3 w-3 ${roas >= 1 ? 'text-green-600' : 'text-red-500'}`} />
+                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
+                          <div className={`w-8 h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center mx-auto mb-2`}>
+                            <TrendingUp className={`h-4 w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">ROAS</p>
-                          <p className={`text-sm font-bold ${roas >= 1 ? 'text-green-600' : 'text-red-500'}`}>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">ROAS</p>
+                          <p className={`text-sm font-bold mt-1 ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
                             {roas.toFixed(2)}x
                           </p>
                         </div>
@@ -169,7 +183,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
