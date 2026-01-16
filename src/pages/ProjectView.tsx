@@ -40,7 +40,7 @@ export default function ProjectView() {
   const [copied, setCopied] = useState(false);
 
   // Custom domain - use your published domain
-  const PUBLIC_DOMAIN = 'https://leadlove-dash.lovable.app';
+  const PUBLIC_DOMAIN = 'https://metrikapro.com.br';
 
   // Generate slug from project name
   const generateSlug = (name: string): string => {
