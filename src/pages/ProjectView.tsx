@@ -36,7 +36,21 @@ export default function ProjectView() {
   const [adType, setAdType] = useState<string>('flex');
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [projectSlug, setProjectSlug] = useState<string>('');
   const [copied, setCopied] = useState(false);
+
+  // Custom domain - use your published domain
+  const PUBLIC_DOMAIN = 'https://leadlove-dash.lovable.app';
+
+  // Generate slug from project name
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9]+/g, '-')     // Replace special chars with dash
+      .replace(/^-+|-+$/g, '');        // Remove leading/trailing dashes
+  };
 
   // Currency formatting helpers
   const formatCurrencyInput = (value: number): string => {
@@ -86,6 +100,7 @@ export default function ProjectView() {
       setAdType(project.ad_type || 'flex');
       setIsPublic((project as any).is_public || false);
       setShareToken((project as any).share_token || null);
+      setProjectSlug((project as any).slug || generateSlug(project.name));
     }
   }, [project]);
 
@@ -235,14 +250,18 @@ export default function ProjectView() {
   // Mutation to toggle public sharing
   const togglePublicSharing = useMutation({
     mutationFn: async (newIsPublic: boolean) => {
+      // Generate slug if enabling and no slug exists
+      const slug = projectSlug || generateSlug(project?.name || '');
       const { error } = await supabase
         .from('projects')
-        .update({ is_public: newIsPublic } as any)
+        .update({ is_public: newIsPublic, slug } as any)
         .eq('id', id);
       if (error) throw error;
+      return slug;
     },
-    onSuccess: (_, newIsPublic) => {
+    onSuccess: (slug, newIsPublic) => {
       setIsPublic(newIsPublic);
+      setProjectSlug(slug);
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       toast({ 
         title: newIsPublic ? 'Link público ativado!' : 'Link público desativado!',
@@ -255,8 +274,8 @@ export default function ProjectView() {
   });
 
   const getPublicUrl = () => {
-    if (!shareToken) return '';
-    return `${window.location.origin}/public/dashboard/${shareToken}`;
+    if (!projectSlug) return '';
+    return `${PUBLIC_DOMAIN}/${projectSlug}`;
   };
 
   const copyShareLink = () => {
@@ -540,7 +559,7 @@ export default function ProjectView() {
                 </Button>
               </div>
               
-              {isPublic && shareToken && (
+              {isPublic && projectSlug && (
                 <div className="flex-1 flex gap-2 w-full sm:w-auto">
                   <div className="flex-1 flex items-center gap-2 bg-muted px-3 py-2 rounded-md">
                     <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />

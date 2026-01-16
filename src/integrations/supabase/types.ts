@@ -187,6 +187,7 @@ export type Database = {
           meta_campaign_ids: string[] | null
           name: string
           share_token: string | null
+          slug: string | null
           updated_at: string
           user_id: string
         }
@@ -205,6 +206,7 @@ export type Database = {
           meta_campaign_ids?: string[] | null
           name: string
           share_token?: string | null
+          slug?: string | null
           updated_at?: string
           user_id: string
         }
@@ -223,6 +225,7 @@ export type Database = {
           meta_campaign_ids?: string[] | null
           name?: string
           share_token?: string | null
+          slug?: string | null
           updated_at?: string
           user_id?: string
         }

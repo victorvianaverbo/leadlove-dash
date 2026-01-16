@@ -31,9 +31,10 @@ const App = () => (
             <Route path="/projects/new" element={<ProjectNew />} />
             <Route path="/projects/:id" element={<ProjectView />} />
             <Route path="/projects/:id/edit" element={<ProjectEdit />} />
-            <Route path="/public/dashboard/:token" element={<PublicDashboard />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            {/* Public dashboard route - must be last to avoid conflicts */}
+            <Route path="/:slug" element={<PublicDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
