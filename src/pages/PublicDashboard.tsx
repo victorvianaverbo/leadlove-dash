@@ -10,23 +10,23 @@ import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repe
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
 export default function PublicDashboard() {
-  const { token } = useParams<{ token: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
 
-  // Fetch project by share token (no auth required)
+  // Fetch project by slug (no auth required)
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
-    queryKey: ['public-project', token],
+    queryKey: ['public-project', slug],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('share_token', token)
+        .eq('slug', slug)
         .eq('is_public', true)
         .single();
       if (error) throw error;
       return data;
     },
-    enabled: !!token,
+    enabled: !!slug,
   });
 
   const getDateFilter = () => {
