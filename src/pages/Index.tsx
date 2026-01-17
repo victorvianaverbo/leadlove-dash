@@ -9,28 +9,28 @@ const plans = [
     name: 'Starter',
     price: 97,
     projects: '1 projeto',
-    features: ['Integração Kiwify', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte por email'],
+    features: ['Kiwify, Hotmart, Guru, Eduzz', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte por email'],
     popular: false,
   },
   {
     name: 'Pro',
     price: 197,
     projects: '5 projetos',
-    features: ['Integração Kiwify', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário'],
+    features: ['Kiwify, Hotmart, Guru, Eduzz', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário'],
     popular: true,
   },
   {
     name: 'Business',
     price: 397,
     projects: '10 projetos',
-    features: ['Integração Kiwify', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário', 'Relatórios avançados'],
+    features: ['Kiwify, Hotmart, Guru, Eduzz', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário', 'Relatórios avançados'],
     popular: false,
   },
   {
     name: 'Agência',
     price: 997,
     projects: 'Projetos ilimitados',
-    features: ['Integração Kiwify', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário', 'Relatórios avançados', 'White-label'],
+    features: ['Kiwify, Hotmart, Guru, Eduzz', 'Integração Meta Ads', 'Cálculo de ROAS/CPA', 'Dashboard compartilhável', 'Suporte prioritário', 'Relatórios avançados', 'White-label'],
     popular: false,
   },
 ];
@@ -69,14 +69,14 @@ export default function Index() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-primary py-20 md:py-32">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-fade-in">
+      <section className="bg-gradient-primary glow-overlay py-20 md:py-32 overflow-hidden">
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-fade-in drop-shadow-lg">
             Dashboard de Vendas para<br />Infoprodutores
           </h1>
-          <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
-            Acompanhe vendas da Kiwify, gastos do Meta Ads e calcule seu ROAS em tempo real. 
-            Tenha controle total do seu negócio digital.
+          <p className="text-lg md:text-xl text-white/90 mb-10 max-w-2xl mx-auto animate-fade-in drop-shadow-sm" style={{ animationDelay: '0.1s' }}>
+            Acompanhe vendas de Kiwify, Hotmart, Guru e Eduzz em um só lugar. 
+            Integre com Meta Ads e tenha ROAS em tempo real.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <Button size="lg" className="bg-white text-primary hover:bg-white/90 hover:text-primary-dark shadow-xl" asChild>
@@ -85,6 +85,17 @@ export default function Index() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
+          </div>
+          
+          {/* Platform Logos */}
+          <div className="flex items-center justify-center gap-4 mt-12 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <span className="text-white/70 text-sm">Integra com:</span>
+            <div className="flex gap-3 text-white font-medium text-sm">
+              <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full">Kiwify</span>
+              <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full">Hotmart</span>
+              <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full">Guru</span>
+              <span className="px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full">Eduzz</span>
+            </div>
           </div>
         </div>
       </section>
