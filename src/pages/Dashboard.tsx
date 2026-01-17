@@ -1,12 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle, Crown, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
+import { STRIPE_PLANS } from "@/lib/stripe-plans";
+import { toast } from "@/hooks/use-toast";
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { 
@@ -17,7 +20,8 @@ const formatCurrency = (value: number) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, subscribed, subscriptionTier, subscriptionEnd, subscriptionLoading } = useAuth();
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -67,6 +71,26 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Portal error:', error);
+      toast({
+        title: 'Erro ao abrir portal',
+        description: 'Tente novamente em alguns instantes.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -81,6 +105,10 @@ export default function Dashboard() {
     return { ...metrics, roas };
   };
 
+  const currentPlan = subscriptionTier ? STRIPE_PLANS[subscriptionTier] : null;
+  const projectLimit = currentPlan?.projects ?? 0;
+  const canCreateProject = projectLimit === -1 || (projects?.length ?? 0) < projectLimit;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -91,6 +119,15 @@ export default function Dashboard() {
               <BarChart3 className="h-5 w-5 text-white" />
             </div>
             <span className="font-bold text-xl">MetrikaPRO</span>
+            {subscribed && currentPlan && (
+              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+                <Crown className="h-3 w-3" />
+                {currentPlan.name}
+              </Badge>
+            )}
+            {subscriptionLoading && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-2" />
+            )}
           </div>
           <div className="flex gap-3">
             <Button variant="ghost" size="icon" asChild title="Documentação">
@@ -98,10 +135,29 @@ export default function Dashboard() {
                 <HelpCircle className="h-5 w-5" />
               </Link>
             </Button>
-            <Button onClick={() => navigate('/projects/new')}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Projeto
-            </Button>
+            {subscribed && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+              >
+                {portalLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Gerenciar Assinatura
+                  </>
+                )}
+              </Button>
+            )}
+            {subscribed && canCreateProject && (
+              <Button onClick={() => navigate('/projects/new')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Projeto
+              </Button>
+            )}
             <Button variant="outline" onClick={signOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sair
@@ -117,6 +173,50 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Gerencie seus projetos e métricas</p>
         </div>
 
+        {/* Subscription Info */}
+        {!subscribed && !subscriptionLoading && (
+          <Card className="mb-8 border-primary/50 bg-primary/5">
+            <CardContent className="py-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">Você ainda não tem uma assinatura ativa</h3>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Escolha um plano para começar a criar projetos e acompanhar suas métricas.
+                  </p>
+                </div>
+                <Button asChild>
+                  <Link to="/#pricing">Ver Planos</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {subscribed && currentPlan && (
+          <Card className="mb-8 border-success/30 bg-success/5">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
+                    <Crown className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Plano {currentPlan.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {projectLimit === -1 
+                        ? 'Projetos ilimitados' 
+                        : `${projects?.length ?? 0} de ${projectLimit} projetos`}
+                      {subscriptionEnd && (
+                        <> • Renova em {new Date(subscriptionEnd).toLocaleDateString('pt-BR')}</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Projects */}
         <div>
           <h2 className="text-xl font-semibold mb-6">Seus Projetos</h2>
@@ -125,6 +225,18 @@ export default function Dashboard() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Carregando projetos...
             </div>
+          ) : !subscribed ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <div className="w-16 h-16 bg-primary-soft rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FolderOpen className="h-8 w-8 text-primary" />
+                </div>
+                <p className="text-muted-foreground mb-6">Assine um plano para criar projetos</p>
+                <Button asChild>
+                  <Link to="/#pricing">Ver Planos</Link>
+                </Button>
+              </CardContent>
+            </Card>
           ) : projects?.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center">
