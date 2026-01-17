@@ -10,15 +10,15 @@
 
 @layer base {
   :root {
-    /* Cores Primárias - Roxo MetrikaPRO */
-    --primary: 262 83% 58%;           /* #8B5CF6 - Purple 600 */
+    /* Cores Primárias - Lilás Suave MetrikaPRO */
+    --primary: 270 60% 62%;           /* Lilás suave principal */
     --primary-foreground: 0 0% 100%;  /* Branco */
     
-    /* Variações de Roxo */
-    --primary-dark: 262 83% 45%;      /* #6D28D9 - Purple 900 */
-    --primary-light: 262 83% 74%;     /* #A78BFA - Purple 500 */
-    --primary-muted: 262 83% 95%;     /* #EDE9FE - Purple 100 */
-    --primary-soft: 262 83% 97%;      /* #F5F3FF - Purple 50 */
+    /* Variações de Lilás */
+    --primary-dark: 270 65% 50%;      /* Lilás profundo */
+    --primary-light: 270 80% 78%;     /* Lilás claro */
+    --primary-muted: 270 80% 95%;     /* Lilás muito claro */
+    --primary-soft: 270 80% 97%;      /* Lilás pastel */
     
     /* Cores Neutras */
     --background: 220 14% 98%;        /* #F9FAFB - Gray 50 */
@@ -198,14 +198,30 @@
     box-shadow: 0 8px 16px hsl(262 83% 58% / 0.3);
   }
   
-  /* Gradient Background for Hero */
+  /* Gradient Background for Hero - Elegant Mesh Gradient */
   .bg-gradient-primary {
-    background: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(262 83% 45%) 100%);
+    background: 
+      radial-gradient(ellipse 80% 50% at 20% 40%, hsl(280 70% 70% / 0.4) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 60% at 80% 60%, hsl(260 80% 75% / 0.3) 0%, transparent 50%),
+      linear-gradient(160deg, hsl(270 60% 58%) 0%, hsl(280 55% 50%) 50%, hsl(260 65% 55%) 100%);
   }
   
   /* Soft gradient background */
   .bg-gradient-soft {
-    background: linear-gradient(180deg, hsl(262 83% 97%) 0%, hsl(0 0% 100%) 100%);
+    background: linear-gradient(180deg, hsl(270 80% 97%) 0%, hsl(0 0% 100%) 100%);
+  }
+  
+  /* Glow overlay effect */
+  .glow-overlay {
+    position: relative;
+  }
+  
+  .glow-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.15) 0%, transparent 40%);
+    pointer-events: none;
   }
   
   /* Hide scrollbar but keep functionality */

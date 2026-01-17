@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
@@ -353,6 +354,24 @@ const [productSearch, setProductSearch] = useState("");
                 placeholder="Descrição do projeto..."
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Help Card - Link to Documentation */}
+        <Card className="bg-primary-soft border-primary/20">
+          <CardContent className="py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <div>
+                <p className="font-medium text-sm">Precisa de ajuda com as integrações?</p>
+                <p className="text-xs text-muted-foreground">
+                  Veja nossos tutoriais passo a passo para Kiwify, Hotmart, Guru e Eduzz
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/documentacao">Ver Tutoriais</Link>
+            </Button>
           </CardContent>
         </Card>
 
