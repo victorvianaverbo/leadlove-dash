@@ -16,6 +16,7 @@ import Terms from "./pages/Terms";
 import Documentation from "./pages/Documentation";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import CheckoutCancel from "./pages/CheckoutCancel";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/documentacao" element={<Documentation />} />
             <Route path="/checkout/success" element={<CheckoutSuccess />} />
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+            <Route path="/admin" element={<Admin />} />
             {/* Public dashboard route - must be last to avoid conflicts */}
             <Route path="/:slug" element={<PublicDashboard />} />
             <Route path="*" element={<NotFound />} />
