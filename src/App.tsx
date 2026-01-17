@@ -14,6 +14,8 @@ import PublicDashboard from "./pages/PublicDashboard";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Documentation from "./pages/Documentation";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
+import CheckoutCancel from "./pages/CheckoutCancel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/documentacao" element={<Documentation />} />
+            <Route path="/checkout/success" element={<CheckoutSuccess />} />
+            <Route path="/checkout/cancel" element={<CheckoutCancel />} />
             {/* Public dashboard route - must be last to avoid conflicts */}
             <Route path="/:slug" element={<PublicDashboard />} />
             <Route path="*" element={<NotFound />} />
