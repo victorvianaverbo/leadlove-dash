@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
+import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { 
@@ -92,6 +93,11 @@ export default function Dashboard() {
             <span className="font-bold text-xl">MetrikaPRO</span>
           </div>
           <div className="flex gap-3">
+            <Button variant="ghost" size="icon" asChild title="Documentação">
+              <Link to="/documentacao">
+                <HelpCircle className="h-5 w-5" />
+              </Link>
+            </Button>
             <Button onClick={() => navigate('/projects/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Projeto

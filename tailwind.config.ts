@@ -90,8 +90,9 @@ export default {
         'md': '0 4px 12px rgba(0, 0, 0, 0.12)',
         'lg': '0 8px 24px rgba(0, 0, 0, 0.12)',
         'xl': '0 12px 32px rgba(0, 0, 0, 0.15)',
-        'primary': '0 8px 16px hsl(262 83% 58% / 0.3)',
-        'primary-lg': '0 12px 24px hsl(262 83% 58% / 0.25)',
+        'primary': '0 8px 16px hsl(270 60% 62% / 0.3)',
+        'primary-lg': '0 12px 24px hsl(270 60% 62% / 0.25)',
+        'lilac-glow': '0 0 40px hsl(270 60% 62% / 0.2)',
       },
       keyframes: {
         "accordion-down": {
