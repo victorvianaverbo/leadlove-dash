@@ -11,6 +11,8 @@ interface AuthContextType {
   subscriptionTier: PlanKey | null;
   subscriptionEnd: string | null;
   subscriptionLoading: boolean;
+  isAdmin: boolean;
+  extraProjects: number;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -27,12 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscriptionTier, setSubscriptionTier] = useState<PlanKey | null>(null);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [extraProjects, setExtraProjects] = useState(0);
 
   const checkSubscription = useCallback(async () => {
     if (!session?.access_token) {
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
+      setIsAdmin(false);
+      setExtraProjects(0);
       return;
     }
 
@@ -51,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSubscribed(data.subscribed || false);
       setSubscriptionEnd(data.subscription_end || null);
+      setIsAdmin(data.is_admin || false);
+      setExtraProjects(data.extra_projects || 0);
       
       if (data.product_id) {
         const tier = getPlanByProductId(data.product_id);
@@ -91,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
+      setIsAdmin(false);
+      setExtraProjects(0);
     }
   }, [session?.access_token, checkSubscription]);
 
@@ -134,6 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
+      setIsAdmin(false);
+      setExtraProjects(0);
     }
   };
 
@@ -146,6 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscriptionTier,
       subscriptionEnd,
       subscriptionLoading,
+      isAdmin,
+      extraProjects,
       signUp, 
       signIn, 
       signOut,
