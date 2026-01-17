@@ -13,7 +13,7 @@ import { Loader2, ArrowLeft, AlertTriangle, Crown, ArrowUpRight } from 'lucide-r
 import { STRIPE_PLANS } from '@/lib/stripe-plans';
 
 export default function ProjectNew() {
-  const { user, loading, subscribed, subscriptionTier, subscriptionLoading } = useAuth();
+  const { user, loading, subscribed, subscriptionTier, subscriptionLoading, extraProjects } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,7 +41,9 @@ export default function ProjectNew() {
   });
 
   const currentPlan = subscriptionTier ? STRIPE_PLANS[subscriptionTier] : null;
-  const projectLimit = currentPlan?.projects ?? 0;
+  const baseProjectLimit = currentPlan?.projects ?? 0;
+  // -1 means unlimited, otherwise add extra projects from admin override
+  const projectLimit = baseProjectLimit === -1 ? -1 : baseProjectLimit + extraProjects;
   const canCreateProject = subscribed && (projectLimit === -1 || projectCount < projectLimit);
   const isAtLimit = subscribed && projectLimit !== -1 && projectCount >= projectLimit;
 

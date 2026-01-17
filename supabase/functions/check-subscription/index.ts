@@ -43,6 +43,27 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
+    // Check if user is admin
+    const { data: roleData } = await supabaseClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .single();
+    
+    const isAdmin = !!roleData;
+    logStep("Admin check", { isAdmin });
+
+    // Get extra projects override
+    const { data: overrideData } = await supabaseClient
+      .from("user_overrides")
+      .select("extra_projects")
+      .eq("user_id", user.id)
+      .single();
+
+    const extraProjects = overrideData?.extra_projects || 0;
+    logStep("Override check", { extraProjects });
+
     // Find customer by email
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
@@ -51,7 +72,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         subscribed: false,
         product_id: null,
-        subscription_end: null
+        subscription_end: null,
+        is_admin: isAdmin,
+        extra_projects: extraProjects
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -88,7 +111,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       subscribed: hasActiveSub,
       product_id: productId,
-      subscription_end: subscriptionEnd
+      subscription_end: subscriptionEnd,
+      is_admin: isAdmin,
+      extra_projects: extraProjects
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
