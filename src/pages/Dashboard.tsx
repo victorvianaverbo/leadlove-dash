@@ -152,10 +152,13 @@ export default function Dashboard() {
                 )}
               </Button>
             )}
-            {subscribed && canCreateProject && (
-              <Button onClick={() => navigate('/projects/new')}>
+            {subscribed && (
+              <Button 
+                onClick={() => navigate('/projects/new')}
+                variant={canCreateProject ? 'default' : 'outline'}
+              >
                 <Plus className="h-4 w-4 mr-2" />
-                Novo Projeto
+                {canCreateProject ? 'Novo Projeto' : 'Limite Atingido'}
               </Button>
             )}
             <Button variant="outline" onClick={signOut}>
