@@ -203,6 +203,7 @@ export default function Index() {
               <span className="font-bold text-lg">MetrikaPRO</span>
             </div>
             <div className="flex gap-6 text-sm text-muted-foreground">
+              <Link to="/documentacao" className="hover:text-primary transition-colors">Documentação</Link>
               <Link to="/terms" className="hover:text-primary transition-colors">Termos de Uso</Link>
               <Link to="/privacy" className="hover:text-primary transition-colors">Privacidade</Link>
             </div>
