@@ -21,9 +21,13 @@ export default function CheckoutSuccess() {
             <CheckCircle className="h-10 w-10 text-success" />
           </div>
           
-          <h1 className="text-2xl font-bold mb-2">Assinatura Ativada!</h1>
-          <p className="text-muted-foreground mb-8">
-            Sua assinatura foi processada com sucesso. Agora você tem acesso completo ao MetrikaPRO.
+          <h1 className="text-2xl font-bold mb-2">Trial Ativado! 🎉</h1>
+          <p className="text-muted-foreground mb-4">
+            Seus 7 dias de teste grátis começaram agora.
+          </p>
+          <p className="text-sm text-muted-foreground mb-8">
+            Aproveite para explorar todas as funcionalidades do MetrikaPRO. 
+            Você só será cobrado após o período de teste.
           </p>
 
           <div className="flex flex-col gap-3">
