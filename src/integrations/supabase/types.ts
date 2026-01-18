@@ -103,6 +103,47 @@ export type Database = {
           },
         ]
       }
+      daily_reports: {
+        Row: {
+          actions: Json | null
+          comparison: Json | null
+          created_at: string | null
+          id: string
+          metrics: Json | null
+          project_id: string
+          report_date: string
+          summary: string
+        }
+        Insert: {
+          actions?: Json | null
+          comparison?: Json | null
+          created_at?: string | null
+          id?: string
+          metrics?: Json | null
+          project_id: string
+          report_date: string
+          summary: string
+        }
+        Update: {
+          actions?: Json | null
+          comparison?: Json | null
+          created_at?: string | null
+          id?: string
+          metrics?: Json | null
+          project_id?: string
+          report_date?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           created_at: string

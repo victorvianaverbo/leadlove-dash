@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3 } from 'lucide-react';
+import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
@@ -28,6 +29,74 @@ interface SalesPublic {
   utm_term: string | null;
 }
 
+interface DailyReport {
+  id: string;
+  project_id: string;
+  report_date: string;
+  summary: string;
+  comparison: {
+    revenue: { yesterday: number; dayBefore: number; change: number };
+    spend: { yesterday: number; dayBefore: number; change: number };
+    sales: { yesterday: number; dayBefore: number; change: number };
+    roas: { yesterday: number; dayBefore: number; change: number };
+    cpa: { yesterday: number; dayBefore: number; change: number };
+  };
+  actions: Array<{ action: string; priority: string }>;
+  metrics: {
+    revenue: number;
+    spend: number;
+    sales: number;
+    roas: number;
+    cpa: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    cpm: number;
+    cpc: number;
+  };
+  created_at: string;
+}
+
+function ChangeIndicator({ value }: { value: number }) {
+  if (value > 0) {
+    return (
+      <span className="inline-flex items-center text-success text-xs font-medium">
+        <ArrowUp className="h-3 w-3 mr-0.5" />
+        +{value.toFixed(1)}%
+      </span>
+    );
+  }
+  if (value < 0) {
+    return (
+      <span className="inline-flex items-center text-destructive text-xs font-medium">
+        <ArrowDown className="h-3 w-3 mr-0.5" />
+        {value.toFixed(1)}%
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center text-muted-foreground text-xs font-medium">
+      <Minus className="h-3 w-3 mr-0.5" />
+      0%
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const colors: Record<string, string> = {
+    alta: 'bg-destructive/10 text-destructive border-destructive/20',
+    média: 'bg-warning/10 text-warning border-warning/20',
+    media: 'bg-warning/10 text-warning border-warning/20',
+    baixa: 'bg-muted text-muted-foreground border-muted',
+  };
+  
+  return (
+    <Badge variant="outline" className={colors[priority.toLowerCase()] || colors.baixa}>
+      {priority}
+    </Badge>
+  );
+}
+
 export default function PublicDashboard() {
   const { slug } = useParams<{ slug: string }>();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
@@ -46,6 +115,24 @@ export default function PublicDashboard() {
       return data;
     },
     enabled: !!slug,
+  });
+
+  // Fetch latest daily report
+  const { data: latestReport } = useQuery({
+    queryKey: ['public-daily-report', project?.id],
+    queryFn: async (): Promise<DailyReport | null> => {
+      const { data, error } = await supabase
+        .from('daily_reports')
+        .select('*')
+        .eq('project_id', project!.id)
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as unknown as DailyReport;
+    },
+    enabled: !!project?.id,
   });
 
   const getDateFilter = () => {
@@ -154,6 +241,15 @@ export default function PublicDashboard() {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
+  const formatReportDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T12:00:00');
+    return date.toLocaleDateString('pt-BR', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long' 
+    });
+  };
+
   if (projectLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -209,6 +305,79 @@ export default function PublicDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* AI Daily Report Section */}
+        {latestReport && (
+          <Card className="mb-8 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-primary/10 rounded-lg">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <CardTitle className="text-lg">Relatório do Dia</CardTitle>
+                </div>
+                <span className="text-sm text-muted-foreground capitalize">
+                  {formatReportDate(latestReport.report_date)}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Summary */}
+              <p className="text-sm leading-relaxed">{latestReport.summary}</p>
+
+              {/* Metrics comparison */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                  <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
+                  <ChangeIndicator value={latestReport.comparison.revenue.change} />
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                  <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
+                  <ChangeIndicator value={-latestReport.comparison.spend.change} />
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                  <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                    {latestReport.metrics.roas.toFixed(2)}x
+                  </p>
+                  <ChangeIndicator value={latestReport.comparison.roas.change} />
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                  <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
+                  <ChangeIndicator value={-latestReport.comparison.cpa.change} />
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                  <p className="font-semibold">{latestReport.metrics.sales}</p>
+                  <ChangeIndicator value={latestReport.comparison.sales.change} />
+                </div>
+              </div>
+
+              {/* Actions */}
+              {latestReport.actions && latestReport.actions.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 text-primary" />
+                    Ações Recomendadas
+                  </p>
+                  <div className="space-y-2">
+                    {latestReport.actions.map((item, index) => (
+                      <div key={index} className="flex items-start gap-2 bg-card rounded-lg p-3 border">
+                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <span className="text-sm flex-1">{item.action}</span>
+                        <PriorityBadge priority={item.priority} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Summary Cards - 5 Essential Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Card className="border-l-4 border-l-success">
