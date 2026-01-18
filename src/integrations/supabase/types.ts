@@ -352,7 +352,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      sales_public: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          id: string | null
+          kiwify_sale_id: string | null
+          payment_method: string | null
+          product_id: string | null
+          product_name: string | null
+          project_id: string | null
+          sale_date: string | null
+          status: string | null
+          user_id: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          id?: string | null
+          kiwify_sale_id?: string | null
+          payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          project_id?: string | null
+          sale_date?: string | null
+          status?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          id?: string | null
+          kiwify_sale_id?: string | null
+          payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          project_id?: string | null
+          sale_date?: string | null
+          status?: string | null
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
