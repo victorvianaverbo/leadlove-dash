@@ -47,8 +47,8 @@ export default function Index() {
 
   const handleSubscribe = async (planKey: PlanKey) => {
     if (!user || !session) {
-      // Redirect to auth with plan info
-      navigate('/auth', { state: { selectedPlan: planKey } });
+      // Redirect to auth with plan in URL
+      navigate(`/auth?plan=${planKey}`);
       return;
     }
 
@@ -108,13 +108,18 @@ export default function Index() {
             Integre com Meta Ads e tenha ROAS em tempo real.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 hover:text-primary-dark shadow-xl" asChild>
-              <Link to="/auth">
-                Começar Grátis
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+            <Button 
+              size="lg" 
+              className="bg-white text-primary hover:bg-white/90 hover:text-primary-dark shadow-xl"
+              onClick={() => handleSubscribe('pro')}
+            >
+              Começar 7 Dias Grátis
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
+          <p className="text-white/70 text-sm mt-4 animate-fade-in" style={{ animationDelay: '0.25s' }}>
+            Sem compromisso. Cancele a qualquer momento.
+          </p>
           
           {/* Platform Logos */}
           <div className="flex items-center justify-center gap-4 mt-12 animate-fade-in" style={{ animationDelay: '0.3s' }}>
@@ -179,7 +184,7 @@ export default function Index() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Escolha seu Plano</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Comece a rastrear suas vendas e otimizar seus anúncios hoje mesmo
+              7 dias grátis em todos os planos. Cancele a qualquer momento.
             </p>
           </div>
 
@@ -216,10 +221,11 @@ export default function Index() {
                   <h3 className="text-xl font-bold mb-2">{planData.name}</h3>
                   <p className="text-muted-foreground text-sm mb-6">{plan.projects}</p>
 
-                  <div className="mb-8">
+                  <div className="mb-2">
                     <span className="text-4xl font-bold">R$ {planData.price}</span>
                     <span className="text-muted-foreground">/mês</span>
                   </div>
+                  <p className="text-sm text-primary font-medium mb-6">7 dias grátis</p>
 
                   <ul className="space-y-3 mb-8">
                     {plan.features.map((feature) => (
@@ -245,8 +251,10 @@ export default function Index() {
                       </>
                     ) : isCurrentPlan ? (
                       'Plano Atual'
+                    ) : subscribed ? (
+                      'Mudar Plano'
                     ) : (
-                      'Assinar'
+                      'Começar Grátis'
                     )}
                   </Button>
                 </div>

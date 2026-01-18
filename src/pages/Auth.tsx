@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,21 +9,53 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, BarChart3 } from 'lucide-react';
+import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, user, loading } = useAuth();
+  const [isCheckoutRedirecting, setIsCheckoutRedirecting] = useState(false);
+  const { signIn, signUp, user, loading, session, subscribed } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  
+  const selectedPlan = searchParams.get('plan') as PlanKey | null;
+  const validPlan = selectedPlan && STRIPE_PLANS[selectedPlan] ? selectedPlan : null;
 
+  // Redirect to checkout if user just signed up with a plan selected
   useEffect(() => {
-    if (!loading && user) {
-      navigate('/dashboard');
-    }
-  }, [user, loading, navigate]);
+    const initiateCheckout = async () => {
+      if (!loading && user && session && validPlan && !subscribed && !isCheckoutRedirecting) {
+        setIsCheckoutRedirecting(true);
+        try {
+          const { data, error } = await supabase.functions.invoke('create-checkout', {
+            body: { priceId: STRIPE_PLANS[validPlan].priceId },
+          });
+
+          if (error) throw error;
+          if (data?.url) {
+            window.location.href = data.url;
+            return;
+          }
+        } catch (error) {
+          console.error('Checkout error:', error);
+          toast({
+            title: 'Erro ao iniciar checkout',
+            description: 'Redirecionando para o dashboard...',
+            variant: 'destructive',
+          });
+          navigate('/dashboard');
+        }
+      } else if (!loading && user && !validPlan) {
+        navigate('/dashboard');
+      }
+    };
+
+    initiateCheckout();
+  }, [user, loading, session, validPlan, subscribed, navigate, toast, isCheckoutRedirecting]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,10 +114,13 @@ export default function Auth() {
     setIsLoading(false);
   };
 
-  if (loading) {
+  if (loading || isCheckoutRedirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {isCheckoutRedirecting && (
+          <p className="text-muted-foreground">Preparando checkout...</p>
+        )}
       </div>
     );
   }
@@ -99,7 +135,15 @@ export default function Auth() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">MetrikaPRO</CardTitle>
-          <CardDescription className="text-base">Acompanhe suas vendas e ROAS em tempo real</CardDescription>
+          {validPlan ? (
+            <CardDescription className="text-base">
+              Criando conta para o plano <span className="font-semibold text-primary">{STRIPE_PLANS[validPlan].name}</span>
+              <br />
+              <span className="text-sm">7 dias grátis, depois R$ {STRIPE_PLANS[validPlan].price}/mês</span>
+            </CardDescription>
+          ) : (
+            <CardDescription className="text-base">Acompanhe suas vendas e ROAS em tempo real</CardDescription>
+          )}
         </CardHeader>
         <CardContent className="pt-6">
           <Tabs defaultValue="signin" className="w-full">

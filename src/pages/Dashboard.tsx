@@ -188,7 +188,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <Button asChild>
-                  <Link to="/#pricing">Ver Planos</Link>
+                  <Link to="/pricing">Ver Planos</Link>
                 </Button>
               </div>
             </CardContent>
@@ -236,7 +236,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-muted-foreground mb-6">Assine um plano para criar projetos</p>
                 <Button asChild>
-                  <Link to="/#pricing">Ver Planos</Link>
+                  <Link to="/pricing">Ver Planos</Link>
                 </Button>
               </CardContent>
             </Card>
