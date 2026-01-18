@@ -17,7 +17,7 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckoutRedirecting, setIsCheckoutRedirecting] = useState(false);
-  const { signIn, signUp, user, loading, session, subscribed } = useAuth();
+  const { signIn, signUp, user, loading, session, subscribed, subscriptionLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
@@ -25,10 +25,42 @@ export default function Auth() {
   const selectedPlan = searchParams.get('plan') as PlanKey | null;
   const validPlan = selectedPlan && STRIPE_PLANS[selectedPlan] ? selectedPlan : null;
 
-  // Redirect to checkout if user just signed up with a plan selected
+  // Handle authenticated user - checkout or portal redirect
   useEffect(() => {
-    const initiateCheckout = async () => {
-      if (!loading && user && session && validPlan && !subscribed && !isCheckoutRedirecting) {
+    const handleAuthenticatedUser = async () => {
+      // Wait for loading states
+      if (loading || subscriptionLoading) return;
+      
+      // Not logged in - show form
+      if (!user || !session) return;
+
+      // User already has active subscription
+      if (subscribed) {
+        if (validPlan) {
+          // User tried to select a plan but already subscribed - redirect to portal
+          setIsCheckoutRedirecting(true);
+          try {
+            const { data, error } = await supabase.functions.invoke('customer-portal');
+            if (error) throw error;
+            if (data?.url) {
+              window.location.href = data.url;
+              return;
+            }
+          } catch (error) {
+            console.error('Portal error:', error);
+            toast({
+              title: 'Você já tem um plano ativo',
+              description: 'Use o portal de assinatura para gerenciar seu plano.',
+            });
+          }
+        }
+        // Already subscribed without plan selection - go to dashboard
+        navigate('/dashboard');
+        return;
+      }
+
+      // User not subscribed - initiate checkout if plan selected
+      if (validPlan && !isCheckoutRedirecting) {
         setIsCheckoutRedirecting(true);
         try {
           const { data, error } = await supabase.functions.invoke('create-checkout', {
@@ -49,13 +81,14 @@ export default function Auth() {
           });
           navigate('/dashboard');
         }
-      } else if (!loading && user && !validPlan) {
+      } else if (!validPlan) {
+        // No plan selected - go to dashboard
         navigate('/dashboard');
       }
     };
 
-    initiateCheckout();
-  }, [user, loading, session, validPlan, subscribed, navigate, toast, isCheckoutRedirecting]);
+    handleAuthenticatedUser();
+  }, [user, loading, subscriptionLoading, session, validPlan, subscribed, navigate, toast, isCheckoutRedirecting]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
