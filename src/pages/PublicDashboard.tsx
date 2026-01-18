@@ -8,6 +8,26 @@ import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Loc
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
+// Type for the public sales view (excludes PII fields)
+interface SalesPublic {
+  id: string;
+  project_id: string;
+  user_id: string;
+  kiwify_sale_id: string;
+  product_id: string;
+  product_name: string | null;
+  amount: number;
+  status: string;
+  payment_method: string | null;
+  sale_date: string;
+  created_at: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+}
+
 export default function PublicDashboard() {
   const { slug } = useParams<{ slug: string }>();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
@@ -63,27 +83,29 @@ export default function PublicDashboard() {
     return null;
   };
 
+  // Use sales_public view to avoid exposing PII (customer_email, customer_name)
   const { data: sales } = useQuery({
     queryKey: ['public-sales', project?.id, dateRange],
-    queryFn: async () => {
+    queryFn: async (): Promise<SalesPublic[]> => {
+      const dateFilter = getDateFilter();
+      const endDateFilter = getEndDateFilter();
+      
       let query = supabase
-        .from('sales')
+        .from('sales_public' as any)
         .select('*')
         .eq('project_id', project!.id)
         .order('sale_date', { ascending: false });
       
-      const dateFilter = getDateFilter();
       if (dateFilter) {
         query = query.gte('sale_date', dateFilter);
       }
-      const endDateFilter = getEndDateFilter();
       if (endDateFilter) {
         query = query.lt('sale_date', endDateFilter);
       }
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return (data || []) as unknown as SalesPublic[];
     },
     enabled: !!project?.id,
   });
