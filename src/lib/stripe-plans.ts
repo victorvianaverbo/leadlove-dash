@@ -1,29 +1,29 @@
 export const STRIPE_PLANS = {
   starter: {
     name: 'Starter',
-    priceId: 'price_1SqdPMLGJ9uCQzbbjjy1HhbX',
-    productId: 'prod_ToFvCqWdBIVMsi',
+    priceId: 'price_1SqdRCLGJ9uCQzbbgiwSn822',
+    productId: 'prod_ToFxrfIt6QwRe4',
     price: 97,
     projects: 1,
   },
   pro: {
     name: 'Pro',
-    priceId: 'price_1SqdQFLGJ9uCQzbbnShki2Vm',
-    productId: 'prod_ToFwv9cb0NMmvp',
+    priceId: 'price_1SqdRELGJ9uCQzbbWq2e6YTd',
+    productId: 'prod_ToFxRDlEJZ1bSB',
     price: 197,
     projects: 5,
   },
   business: {
     name: 'Business',
-    priceId: 'price_1SqdQVLGJ9uCQzbbWpfug7RR',
-    productId: 'prod_ToFws6yTdBBxgL',
+    priceId: 'price_1SqdRGLGJ9uCQzbbcGI4Rnxk',
+    productId: 'prod_ToFxMqPNCLjWoh',
     price: 397,
     projects: 10,
   },
   agencia: {
     name: 'Agência',
-    priceId: 'price_1SqdQlLGJ9uCQzbbmB1kv6FT',
-    productId: 'prod_ToFwdFNKLqedmz',
+    priceId: 'price_1SqdRHLGJ9uCQzbbvQRZe7pn',
+    productId: 'prod_ToFxWKyCHGQMLh',
     price: 997,
     projects: -1, // ilimitado
   },
