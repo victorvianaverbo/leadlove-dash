@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, BarChart3 } from 'lucide-react';
+import { Loader2, BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
 import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
 
 export default function Auth() {
@@ -17,7 +17,8 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckoutRedirecting, setIsCheckoutRedirecting] = useState(false);
-  const { signIn, signUp, user, loading, session, subscribed, subscriptionLoading } = useAuth();
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const { signIn, signUp, user, loading, session, subscribed, subscriptionLoading, checkSubscription } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
@@ -34,6 +35,9 @@ export default function Auth() {
       // Not logged in - show form
       if (!user || !session) return;
 
+      // If awaiting payment, don't redirect
+      if (awaitingPayment) return;
+
       // User already has active subscription
       if (subscribed) {
         if (validPlan) {
@@ -43,7 +47,13 @@ export default function Auth() {
             const { data, error } = await supabase.functions.invoke('customer-portal');
             if (error) throw error;
             if (data?.url) {
-              window.location.href = data.url;
+              window.open(data.url, '_blank');
+              toast({
+                title: 'Portal aberto em nova aba',
+                description: 'Gerencie seu plano na nova aba.',
+              });
+              setIsCheckoutRedirecting(false);
+              navigate('/dashboard');
               return;
             }
           } catch (error) {
@@ -53,6 +63,7 @@ export default function Auth() {
               description: 'Use o portal de assinatura para gerenciar seu plano.',
             });
           }
+          setIsCheckoutRedirecting(false);
         }
         // Already subscribed without plan selection - go to dashboard
         navigate('/dashboard');
@@ -69,7 +80,9 @@ export default function Auth() {
 
           if (error) throw error;
           if (data?.url) {
-            window.location.href = data.url;
+            window.open(data.url, '_blank');
+            setAwaitingPayment(true);
+            setIsCheckoutRedirecting(false);
             return;
           }
         } catch (error) {
@@ -81,6 +94,7 @@ export default function Auth() {
           });
           navigate('/dashboard');
         }
+        setIsCheckoutRedirecting(false);
       } else if (!validPlan) {
         // No plan selected - go to dashboard
         navigate('/dashboard');
@@ -88,7 +102,29 @@ export default function Auth() {
     };
 
     handleAuthenticatedUser();
-  }, [user, loading, subscriptionLoading, session, validPlan, subscribed, navigate, toast, isCheckoutRedirecting]);
+  }, [user, loading, subscriptionLoading, session, validPlan, subscribed, navigate, toast, isCheckoutRedirecting, awaitingPayment]);
+
+  // Polling while awaiting payment
+  useEffect(() => {
+    if (!awaitingPayment || !session?.access_token) return;
+
+    const interval = setInterval(async () => {
+      await checkSubscription();
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [awaitingPayment, session?.access_token, checkSubscription]);
+
+  // Redirect when payment is detected
+  useEffect(() => {
+    if (awaitingPayment && subscribed) {
+      toast({
+        title: 'Pagamento confirmado! 🎉',
+        description: 'Seu plano foi ativado com sucesso.',
+      });
+      navigate('/dashboard');
+    }
+  }, [awaitingPayment, subscribed, navigate, toast]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +182,66 @@ export default function Auth() {
     }
     setIsLoading(false);
   };
+
+  const handleCheckPayment = async () => {
+    await checkSubscription();
+    if (!subscribed) {
+      toast({
+        title: 'Pagamento não detectado',
+        description: 'Complete o pagamento na aba do Stripe.',
+      });
+    }
+  };
+
+  // Awaiting payment UI
+  if (awaitingPayment) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-soft p-4">
+        <Card className="max-w-md w-full text-center shadow-xl border-0">
+          <CardHeader className="pb-4">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-gradient-primary rounded-2xl shadow-primary">
+                <ExternalLink className="h-10 w-10 text-white" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">Complete o pagamento</CardTitle>
+            <CardDescription className="text-base">
+              Uma nova aba foi aberta para você finalizar o pagamento no Stripe.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Aguardando confirmação...</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Esta página será atualizada automaticamente assim que o pagamento for confirmado.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Button 
+                variant="outline" 
+                onClick={handleCheckPayment}
+                className="w-full"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Já finalizei o pagamento
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setAwaitingPayment(false);
+                  navigate('/dashboard');
+                }}
+                className="w-full text-muted-foreground"
+              >
+                Continuar sem assinar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading || isCheckoutRedirecting) {
     return (
