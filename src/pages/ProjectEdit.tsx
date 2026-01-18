@@ -110,20 +110,9 @@ const [productSearch, setProductSearch] = useState("");
     }
   }, [project]);
 
-  // Load integration credentials
-  useEffect(() => {
-    if (kiwifyIntegration) {
-      const creds = kiwifyIntegration.credentials as { client_id?: string; client_secret?: string; account_id?: string };
-      setKiwifyClientId(creds.client_id || "");
-      setKiwifyClientSecret(creds.client_secret || "");
-      setKiwifyAccountId(creds.account_id || "");
-    }
-    if (metaIntegration) {
-      const creds = metaIntegration.credentials as { access_token?: string; ad_account_id?: string };
-      setMetaAccessToken(creds.access_token || "");
-      setMetaAdAccountId(creds.ad_account_id || "");
-    }
-  }, [kiwifyIntegration, metaIntegration]);
+  // Security: We no longer load actual credentials from the database to prevent exposure in browser DevTools
+  // Users must re-enter credentials to update them - existing credentials remain secure on the server
+  // This prevents client-side exposure of sensitive third-party API credentials
 
   // Filter products by search
   const filteredProducts = kiwifyProducts?.filter((p: { name: string }) =>
@@ -404,12 +393,17 @@ const [productSearch, setProductSearch] = useState("");
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {kiwifyIntegration && (
+              <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
+                ✓ Credenciais salvas com segurança. Para atualizar, preencha os campos abaixo.
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium">Client ID</label>
               <Input
                 value={kiwifyClientId}
                 onChange={(e) => setKiwifyClientId(e.target.value)}
-                placeholder="Seu Client ID do Kiwify"
+                placeholder={kiwifyIntegration ? "••••••••••••" : "Seu Client ID do Kiwify"}
               />
             </div>
             <div>
@@ -419,7 +413,7 @@ const [productSearch, setProductSearch] = useState("");
                   type={showKiwifySecret ? "text" : "password"}
                   value={kiwifyClientSecret}
                   onChange={(e) => setKiwifyClientSecret(e.target.value)}
-                  placeholder="Seu Client Secret do Kiwify"
+                  placeholder={kiwifyIntegration ? "••••••••••••" : "Seu Client Secret do Kiwify"}
                 />
                 <Button
                   type="button"
@@ -437,12 +431,12 @@ const [productSearch, setProductSearch] = useState("");
               <Input
                 value={kiwifyAccountId}
                 onChange={(e) => setKiwifyAccountId(e.target.value)}
-                placeholder="Seu Account ID do Kiwify"
+                placeholder={kiwifyIntegration ? "••••••••••••" : "Seu Account ID do Kiwify"}
               />
             </div>
             <Button onClick={handleSaveKiwify} disabled={saveIntegration.isPending}>
               {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Salvar Credenciais Kiwify
+              {kiwifyIntegration ? "Atualizar Credenciais Kiwify" : "Salvar Credenciais Kiwify"}
             </Button>
 
             {/* Kiwify Products */}
@@ -594,6 +588,11 @@ const [productSearch, setProductSearch] = useState("");
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {metaIntegration && (
+              <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
+                ✓ Credenciais salvas com segurança. Para atualizar, preencha os campos abaixo.
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium">Access Token</label>
               <div className="relative">
@@ -601,7 +600,7 @@ const [productSearch, setProductSearch] = useState("");
                   type={showMetaToken ? "text" : "password"}
                   value={metaAccessToken}
                   onChange={(e) => setMetaAccessToken(e.target.value)}
-                  placeholder="Seu Access Token do Meta"
+                  placeholder={metaIntegration ? "••••••••••••" : "Seu Access Token do Meta"}
                 />
                 <Button
                   type="button"
@@ -619,12 +618,12 @@ const [productSearch, setProductSearch] = useState("");
               <Input
                 value={metaAdAccountId}
                 onChange={(e) => setMetaAdAccountId(e.target.value)}
-                placeholder="Ex: act_123456789"
+                placeholder={metaIntegration ? "••••••••••••" : "Ex: act_123456789"}
               />
             </div>
             <Button onClick={handleSaveMeta} disabled={saveIntegration.isPending}>
               {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Salvar Credenciais Meta
+              {metaIntegration ? "Atualizar Credenciais Meta" : "Salvar Credenciais Meta"}
             </Button>
 
             {/* Meta Campaigns */}
