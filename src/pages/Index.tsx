@@ -111,7 +111,9 @@ export default function Index() {
             <Button 
               size="lg" 
               className="bg-white text-primary hover:bg-white/90 hover:text-primary-dark shadow-xl"
-              onClick={() => handleSubscribe('pro')}
+              onClick={() => {
+                document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+              }}
             >
               Começar 7 Dias Grátis
               <ArrowRight className="ml-2 h-5 w-5" />
