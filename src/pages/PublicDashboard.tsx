@@ -409,84 +409,33 @@ export default function PublicDashboard() {
               {/* Summary */}
               <p className="text-sm leading-relaxed">{latestReport.summary}</p>
 
-              {/* Funnel Metrics Section - New Format */}
-              {hasFunnelMetrics && latestReport.metrics.rates && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    Funil de Conversão
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <FunnelMetricCard
-                      label="Tx. Engajamento"
-                      value={latestReport.metrics.rates.engagement}
-                      benchmark={latestReport.metrics.benchmarks.engagement}
-                      status={latestReport.metrics.status.engagement}
-                      change={latestReport.comparison.engagement?.change}
-                      icon={Eye}
-                    />
-                    <FunnelMetricCard
-                      label="CTR (Link)"
-                      value={latestReport.metrics.rates.ctr}
-                      benchmark={latestReport.metrics.benchmarks.ctr}
-                      status={latestReport.metrics.status.ctr}
-                      change={latestReport.comparison.ctr?.change}
-                      icon={MousePointer}
-                    />
-                    <FunnelMetricCard
-                      label="Taxa LP/Clique"
-                      value={latestReport.metrics.rates.lpRate}
-                      benchmark={latestReport.metrics.benchmarks.lpRate}
-                      status={latestReport.metrics.status.lpRate}
-                      change={latestReport.comparison.lpRate?.change}
-                      icon={Target}
-                    />
-                    <FunnelMetricCard
-                      label="Tx. Checkout"
-                      value={latestReport.metrics.rates.checkoutRate}
-                      benchmark={latestReport.metrics.benchmarks.checkoutRate}
-                      status={latestReport.metrics.status.checkoutRate}
-                      change={latestReport.comparison.checkoutRate?.change}
-                      icon={CreditCard}
-                    />
-                    <FunnelMetricCard
-                      label="Taxa Venda/LP"
-                      value={latestReport.metrics.rates.saleRate}
-                      benchmark={latestReport.metrics.benchmarks.saleRate}
-                      status={latestReport.metrics.status.saleRate}
-                      change={latestReport.comparison.saleRate?.change}
-                      icon={ShoppingBag}
-                    />
+              {/* Metrics Summary - 5 Essential Metrics */}
+              {hasFunnelMetrics && latestReport.metrics && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                    <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
+                    <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
                   </div>
-
-                  {/* Absolute Numbers Row */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Receita</p>
-                      <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
-                      <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Gasto</p>
-                      <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
-                      <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                      <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
-                        {latestReport.metrics.roas.toFixed(2)}x
-                      </p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                      <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Vendas</p>
-                      <p className="font-semibold">{latestReport.metrics.sales}</p>
-                      <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
-                    </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                    <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
+                    <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                    <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                      {latestReport.metrics.roas.toFixed(2)}x
+                    </p>
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                    <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                    <p className="font-semibold">{latestReport.metrics.sales}</p>
+                    <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
                   </div>
                 </div>
               )}
@@ -546,71 +495,6 @@ export default function PublicDashboard() {
           </Card>
         )}
 
-        {/* Summary Cards - 5 Essential Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <Card className="border-l-4 border-l-success">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-              <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-4 w-4 text-success" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground">{totalSales} vendas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-destructive">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Gasto Total</CardTitle>
-              <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="h-4 w-4 text-destructive" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-l-4 ${roas >= 1 ? 'border-l-success' : 'border-l-destructive'}`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">ROAS</CardTitle>
-              <div className={`w-8 h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
-                <TrendingUp className={`h-4 w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
-                {roas.toFixed(2)}x
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-info">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">CPA</CardTitle>
-              <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center">
-                <Target className="h-4 w-4 text-info" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-info">{formatCurrency(cpa)}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Vendas</CardTitle>
-              <div className="w-8 h-8 bg-primary-soft rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalSales}</div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Powered by badge */}
         <div className="text-center">
