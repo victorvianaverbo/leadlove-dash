@@ -216,6 +216,11 @@ export type Database = {
         Row: {
           account_status: string | null
           ad_type: string | null
+          benchmark_checkout_rate: number | null
+          benchmark_ctr: number | null
+          benchmark_engagement: number | null
+          benchmark_lp_rate: number | null
+          benchmark_sale_rate: number | null
           campaign_objective: string | null
           class_date: string | null
           created_at: string
@@ -235,6 +240,11 @@ export type Database = {
         Insert: {
           account_status?: string | null
           ad_type?: string | null
+          benchmark_checkout_rate?: number | null
+          benchmark_ctr?: number | null
+          benchmark_engagement?: number | null
+          benchmark_lp_rate?: number | null
+          benchmark_sale_rate?: number | null
           campaign_objective?: string | null
           class_date?: string | null
           created_at?: string
@@ -254,6 +264,11 @@ export type Database = {
         Update: {
           account_status?: string | null
           ad_type?: string | null
+          benchmark_checkout_rate?: number | null
+          benchmark_ctr?: number | null
+          benchmark_engagement?: number | null
+          benchmark_lp_rate?: number | null
+          benchmark_sale_rate?: number | null
           campaign_objective?: string | null
           class_date?: string | null
           created_at?: string
