@@ -29,9 +29,15 @@ export default function Dashboard() {
     }
   }, [user, loading, navigate]);
 
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects'],
+  const { data: projects, isLoading: projectsLoading, error: projectsError } = useQuery({
+    queryKey: ['projects', user?.id],
     queryFn: async () => {
+      // Verificar se sessão ainda é válida
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Session expired');
+      }
+      
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -40,7 +46,20 @@ export default function Dashboard() {
       return data;
     },
     enabled: !!user,
+    retry: (failureCount, error) => {
+      // Não tentar novamente se sessão expirou
+      if (error instanceof Error && error.message === 'Session expired') return false;
+      return failureCount < 3;
+    },
   });
+
+  // Se sessão expirou, redirecionar para login
+  useEffect(() => {
+    if (projectsError instanceof Error && projectsError.message === 'Session expired') {
+      signOut();
+      navigate('/auth');
+    }
+  }, [projectsError, signOut, navigate]);
 
   const { data: projectMetrics } = useQuery({
     queryKey: ['project-metrics'],
