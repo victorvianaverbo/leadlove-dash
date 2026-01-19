@@ -92,8 +92,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth event:', event);
+        
         if (event === 'TOKEN_REFRESHED') {
           console.log('Token refreshed successfully');
+          setSession(session);
+          setUser(session?.user ?? null);
         }
         
         if (event === 'SIGNED_OUT') {
@@ -117,6 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Session error:', error);
+        // Se houver erro, limpar token antigo do localStorage
+        const storageKey = `sb-ohwaygqxelyaytljbcsb-auth-token`;
+        localStorage.removeItem(storageKey);
       }
       setSession(session);
       setUser(session?.user ?? null);
@@ -149,6 +156,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => clearInterval(interval);
   }, [session?.access_token, checkSubscription]);
+
+  // Proactively refresh session every 10 minutes to prevent expiration
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    const refreshSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.warn('Failed to refresh session:', error);
+        } else if (data.session) {
+          console.log('Session refreshed proactively');
+        }
+      } catch (e) {
+        console.warn('Session refresh error:', e);
+      }
+    };
+
+    const interval = setInterval(refreshSession, 10 * 60 * 1000); // 10 minutes
+
+    return () => clearInterval(interval);
+  }, [session?.access_token]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
