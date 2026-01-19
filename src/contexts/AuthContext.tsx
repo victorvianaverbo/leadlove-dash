@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [extraProjects, setExtraProjects] = useState(0);
 
   const checkSubscription = useCallback(async () => {
-    if (!session?.access_token) {
+    // Verificar se temos uma sessão válida antes de chamar a edge function
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    
+    if (!currentSession?.access_token) {
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
@@ -46,12 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
       });
 
       if (error) {
         console.error('Error checking subscription:', error);
+        // Se for erro de autenticação, limpar estado
+        if (error.message?.includes('Auth') || error.message?.includes('session')) {
+          setSubscribed(false);
+          setSubscriptionTier(null);
+          setSubscriptionEnd(null);
+          setIsAdmin(false);
+          setExtraProjects(0);
+        }
+        return;
+      }
+
+      if (data?.error) {
+        console.error('Subscription check returned error:', data.error);
         return;
       }
 
@@ -71,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setSubscriptionLoading(false);
     }
-  }, [session?.access_token]);
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
