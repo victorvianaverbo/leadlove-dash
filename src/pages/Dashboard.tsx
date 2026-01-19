@@ -68,9 +68,14 @@ export default function Dashboard() {
   const { data: projectMetrics } = useQuery({
     queryKey: ['project-metrics'],
     queryFn: async () => {
+      // Limitar aos últimos 30 dias para carregamento mais rápido
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
+
       const [salesResult, spendResult] = await Promise.all([
-        supabase.from('sales').select('project_id, amount'),
-        supabase.from('ad_spend').select('project_id, spend')
+        supabase.from('sales').select('project_id, amount').gte('sale_date', dateFilter),
+        supabase.from('ad_spend').select('project_id, spend').gte('date', dateFilter)
       ]);
 
       const metrics: Record<string, { revenue: number; spend: number }> = {};
@@ -92,6 +97,7 @@ export default function Dashboard() {
       return metrics;
     },
     enabled: !!user,
+    staleTime: 2 * 60 * 1000, // 2 minutos de cache
   });
 
   const handleManageSubscription = async () => {

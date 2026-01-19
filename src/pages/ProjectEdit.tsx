@@ -79,7 +79,7 @@ export default function ProjectEdit() {
   const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify' && i.is_active);
   const metaIntegration = integrations?.find(i => i.type === 'meta_ads' && i.is_active);
 
-  // Fetch Kiwify products
+  // Fetch Kiwify products - com cache para evitar re-fetch desnecessário
   const { data: kiwifyProducts, isLoading: productsLoading, refetch: refetchProducts, isFetching: productsRefetching } = useQuery({
     queryKey: ['kiwify-products', id],
     queryFn: async () => {
@@ -90,9 +90,11 @@ export default function ProjectEdit() {
       return data?.products || [];
     },
     enabled: !!kiwifyIntegration,
+    staleTime: 5 * 60 * 1000, // 5 minutos de cache
+    gcTime: 10 * 60 * 1000,   // 10 minutos no garbage collector
   });
 
-  // Fetch Meta campaigns
+  // Fetch Meta campaigns - com cache para evitar re-fetch desnecessário
   const { data: metaCampaignsData, isLoading: campaignsLoading, refetch: refetchCampaigns, isFetching: campaignsRefetching } = useQuery({
     queryKey: ['meta-campaigns', id],
     queryFn: async () => {
@@ -103,6 +105,8 @@ export default function ProjectEdit() {
       return data;
     },
     enabled: !!metaIntegration,
+    staleTime: 5 * 60 * 1000, // 5 minutos de cache
+    gcTime: 10 * 60 * 1000,   // 10 minutos no garbage collector
   });
 
   const metaCampaigns = metaCampaignsData?.campaigns || [];

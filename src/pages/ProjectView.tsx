@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2, Sparkles } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -303,26 +303,6 @@ export default function ProjectView() {
     },
   });
 
-  // Generate daily report mutation
-  const generateReport = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('generate-daily-report', {
-        body: { project_id: id }
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      toast({ 
-        title: 'Relatório gerado!', 
-        description: data?.summary?.substring(0, 100) + '...' || 'O relatório foi gerado com sucesso.' 
-      });
-    },
-    onError: (error) => {
-      toast({ title: 'Erro ao gerar relatório', description: error.message, variant: 'destructive' });
-    },
-  });
 
   const getPublicUrl = () => {
     if (!projectSlug) return '';
@@ -453,18 +433,6 @@ export default function ProjectView() {
                 <RefreshCw className="h-4 w-4" />
               )}
               <span className="ml-2 hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button 
-              variant="secondary"
-              onClick={() => generateReport.mutate()} 
-              disabled={generateReport.isPending}
-            >
-              {generateReport.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              <span className="ml-2 hidden sm:inline">Gerar Relatório</span>
             </Button>
             <Button variant="outline" size="icon" asChild>
               <Link to={`/projects/${id}/edit`}>
