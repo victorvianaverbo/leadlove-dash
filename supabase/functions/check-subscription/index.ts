@@ -101,8 +101,22 @@ serve(async (req) => {
 
     if (hasActiveSub && validSubscription) {
       const subscription = validSubscription;
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      productId = subscription.items.data[0].price.product as string;
+      
+      // Safely convert timestamp to ISO string
+      try {
+        if (subscription.current_period_end) {
+          const endDate = new Date(subscription.current_period_end * 1000);
+          if (!isNaN(endDate.getTime())) {
+            subscriptionEnd = endDate.toISOString();
+          }
+        }
+      } catch (dateError) {
+        logStep("Warning: Could not parse subscription end date", { 
+          raw: subscription.current_period_end 
+        });
+      }
+      
+      productId = subscription.items.data[0]?.price?.product as string || null;
       logStep("Active/Trialing subscription found", { 
         subscriptionId: subscription.id, 
         status: subscription.status,
