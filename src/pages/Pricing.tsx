@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { BarChart3, Loader2, Check, Crown, ArrowLeft } from 'lucide-react';
 import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
-import { toast } from '@/hooks/use-toast';
+import { CheckoutModal } from '@/components/CheckoutModal';
 
 const plans: { key: PlanKey; projects: string; features: string[]; popular: boolean }[] = [
   {
@@ -38,6 +37,9 @@ export default function Pricing() {
   const { user, subscribed, subscriptionTier, session } = useAuth();
   const navigate = useNavigate();
   const [checkoutLoading, setCheckoutLoading] = useState<PlanKey | null>(null);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
 
   const handleSubscribe = async (planKey: PlanKey) => {
     if (!user || !session) {
@@ -45,26 +47,16 @@ export default function Pricing() {
       return;
     }
 
-    setCheckoutLoading(planKey);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId: STRIPE_PLANS[planKey].priceId },
-      });
+    const plan = STRIPE_PLANS[planKey];
+    setSelectedPriceId(plan.priceId);
+    setSelectedPlanName(plan.name);
+    setShowCheckoutModal(true);
+  };
 
-      if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast({
-        title: 'Erro ao iniciar checkout',
-        description: 'Tente novamente em alguns instantes.',
-        variant: 'destructive',
-      });
-    } finally {
-      setCheckoutLoading(null);
-    }
+  const handleCloseCheckout = () => {
+    setShowCheckoutModal(false);
+    setSelectedPriceId(null);
+    setSelectedPlanName('');
   };
 
   return (
@@ -168,6 +160,14 @@ export default function Pricing() {
           </div>
         </div>
       </section>
+
+      {/* Checkout Modal */}
+      <CheckoutModal
+        isOpen={showCheckoutModal}
+        onClose={handleCloseCheckout}
+        priceId={selectedPriceId}
+        planName={selectedPlanName}
+      />
     </div>
   );
 }
