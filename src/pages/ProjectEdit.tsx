@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search, BookOpen } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search, BookOpen, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function ProjectEdit() {
@@ -25,9 +25,16 @@ export default function ProjectEdit() {
   const [description, setDescription] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-const [campaignSearch, setCampaignSearch] = useState("");
-const [productSearch, setProductSearch] = useState("");
+  const [campaignSearch, setCampaignSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [manualProductIds, setManualProductIds] = useState("");
+
+  // Benchmark states
+  const [benchmarkEngagement, setBenchmarkEngagement] = useState<number>(2.0);
+  const [benchmarkCtr, setBenchmarkCtr] = useState<number>(1.0);
+  const [benchmarkLpRate, setBenchmarkLpRate] = useState<number>(70.0);
+  const [benchmarkCheckoutRate, setBenchmarkCheckoutRate] = useState<number>(5.0);
+  const [benchmarkSaleRate, setBenchmarkSaleRate] = useState<number>(2.0);
 
   // Kiwify credentials
   const [kiwifyClientId, setKiwifyClientId] = useState("");
@@ -107,6 +114,12 @@ const [productSearch, setProductSearch] = useState("");
       setDescription(project.description || "");
       setSelectedProducts(project.kiwify_product_ids || []);
       setSelectedCampaigns(project.meta_campaign_ids || []);
+      // Load benchmarks
+      setBenchmarkEngagement((project as any).benchmark_engagement ?? 2.0);
+      setBenchmarkCtr((project as any).benchmark_ctr ?? 1.0);
+      setBenchmarkLpRate((project as any).benchmark_lp_rate ?? 70.0);
+      setBenchmarkCheckoutRate((project as any).benchmark_checkout_rate ?? 5.0);
+      setBenchmarkSaleRate((project as any).benchmark_sale_rate ?? 2.0);
     }
   }, [project]);
 
@@ -202,7 +215,12 @@ const [productSearch, setProductSearch] = useState("");
           description,
           kiwify_product_ids: allProductIds,
           meta_campaign_ids: selectedCampaigns,
-        })
+          benchmark_engagement: benchmarkEngagement,
+          benchmark_ctr: benchmarkCtr,
+          benchmark_lp_rate: benchmarkLpRate,
+          benchmark_checkout_rate: benchmarkCheckoutRate,
+          benchmark_sale_rate: benchmarkSaleRate,
+        } as any)
         .eq('id', id);
       if (error) throw error;
     },
@@ -342,6 +360,73 @@ const [productSearch, setProductSearch] = useState("");
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Descrição do projeto..."
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Benchmarks Card */}
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Benchmarks de Funil
+            </CardTitle>
+            <CardDescription>
+              Defina os valores mínimos esperados para cada métrica do funil. O relatório diário usará esses valores como referência.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tx. Engajamento (%)</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={benchmarkEngagement}
+                  onChange={(e) => setBenchmarkEngagement(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">Padrão: 2%</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">CTR Link (%)</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={benchmarkCtr}
+                  onChange={(e) => setBenchmarkCtr(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">Padrão: 1%</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Taxa LP/Clique (%)</label>
+                <Input
+                  type="number"
+                  step="1"
+                  value={benchmarkLpRate}
+                  onChange={(e) => setBenchmarkLpRate(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">Padrão: 70%</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tx. Checkout (%)</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={benchmarkCheckoutRate}
+                  onChange={(e) => setBenchmarkCheckoutRate(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">Padrão: 5%</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Taxa Venda/LP (%)</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={benchmarkSaleRate}
+                  onChange={(e) => setBenchmarkSaleRate(parseFloat(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">Padrão: 2%</p>
+              </div>
             </div>
           </CardContent>
         </Card>
