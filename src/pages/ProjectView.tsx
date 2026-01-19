@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
+import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,7 @@ export default function ProjectView() {
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [projectSlug, setProjectSlug] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Custom domain - use your published domain
   const PUBLIC_DOMAIN = 'https://metrikapro.com.br';
@@ -273,6 +275,34 @@ export default function ProjectView() {
     },
   });
 
+  // Mutation to delete project
+  const deleteProject = useMutation({
+    mutationFn: async () => {
+      // Delete related data first
+      await supabase.from('daily_reports').delete().eq('project_id', id);
+      await supabase.from('integrations').delete().eq('project_id', id);
+      await supabase.from('ad_spend').delete().eq('project_id', id);
+      await supabase.from('sales').delete().eq('project_id', id);
+      // Delete project
+      const { error } = await supabase.from('projects').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Projeto excluído!',
+        description: 'O projeto e todos os dados foram removidos.',
+      });
+      navigate('/dashboard');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao excluir',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getPublicUrl = () => {
     if (!projectSlug) return '';
     return `${PUBLIC_DOMAIN}/${projectSlug}`;
@@ -407,6 +437,14 @@ export default function ProjectView() {
               <Link to={`/projects/${id}/edit`}>
                 <Settings className="h-4 w-4" />
               </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -967,6 +1005,15 @@ export default function ProjectView() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Project Dialog */}
+        <DeleteProjectDialog
+          projectName={project?.name || ''}
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={() => deleteProject.mutate()}
+          isDeleting={deleteProject.isPending}
+        />
       </main>
     </div>
   );
