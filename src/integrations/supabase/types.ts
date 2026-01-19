@@ -101,6 +101,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ad_spend_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       daily_reports: {
@@ -142,6 +149,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "daily_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       integrations: {
@@ -181,6 +195,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
             referencedColumns: ["id"]
           },
         ]
@@ -356,6 +377,13 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sales_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_overrides: {
@@ -408,6 +436,78 @@ export type Database = {
       }
     }
     Views: {
+      projects_public: {
+        Row: {
+          account_status: string | null
+          ad_type: string | null
+          benchmark_checkout_rate: number | null
+          benchmark_ctr: number | null
+          benchmark_engagement: number | null
+          benchmark_lp_rate: number | null
+          benchmark_sale_rate: number | null
+          campaign_objective: string | null
+          class_date: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          investment_value: number | null
+          is_public: boolean | null
+          kiwify_product_ids: string[] | null
+          last_sync_at: string | null
+          meta_campaign_ids: string[] | null
+          name: string | null
+          share_token: string | null
+          slug: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_status?: string | null
+          ad_type?: string | null
+          benchmark_checkout_rate?: number | null
+          benchmark_ctr?: number | null
+          benchmark_engagement?: number | null
+          benchmark_lp_rate?: number | null
+          benchmark_sale_rate?: number | null
+          campaign_objective?: string | null
+          class_date?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          investment_value?: number | null
+          is_public?: boolean | null
+          kiwify_product_ids?: string[] | null
+          last_sync_at?: string | null
+          meta_campaign_ids?: string[] | null
+          name?: string | null
+          share_token?: string | null
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_status?: string | null
+          ad_type?: string | null
+          benchmark_checkout_rate?: number | null
+          benchmark_ctr?: number | null
+          benchmark_engagement?: number | null
+          benchmark_lp_rate?: number | null
+          benchmark_sale_rate?: number | null
+          campaign_objective?: string | null
+          class_date?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          investment_value?: number | null
+          is_public?: boolean | null
+          kiwify_product_ids?: string[] | null
+          last_sync_at?: string | null
+          meta_campaign_ids?: string[] | null
+          name?: string | null
+          share_token?: string | null
+          slug?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       sales_public: {
         Row: {
           amount: number | null
@@ -469,6 +569,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
             referencedColumns: ["id"]
           },
         ]
