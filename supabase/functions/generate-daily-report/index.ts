@@ -20,6 +20,15 @@ function getBrasiliaDate(daysAgo = 0): string {
   return brasilia.toISOString().split('T')[0];
 }
 
+// Default benchmarks (market standards)
+const DEFAULT_BENCHMARKS = {
+  engagement: 2.0,    // Tx. Engajamento Criativo >= 2%
+  ctr: 1.0,           // CTR (Link) >= 1%
+  lpRate: 70.0,       // Taxa LP/Clique >= 70%
+  checkoutRate: 5.0,  // Tx. Conv. Checkout >= 5%
+  saleRate: 2.0,      // Taxa Venda/LP >= 2%
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -105,7 +114,7 @@ async function generateReportForProject(
   console.log(`Generating report for project ${projectId}`);
   console.log(`Today (Brasilia): ${today}, Yesterday: ${yesterday}`);
 
-  // Fetch project details
+  // Fetch project details (including benchmarks)
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('*')
@@ -118,7 +127,16 @@ async function generateReportForProject(
 
   const projectData = project as any;
 
-  // Fetch yesterday's sales (the report is generated at midnight, so we report on yesterday)
+  // Get project benchmarks (use defaults if not set)
+  const benchmarks = {
+    engagement: projectData.benchmark_engagement ?? DEFAULT_BENCHMARKS.engagement,
+    ctr: projectData.benchmark_ctr ?? DEFAULT_BENCHMARKS.ctr,
+    lpRate: projectData.benchmark_lp_rate ?? DEFAULT_BENCHMARKS.lpRate,
+    checkoutRate: projectData.benchmark_checkout_rate ?? DEFAULT_BENCHMARKS.checkoutRate,
+    saleRate: projectData.benchmark_sale_rate ?? DEFAULT_BENCHMARKS.saleRate,
+  };
+
+  // Fetch yesterday's sales
   const { data: yesterdaySales, error: salesError } = await supabase
     .from('sales')
     .select('*')
@@ -171,106 +189,158 @@ async function generateReportForProject(
   const filteredYesterdayAdSpend = filterAdSpend(yesterdayAdSpend || []) || [];
   const filteredDayBeforeAdSpend = filterAdSpend(dayBeforeAdSpend || []) || [];
 
-  // Calculate metrics for yesterday
-  const yesterdayRevenue = filteredYesterdaySales.reduce((sum, s) => sum + Number(s.amount), 0);
-  const yesterdaySpend = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
-  const yesterdaySalesCount = filteredYesterdaySales.length;
-  const yesterdayRoas = yesterdaySpend > 0 ? yesterdayRevenue / yesterdaySpend : 0;
-  const yesterdayCpa = yesterdaySalesCount > 0 ? yesterdaySpend / yesterdaySalesCount : 0;
-  const yesterdayImpressions = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
-  const yesterdayClicks = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.clicks || 0), 0);
-  const yesterdayCtr = yesterdayImpressions > 0 ? (yesterdayClicks / yesterdayImpressions) * 100 : 0;
-  const yesterdayCpm = yesterdayImpressions > 0 ? (yesterdaySpend / yesterdayImpressions) * 1000 : 0;
-  const yesterdayCpc = yesterdayClicks > 0 ? yesterdaySpend / yesterdayClicks : 0;
+  // ========== FUNNEL METRICS ==========
+  // Yesterday's funnel data
+  const yImpressions = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
+  const yLinkClicks = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
+  const yLpViews = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.landing_page_views || 0), 0);
+  const yCheckouts = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
+  const ySalesCount = filteredYesterdaySales.length;
+  const yThruplays = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.thruplays || 0), 0);
+  const yRevenue = filteredYesterdaySales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const ySpend = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
 
-  // Calculate metrics for day before
-  const dayBeforeRevenue = filteredDayBeforeSales.reduce((sum, s) => sum + Number(s.amount), 0);
-  const dayBeforeSpend = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
-  const dayBeforeSalesCount = filteredDayBeforeSales.length;
-  const dayBeforeRoas = dayBeforeSpend > 0 ? dayBeforeRevenue / dayBeforeSpend : 0;
-  const dayBeforeCpa = dayBeforeSalesCount > 0 ? dayBeforeSpend / dayBeforeSalesCount : 0;
+  // Day before funnel data
+  const dbImpressions = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
+  const dbLinkClicks = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
+  const dbLpViews = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.landing_page_views || 0), 0);
+  const dbCheckouts = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
+  const dbSalesCount = filteredDayBeforeSales.length;
+  const dbRevenue = filteredDayBeforeSales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const dbSpend = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
 
-  // Build comparison data
-  const comparison = {
-    revenue: {
-      yesterday: yesterdayRevenue,
-      dayBefore: dayBeforeRevenue,
-      change: dayBeforeRevenue > 0 ? ((yesterdayRevenue - dayBeforeRevenue) / dayBeforeRevenue) * 100 : 0,
-    },
-    spend: {
-      yesterday: yesterdaySpend,
-      dayBefore: dayBeforeSpend,
-      change: dayBeforeSpend > 0 ? ((yesterdaySpend - dayBeforeSpend) / dayBeforeSpend) * 100 : 0,
-    },
-    sales: {
-      yesterday: yesterdaySalesCount,
-      dayBefore: dayBeforeSalesCount,
-      change: dayBeforeSalesCount > 0 ? ((yesterdaySalesCount - dayBeforeSalesCount) / dayBeforeSalesCount) * 100 : 0,
-    },
-    roas: {
-      yesterday: yesterdayRoas,
-      dayBefore: dayBeforeRoas,
-      change: dayBeforeRoas > 0 ? ((yesterdayRoas - dayBeforeRoas) / dayBeforeRoas) * 100 : 0,
-    },
-    cpa: {
-      yesterday: yesterdayCpa,
-      dayBefore: dayBeforeCpa,
-      change: dayBeforeCpa > 0 ? ((yesterdayCpa - dayBeforeCpa) / dayBeforeCpa) * 100 : 0,
-    },
+  // Calculate the 5 funnel rates for yesterday
+  // 1. Tx. Engajamento Criativo = (ThruPlays ou Cliques) / Impressões
+  const yEngagementRate = yImpressions > 0 ? (yLinkClicks / yImpressions) * 100 : 0;
+  // 2. CTR (Link) = Link Clicks / Impressões
+  const yCtrRate = yImpressions > 0 ? (yLinkClicks / yImpressions) * 100 : 0;
+  // 3. Taxa LP/Clique = LP Views / Link Clicks
+  const yLpRate = yLinkClicks > 0 ? (yLpViews / yLinkClicks) * 100 : 0;
+  // 4. Tx. Conv. Checkout = Checkouts / LP Views
+  const yCheckoutRate = yLpViews > 0 ? (yCheckouts / yLpViews) * 100 : 0;
+  // 5. Taxa Venda/LP = Vendas / LP Views
+  const ySaleRate = yLpViews > 0 ? (ySalesCount / yLpViews) * 100 : 0;
+
+  // Calculate the 5 funnel rates for day before
+  const dbEngagementRate = dbImpressions > 0 ? (dbLinkClicks / dbImpressions) * 100 : 0;
+  const dbCtrRate = dbImpressions > 0 ? (dbLinkClicks / dbImpressions) * 100 : 0;
+  const dbLpRate = dbLinkClicks > 0 ? (dbLpViews / dbLinkClicks) * 100 : 0;
+  const dbCheckoutRate = dbLpViews > 0 ? (dbCheckouts / dbLpViews) * 100 : 0;
+  const dbSaleRate = dbLpViews > 0 ? (dbSalesCount / dbLpViews) * 100 : 0;
+
+  // Determine status for each metric (ok or alert)
+  const funnelStatus = {
+    engagement: yEngagementRate >= benchmarks.engagement ? 'ok' : 'alert',
+    ctr: yCtrRate >= benchmarks.ctr ? 'ok' : 'alert',
+    lpRate: yLpRate >= benchmarks.lpRate ? 'ok' : 'alert',
+    checkoutRate: yCheckoutRate >= benchmarks.checkoutRate ? 'ok' : 'alert',
+    saleRate: ySaleRate >= benchmarks.saleRate ? 'ok' : 'alert',
   };
 
-  const metrics = {
-    revenue: yesterdayRevenue,
-    spend: yesterdaySpend,
-    sales: yesterdaySalesCount,
-    roas: yesterdayRoas,
-    cpa: yesterdayCpa,
-    impressions: yesterdayImpressions,
-    clicks: yesterdayClicks,
-    ctr: yesterdayCtr,
-    cpm: yesterdayCpm,
-    cpc: yesterdayCpc,
+  // Calculate changes from day before
+  const calcChange = (current: number, previous: number) => 
+    previous > 0 ? ((current - previous) / previous) * 100 : (current > 0 ? 100 : 0);
+
+  const funnelComparison = {
+    engagement: { yesterday: yEngagementRate, dayBefore: dbEngagementRate, change: calcChange(yEngagementRate, dbEngagementRate) },
+    ctr: { yesterday: yCtrRate, dayBefore: dbCtrRate, change: calcChange(yCtrRate, dbCtrRate) },
+    lpRate: { yesterday: yLpRate, dayBefore: dbLpRate, change: calcChange(yLpRate, dbLpRate) },
+    checkoutRate: { yesterday: yCheckoutRate, dayBefore: dbCheckoutRate, change: calcChange(yCheckoutRate, dbCheckoutRate) },
+    saleRate: { yesterday: ySaleRate, dayBefore: dbSaleRate, change: calcChange(ySaleRate, dbSaleRate) },
+    revenue: { yesterday: yRevenue, dayBefore: dbRevenue, change: calcChange(yRevenue, dbRevenue) },
+    spend: { yesterday: ySpend, dayBefore: dbSpend, change: calcChange(ySpend, dbSpend) },
+    sales: { yesterday: ySalesCount, dayBefore: dbSalesCount, change: calcChange(ySalesCount, dbSalesCount) },
   };
 
-  // Generate AI summary
-  const prompt = `Você é um analista de performance de marketing digital. Analise os dados abaixo e gere um relatório executivo em português brasileiro.
+  // ROAS and CPA
+  const yRoas = ySpend > 0 ? yRevenue / ySpend : 0;
+  const yCpa = ySalesCount > 0 ? ySpend / ySalesCount : 0;
+  const dbRoas = dbSpend > 0 ? dbRevenue / dbSpend : 0;
+  const dbCpa = dbSalesCount > 0 ? dbSpend / dbSalesCount : 0;
 
-DADOS DO DIA ${yesterday}:
-- Receita: R$ ${yesterdayRevenue.toFixed(2)} (${yesterdaySalesCount} vendas)
-- Gasto em Ads: R$ ${yesterdaySpend.toFixed(2)}
-- ROAS: ${yesterdayRoas.toFixed(2)}x
-- CPA: R$ ${yesterdayCpa.toFixed(2)}
-- CTR: ${yesterdayCtr.toFixed(2)}%
-- CPM: R$ ${yesterdayCpm.toFixed(2)}
-- CPC: R$ ${yesterdayCpc.toFixed(2)}
-- Impressões: ${yesterdayImpressions.toLocaleString()}
-- Cliques: ${yesterdayClicks.toLocaleString()}
+  // Build funnel metrics object
+  const funnelMetrics = {
+    // Raw numbers
+    impressions: yImpressions,
+    linkClicks: yLinkClicks,
+    lpViews: yLpViews,
+    checkouts: yCheckouts,
+    sales: ySalesCount,
+    thruplays: yThruplays,
+    revenue: yRevenue,
+    spend: ySpend,
+    roas: yRoas,
+    cpa: yCpa,
+    // Calculated rates
+    rates: {
+      engagement: yEngagementRate,
+      ctr: yCtrRate,
+      lpRate: yLpRate,
+      checkoutRate: yCheckoutRate,
+      saleRate: ySaleRate,
+    },
+    // Benchmarks used
+    benchmarks,
+    // Status for each metric
+    status: funnelStatus,
+  };
 
-COMPARAÇÃO COM O DIA ANTERIOR (${dayBeforeYesterday}):
-- Receita: R$ ${dayBeforeRevenue.toFixed(2)} (${dayBeforeSalesCount} vendas) → ${comparison.revenue.change > 0 ? '+' : ''}${comparison.revenue.change.toFixed(1)}%
-- Gasto: R$ ${dayBeforeSpend.toFixed(2)} → ${comparison.spend.change > 0 ? '+' : ''}${comparison.spend.change.toFixed(1)}%
-- ROAS: ${dayBeforeRoas.toFixed(2)}x → ${comparison.roas.change > 0 ? '+' : ''}${comparison.roas.change.toFixed(1)}%
-- CPA: R$ ${dayBeforeCpa.toFixed(2)} → ${comparison.cpa.change > 0 ? '+' : ''}${comparison.cpa.change.toFixed(1)}%
+  // Generate AI summary focused on funnel metrics
+  const prompt = `Você é um analista de performance de marketing digital especializado em funil de vendas.
 
-Gere um relatório com:
-1. Um resumo executivo de 2-3 frases sobre o desempenho do dia
-2. Destaques positivos e negativos
-3. 3-5 ações recomendadas para o próximo dia, baseadas nos dados
+DADOS DO DIA ${yesterday} - PROJETO: ${projectData.name}
+
+=== MÉTRICAS DE FUNIL ===
+
+1. Tx. Engajamento Criativo: ${yEngagementRate.toFixed(2)}% (benchmark: ${benchmarks.engagement}%)
+   → ${funnelStatus.engagement === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
+   → Variação: ${funnelComparison.engagement.change > 0 ? '+' : ''}${funnelComparison.engagement.change.toFixed(1)}% vs ontem
+
+2. CTR (Link Clicks): ${yCtrRate.toFixed(2)}% (benchmark: ${benchmarks.ctr}%)
+   → ${funnelStatus.ctr === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
+   → Variação: ${funnelComparison.ctr.change > 0 ? '+' : ''}${funnelComparison.ctr.change.toFixed(1)}% vs ontem
+
+3. Taxa LP/Clique: ${yLpRate.toFixed(2)}% (benchmark: ${benchmarks.lpRate}%)
+   → ${funnelStatus.lpRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
+   → Variação: ${funnelComparison.lpRate.change > 0 ? '+' : ''}${funnelComparison.lpRate.change.toFixed(1)}% vs ontem
+
+4. Tx. Conv. Checkout: ${yCheckoutRate.toFixed(2)}% (benchmark: ${benchmarks.checkoutRate}%)
+   → ${funnelStatus.checkoutRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
+   → Variação: ${funnelComparison.checkoutRate.change > 0 ? '+' : ''}${funnelComparison.checkoutRate.change.toFixed(1)}% vs ontem
+
+5. Taxa Venda/LP: ${ySaleRate.toFixed(2)}% (benchmark: ${benchmarks.saleRate}%)
+   → ${funnelStatus.saleRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
+   → Variação: ${funnelComparison.saleRate.change > 0 ? '+' : ''}${funnelComparison.saleRate.change.toFixed(1)}% vs ontem
+
+=== DADOS ABSOLUTOS ===
+- Impressões: ${yImpressions.toLocaleString()}
+- Link Clicks: ${yLinkClicks.toLocaleString()}
+- LP Views: ${yLpViews.toLocaleString()}
+- Checkouts: ${yCheckouts.toLocaleString()}
+- Vendas: ${ySalesCount}
+- Receita: R$ ${yRevenue.toFixed(2)}
+- Gasto: R$ ${ySpend.toFixed(2)}
+- ROAS: ${yRoas.toFixed(2)}x
+- CPA: R$ ${yCpa.toFixed(2)}
+
+=== INSTRUÇÕES ===
+1. Analise cada etapa do funil e identifique onde está o gargalo (métrica mais fraca).
+2. Gere recomendações específicas para melhorar as métricas que estão abaixo do benchmark.
+3. Priorize ações para o gargalo principal.
+4. Seja direto e objetivo - o cliente precisa de insights acionáveis.
 
 Formato de resposta (JSON):
 {
-  "summary": "Resumo executivo aqui...",
-  "highlights": {
-    "positive": ["ponto positivo 1", "ponto positivo 2"],
-    "negative": ["ponto negativo 1"]
-  },
+  "summary": "Resumo de 2-3 frases focando no gargalo do funil e performance geral",
+  "bottleneck": "nome da métrica que é o maior gargalo (engagement, ctr, lpRate, checkoutRate ou saleRate)",
   "actions": [
-    {"action": "Ação 1", "priority": "alta"},
-    {"action": "Ação 2", "priority": "média"}
+    {"action": "Ação específica para o gargalo", "priority": "alta"},
+    {"action": "Ação secundária", "priority": "média"},
+    {"action": "Ação complementar", "priority": "baixa"}
   ]
 }`;
 
-  console.log('Calling Lovable AI for report generation...');
+  console.log('Calling Lovable AI for funnel-focused report generation...');
 
   const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -281,7 +351,7 @@ Formato de resposta (JSON):
     body: JSON.stringify({
       model: 'google/gemini-3-flash-preview',
       messages: [
-        { role: 'system', content: 'Você é um analista de marketing digital especializado. Responda sempre em JSON válido.' },
+        { role: 'system', content: 'Você é um analista de marketing digital especializado em funil de vendas. Responda sempre em JSON válido. Foque nas métricas de funil e identifique gargalos.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
@@ -317,7 +387,7 @@ Formato de resposta (JSON):
     console.error('Error parsing AI response:', parseError);
     parsedAiResponse = {
       summary: aiContent || 'Relatório gerado com sucesso.',
-      highlights: { positive: [], negative: [] },
+      bottleneck: null,
       actions: [],
     };
   }
@@ -329,9 +399,9 @@ Formato de resposta (JSON):
       project_id: projectId,
       report_date: yesterday,
       summary: parsedAiResponse.summary,
-      comparison,
+      comparison: funnelComparison,
       actions: parsedAiResponse.actions || [],
-      metrics,
+      metrics: funnelMetrics,
     }, {
       onConflict: 'project_id,report_date',
     })
@@ -350,5 +420,7 @@ Formato de resposta (JSON):
     report_id: report.id,
     report_date: yesterday,
     summary: parsedAiResponse.summary,
+    bottleneck: parsedAiResponse.bottleneck,
+    funnel: funnelMetrics,
   };
 }

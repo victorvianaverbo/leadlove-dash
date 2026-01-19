@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle } from 'lucide-react';
+import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle, Eye, MousePointer, CreditCard, ShoppingBag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
@@ -29,31 +29,59 @@ interface SalesPublic {
   utm_term: string | null;
 }
 
+interface FunnelMetrics {
+  impressions: number;
+  linkClicks: number;
+  lpViews: number;
+  checkouts: number;
+  sales: number;
+  thruplays: number;
+  revenue: number;
+  spend: number;
+  roas: number;
+  cpa: number;
+  rates: {
+    engagement: number;
+    ctr: number;
+    lpRate: number;
+    checkoutRate: number;
+    saleRate: number;
+  };
+  benchmarks: {
+    engagement: number;
+    ctr: number;
+    lpRate: number;
+    checkoutRate: number;
+    saleRate: number;
+  };
+  status: {
+    engagement: 'ok' | 'alert';
+    ctr: 'ok' | 'alert';
+    lpRate: 'ok' | 'alert';
+    checkoutRate: 'ok' | 'alert';
+    saleRate: 'ok' | 'alert';
+  };
+}
+
 interface DailyReport {
   id: string;
   project_id: string;
   report_date: string;
   summary: string;
   comparison: {
+    engagement?: { yesterday: number; dayBefore: number; change: number };
+    ctr?: { yesterday: number; dayBefore: number; change: number };
+    lpRate?: { yesterday: number; dayBefore: number; change: number };
+    checkoutRate?: { yesterday: number; dayBefore: number; change: number };
+    saleRate?: { yesterday: number; dayBefore: number; change: number };
     revenue: { yesterday: number; dayBefore: number; change: number };
     spend: { yesterday: number; dayBefore: number; change: number };
     sales: { yesterday: number; dayBefore: number; change: number };
-    roas: { yesterday: number; dayBefore: number; change: number };
-    cpa: { yesterday: number; dayBefore: number; change: number };
+    roas?: { yesterday: number; dayBefore: number; change: number };
+    cpa?: { yesterday: number; dayBefore: number; change: number };
   };
   actions: Array<{ action: string; priority: string }>;
-  metrics: {
-    revenue: number;
-    spend: number;
-    sales: number;
-    roas: number;
-    cpa: number;
-    impressions: number;
-    clicks: number;
-    ctr: number;
-    cpm: number;
-    cpc: number;
-  };
+  metrics: FunnelMetrics;
   created_at: string;
 }
 
@@ -94,6 +122,59 @@ function PriorityBadge({ priority }: { priority: string }) {
     <Badge variant="outline" className={colors[priority.toLowerCase()] || colors.baixa}>
       {priority}
     </Badge>
+  );
+}
+
+function FunnelMetricCard({ 
+  label, 
+  value, 
+  benchmark, 
+  status, 
+  change,
+  icon: Icon,
+  suffix = '%'
+}: { 
+  label: string; 
+  value: number; 
+  benchmark: number; 
+  status: 'ok' | 'alert'; 
+  change?: number;
+  icon: React.ElementType;
+  suffix?: string;
+}) {
+  const isOk = status === 'ok';
+  
+  return (
+    <div className={`relative rounded-xl p-4 border-2 transition-all ${
+      isOk 
+        ? 'border-success/30 bg-success/5' 
+        : 'border-destructive/30 bg-destructive/5'
+    }`}>
+      <div className="flex items-start justify-between mb-2">
+        <div className={`p-2 rounded-lg ${isOk ? 'bg-success/10' : 'bg-destructive/10'}`}>
+          <Icon className={`h-4 w-4 ${isOk ? 'text-success' : 'text-destructive'}`} />
+        </div>
+        <Badge variant="outline" className={`text-xs ${
+          isOk 
+            ? 'bg-success/10 text-success border-success/30' 
+            : 'bg-destructive/10 text-destructive border-destructive/30'
+        }`}>
+          {isOk ? 'OK' : 'Alerta'}
+        </Badge>
+      </div>
+      
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className={`text-xl font-bold ${isOk ? 'text-success' : 'text-destructive'}`}>
+        {value.toFixed(2)}{suffix}
+      </p>
+      
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+        <span className="text-xs text-muted-foreground">
+          Meta: {benchmark}{suffix}
+        </span>
+        {change !== undefined && <ChangeIndicator value={change} />}
+      </div>
+    </div>
   );
 }
 
@@ -250,6 +331,9 @@ export default function PublicDashboard() {
     });
   };
 
+  // Check if report has funnel metrics (new format)
+  const hasFunnelMetrics = latestReport?.metrics?.rates !== undefined;
+
   if (projectLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -321,40 +405,124 @@ export default function PublicDashboard() {
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {/* Summary */}
               <p className="text-sm leading-relaxed">{latestReport.summary}</p>
 
-              {/* Metrics comparison */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Receita</p>
-                  <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
-                  <ChangeIndicator value={latestReport.comparison.revenue.change} />
+              {/* Funnel Metrics Section - New Format */}
+              {hasFunnelMetrics && latestReport.metrics.rates && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Funil de Conversão
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <FunnelMetricCard
+                      label="Tx. Engajamento"
+                      value={latestReport.metrics.rates.engagement}
+                      benchmark={latestReport.metrics.benchmarks.engagement}
+                      status={latestReport.metrics.status.engagement}
+                      change={latestReport.comparison.engagement?.change}
+                      icon={Eye}
+                    />
+                    <FunnelMetricCard
+                      label="CTR (Link)"
+                      value={latestReport.metrics.rates.ctr}
+                      benchmark={latestReport.metrics.benchmarks.ctr}
+                      status={latestReport.metrics.status.ctr}
+                      change={latestReport.comparison.ctr?.change}
+                      icon={MousePointer}
+                    />
+                    <FunnelMetricCard
+                      label="Taxa LP/Clique"
+                      value={latestReport.metrics.rates.lpRate}
+                      benchmark={latestReport.metrics.benchmarks.lpRate}
+                      status={latestReport.metrics.status.lpRate}
+                      change={latestReport.comparison.lpRate?.change}
+                      icon={Target}
+                    />
+                    <FunnelMetricCard
+                      label="Tx. Checkout"
+                      value={latestReport.metrics.rates.checkoutRate}
+                      benchmark={latestReport.metrics.benchmarks.checkoutRate}
+                      status={latestReport.metrics.status.checkoutRate}
+                      change={latestReport.comparison.checkoutRate?.change}
+                      icon={CreditCard}
+                    />
+                    <FunnelMetricCard
+                      label="Taxa Venda/LP"
+                      value={latestReport.metrics.rates.saleRate}
+                      benchmark={latestReport.metrics.benchmarks.saleRate}
+                      status={latestReport.metrics.status.saleRate}
+                      change={latestReport.comparison.saleRate?.change}
+                      icon={ShoppingBag}
+                    />
+                  </div>
+
+                  {/* Absolute Numbers Row */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                      <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
+                      <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                      <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
+                      <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                      <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                        {latestReport.metrics.roas.toFixed(2)}x
+                      </p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                      <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                      <p className="font-semibold">{latestReport.metrics.sales}</p>
+                      <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Gasto</p>
-                  <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
-                  <ChangeIndicator value={-latestReport.comparison.spend.change} />
+              )}
+
+              {/* Legacy format - show old metrics if no funnel data */}
+              {!hasFunnelMetrics && (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                    <p className="font-semibold text-success">{formatCurrency((latestReport.metrics as any).revenue || 0)}</p>
+                    <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                    <p className="font-semibold text-destructive">{formatCurrency((latestReport.metrics as any).spend || 0)}</p>
+                    <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                    <p className={`font-semibold ${((latestReport.metrics as any).roas || 0) >= 1 ? 'text-success' : 'text-destructive'}`}>
+                      {((latestReport.metrics as any).roas || 0).toFixed(2)}x
+                    </p>
+                    <ChangeIndicator value={latestReport.comparison.roas?.change || 0} />
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                    <p className="font-semibold">{formatCurrency((latestReport.metrics as any).cpa || 0)}</p>
+                    <ChangeIndicator value={-(latestReport.comparison.cpa?.change || 0)} />
+                  </div>
+                  <div className="bg-card rounded-lg p-3 border">
+                    <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                    <p className="font-semibold">{(latestReport.metrics as any).sales || 0}</p>
+                    <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
+                  </div>
                 </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                  <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
-                    {latestReport.metrics.roas.toFixed(2)}x
-                  </p>
-                  <ChangeIndicator value={latestReport.comparison.roas.change} />
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                  <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
-                  <ChangeIndicator value={-latestReport.comparison.cpa.change} />
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Vendas</p>
-                  <p className="font-semibold">{latestReport.metrics.sales}</p>
-                  <ChangeIndicator value={latestReport.comparison.sales.change} />
-                </div>
-              </div>
+              )}
 
               {/* Actions */}
               {latestReport.actions && latestReport.actions.length > 0 && (
