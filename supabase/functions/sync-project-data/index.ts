@@ -43,9 +43,20 @@ Deno.serve(async (req) => {
     const userId = claimsData.claims.sub;
 
     const { project_id } = await req.json();
+    
+    // Validate project_id is provided
     if (!project_id) {
       return new Response(
         JSON.stringify({ error: 'project_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate project_id is a valid UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (typeof project_id !== 'string' || !uuidRegex.test(project_id)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid project_id format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

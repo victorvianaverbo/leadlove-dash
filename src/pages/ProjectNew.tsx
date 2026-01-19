@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, AlertTriangle, Crown } from 'lucide-react';
 import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
 import { CheckoutModal } from '@/components/CheckoutModal';
+import { validateProjectName, validateProjectDescription } from '@/lib/validation';
 
 // List of upgrade options for the modal
 const upgradeOptions: { key: PlanKey; label: string }[] = [
@@ -97,10 +98,21 @@ export default function ProjectNew() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast({ title: 'Nome obrigatório', variant: 'destructive' });
+    
+    // Validate name
+    const nameValidation = validateProjectName(name);
+    if (!nameValidation.valid) {
+      toast({ title: 'Erro de validação', description: nameValidation.error, variant: 'destructive' });
       return;
     }
+    
+    // Validate description
+    const descValidation = validateProjectDescription(description);
+    if (!descValidation.valid) {
+      toast({ title: 'Erro de validação', description: descValidation.error, variant: 'destructive' });
+      return;
+    }
+    
     if (!canCreateProject) {
       toast({ title: 'Limite de projetos atingido', description: 'Faça upgrade para criar mais projetos.', variant: 'destructive' });
       return;
