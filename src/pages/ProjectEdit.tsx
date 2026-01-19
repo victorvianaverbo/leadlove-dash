@@ -123,9 +123,27 @@ export default function ProjectEdit() {
     }
   }, [project]);
 
-  // Security: We no longer load actual credentials from the database to prevent exposure in browser DevTools
-  // Users must re-enter credentials to update them - existing credentials remain secure on the server
-  // This prevents client-side exposure of sensitive third-party API credentials
+  // Load NON-SENSITIVE credentials from integrations to show connection status
+  // Sensitive fields (access_token, client_secret) remain empty for security
+  useEffect(() => {
+    if (integrations) {
+      const kiwify = integrations.find(i => i.type === 'kiwify' && i.is_active);
+      const meta = integrations.find(i => i.type === 'meta_ads' && i.is_active);
+      
+      if (kiwify?.credentials) {
+        const creds = kiwify.credentials as { client_id?: string; account_id?: string };
+        setKiwifyClientId(creds.client_id || "");
+        setKiwifyAccountId(creds.account_id || "");
+        // client_secret stays empty (sensitive)
+      }
+      
+      if (meta?.credentials) {
+        const creds = meta.credentials as { ad_account_id?: string };
+        setMetaAdAccountId(creds.ad_account_id || "");
+        // access_token stays empty (sensitive)
+      }
+    }
+  }, [integrations]);
 
   // Filter products by search
   const filteredProducts = kiwifyProducts?.filter((p: { name: string }) =>
@@ -253,25 +271,58 @@ export default function ProjectEdit() {
   });
 
   const handleSaveKiwify = () => {
-    if (!kiwifyClientId || !kiwifyClientSecret || !kiwifyAccountId) {
-      toast({ title: "Preencha todas as credenciais do Kiwify", variant: "destructive" });
-      return;
+    // If integration exists, only require the secret to be re-entered
+    if (kiwifyIntegration) {
+      if (!kiwifyClientSecret) {
+        toast({ title: "Digite o Client Secret para atualizar", variant: "destructive" });
+        return;
+      }
+      const currentCreds = kiwifyIntegration.credentials as { client_id?: string; account_id?: string };
+      saveIntegration.mutate({
+        type: 'kiwify',
+        credentials: { 
+          client_id: kiwifyClientId || currentCreds.client_id, 
+          client_secret: kiwifyClientSecret, 
+          account_id: kiwifyAccountId || currentCreds.account_id 
+        },
+      });
+    } else {
+      if (!kiwifyClientId || !kiwifyClientSecret || !kiwifyAccountId) {
+        toast({ title: "Preencha todas as credenciais do Kiwify", variant: "destructive" });
+        return;
+      }
+      saveIntegration.mutate({
+        type: 'kiwify',
+        credentials: { client_id: kiwifyClientId, client_secret: kiwifyClientSecret, account_id: kiwifyAccountId },
+      });
     }
-    saveIntegration.mutate({
-      type: 'kiwify',
-      credentials: { client_id: kiwifyClientId, client_secret: kiwifyClientSecret, account_id: kiwifyAccountId },
-    });
   };
 
   const handleSaveMeta = () => {
-    if (!metaAccessToken || !metaAdAccountId) {
-      toast({ title: "Preencha todas as credenciais do Meta Ads", variant: "destructive" });
-      return;
+    // If integration exists, only require the token to be re-entered
+    if (metaIntegration) {
+      if (!metaAccessToken) {
+        toast({ title: "Digite o Access Token para atualizar", variant: "destructive" });
+        return;
+      }
+      const currentCreds = metaIntegration.credentials as { ad_account_id?: string };
+      saveIntegration.mutate({
+        type: 'meta_ads',
+        credentials: { 
+          access_token: metaAccessToken, 
+          ad_account_id: metaAdAccountId || currentCreds.ad_account_id 
+        },
+      });
+    } else {
+      if (!metaAccessToken || !metaAdAccountId) {
+        toast({ title: "Preencha todas as credenciais do Meta Ads", variant: "destructive" });
+        return;
+      }
+      saveIntegration.mutate({
+        type: 'meta_ads',
+        credentials: { access_token: metaAccessToken, ad_account_id: metaAdAccountId },
+      });
     }
-    saveIntegration.mutate({
-      type: 'meta_ads',
-      credentials: { access_token: metaAccessToken, ad_account_id: metaAdAccountId },
-    });
   };
 
   const toggleProduct = (productId: string) => {
@@ -488,8 +539,12 @@ export default function ProjectEdit() {
               <Input
                 value={kiwifyClientId}
                 onChange={(e) => setKiwifyClientId(e.target.value)}
-                placeholder={kiwifyIntegration ? "••••••••••••" : "Seu Client ID do Kiwify"}
+                placeholder="Seu Client ID do Kiwify"
+                className={kiwifyIntegration && kiwifyClientId ? "bg-muted/30" : ""}
               />
+              {kiwifyIntegration && kiwifyClientId && (
+                <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Client Secret</label>
@@ -510,14 +565,21 @@ export default function ProjectEdit() {
                   {showKiwifySecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              {kiwifyIntegration && (
+                <p className="text-xs text-muted-foreground mt-1">Oculto por segurança. Digite novamente para atualizar.</p>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Account ID</label>
               <Input
                 value={kiwifyAccountId}
                 onChange={(e) => setKiwifyAccountId(e.target.value)}
-                placeholder={kiwifyIntegration ? "••••••••••••" : "Seu Account ID do Kiwify"}
+                placeholder="Seu Account ID do Kiwify"
+                className={kiwifyIntegration && kiwifyAccountId ? "bg-muted/30" : ""}
               />
+              {kiwifyIntegration && kiwifyAccountId && (
+                <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
+              )}
             </div>
             <Button onClick={handleSaveKiwify} disabled={saveIntegration.isPending}>
               {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -697,14 +759,21 @@ export default function ProjectEdit() {
                   {showMetaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              {metaIntegration && (
+                <p className="text-xs text-muted-foreground mt-1">Oculto por segurança. Digite novamente para atualizar.</p>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Ad Account ID</label>
               <Input
                 value={metaAdAccountId}
                 onChange={(e) => setMetaAdAccountId(e.target.value)}
-                placeholder={metaIntegration ? "••••••••••••" : "Ex: act_123456789"}
+                placeholder="Ex: act_123456789"
+                className={metaIntegration && metaAdAccountId ? "bg-muted/30" : ""}
               />
+              {metaIntegration && metaAdAccountId && (
+                <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
+              )}
             </div>
             <Button onClick={handleSaveMeta} disabled={saveIntegration.isPending}>
               {saveIntegration.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
