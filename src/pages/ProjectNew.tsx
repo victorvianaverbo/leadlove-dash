@@ -9,8 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, AlertTriangle, Crown, ArrowUpRight } from 'lucide-react';
-import { STRIPE_PLANS } from '@/lib/stripe-plans';
+import { Loader2, ArrowLeft, AlertTriangle, Crown } from 'lucide-react';
+import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
+import { CheckoutModal } from '@/components/CheckoutModal';
+
+// List of upgrade options for the modal
+const upgradeOptions: { key: PlanKey; label: string }[] = [
+  { key: 'pro', label: 'Pro - 5 projetos' },
+  { key: 'business', label: 'Business - 10 projetos' },
+  { key: 'agencia', label: 'Agência - Ilimitado' },
+];
 
 export default function ProjectNew() {
   const { user, loading, subscribed, subscriptionTier, subscriptionLoading, extraProjects } = useAuth();
@@ -20,6 +28,9 @@ export default function ProjectNew() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,6 +57,15 @@ export default function ProjectNew() {
   const projectLimit = baseProjectLimit === -1 ? -1 : baseProjectLimit + extraProjects;
   const canCreateProject = subscribed && (projectLimit === -1 || projectCount < projectLimit);
   const isAtLimit = subscribed && projectLimit !== -1 && projectCount >= projectLimit;
+
+  // Filter upgrade options to only show plans with more projects than current
+  const availableUpgrades = upgradeOptions.filter((option) => {
+    const optionPlan = STRIPE_PLANS[option.key];
+    if (optionPlan.projects === -1) return true; // unlimited always available
+    if (!currentPlan) return true;
+    if (currentPlan.projects === -1) return false; // already unlimited
+    return optionPlan.projects > currentPlan.projects;
+  });
 
   const createProject = useMutation({
     mutationFn: async () => {
@@ -88,6 +108,19 @@ export default function ProjectNew() {
     createProject.mutate();
   };
 
+  const handleUpgrade = (planKey: PlanKey) => {
+    const plan = STRIPE_PLANS[planKey];
+    setSelectedPriceId(plan.priceId);
+    setSelectedPlanName(plan.name);
+    setShowCheckoutModal(true);
+  };
+
+  const handleCloseCheckout = () => {
+    setShowCheckoutModal(false);
+    setSelectedPriceId(null);
+    setSelectedPlanName('');
+  };
+
   if (loading || !user || subscriptionLoading || countLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -96,7 +129,7 @@ export default function ProjectNew() {
     );
   }
 
-  // Not subscribed - redirect to pricing
+  // Not subscribed - show upgrade prompt with checkout modal
   if (!subscribed) {
     return (
       <div className="min-h-screen bg-background">
@@ -121,20 +154,34 @@ export default function ProjectNew() {
               <p className="text-muted-foreground mb-6">
                 Você precisa de uma assinatura ativa para criar projetos.
               </p>
-              <Button asChild>
-                <Link to="/#pricing">
-                  Ver Planos
-                  <ArrowUpRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
+              <div className="space-y-3">
+                {upgradeOptions.map((option) => (
+                  <Button
+                    key={option.key}
+                    className="w-full"
+                    variant={option.key === 'pro' ? 'default' : 'outline'}
+                    onClick={() => handleUpgrade(option.key)}
+                  >
+                    <Crown className="h-4 w-4 mr-2" />
+                    {option.label} - R$ {STRIPE_PLANS[option.key].price}/mês
+                  </Button>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </main>
+
+        <CheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={handleCloseCheckout}
+          priceId={selectedPriceId}
+          planName={selectedPlanName}
+        />
       </div>
     );
   }
 
-  // At project limit - show upgrade prompt
+  // At project limit - show upgrade prompt with checkout modal
   if (isAtLimit) {
     return (
       <div className="min-h-screen bg-background">
@@ -162,22 +209,38 @@ export default function ProjectNew() {
               <p className="text-muted-foreground mb-6">
                 Faça upgrade para um plano maior e tenha mais projetos.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button asChild>
-                  <Link to="/#pricing">
-                    <Crown className="h-4 w-4 mr-2" />
-                    Fazer Upgrade
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/dashboard">
-                    Voltar ao Dashboard
-                  </Link>
+              <div className="space-y-3">
+                {availableUpgrades.length > 0 ? (
+                  availableUpgrades.map((option) => (
+                    <Button
+                      key={option.key}
+                      className="w-full"
+                      variant={option.key === 'pro' || (option.key === 'business' && subscriptionTier === 'pro') ? 'default' : 'outline'}
+                      onClick={() => handleUpgrade(option.key)}
+                    >
+                      <Crown className="h-4 w-4 mr-2" />
+                      {option.label} - R$ {STRIPE_PLANS[option.key].price}/mês
+                    </Button>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Você já está no plano máximo. Entre em contato para opções personalizadas.
+                  </p>
+                )}
+                <Button variant="ghost" asChild className="w-full">
+                  <Link to="/dashboard">Voltar ao Dashboard</Link>
                 </Button>
               </div>
             </CardContent>
           </Card>
         </main>
+
+        <CheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={handleCloseCheckout}
+          priceId={selectedPriceId}
+          planName={selectedPlanName}
+        />
       </div>
     );
   }
