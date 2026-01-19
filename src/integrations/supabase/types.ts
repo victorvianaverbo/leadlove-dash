@@ -520,7 +520,6 @@ export type Database = {
           project_id: string | null
           sale_date: string | null
           status: string | null
-          user_id: string | null
           utm_campaign: string | null
           utm_content: string | null
           utm_medium: string | null
@@ -538,7 +537,6 @@ export type Database = {
           project_id?: string | null
           sale_date?: string | null
           status?: string | null
-          user_id?: string | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
@@ -556,7 +554,6 @@ export type Database = {
           project_id?: string | null
           sale_date?: string | null
           status?: string | null
-          user_id?: string | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
