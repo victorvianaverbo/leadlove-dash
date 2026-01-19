@@ -9,6 +9,31 @@ import { Badge } from '@/components/ui/badge';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
 
+// Type for the public project view (excludes user_id for privacy)
+interface ProjectPublic {
+  id: string;
+  name: string;
+  description: string | null;
+  slug: string | null;
+  is_public: boolean | null;
+  share_token: string | null;
+  created_at: string;
+  updated_at: string;
+  last_sync_at: string | null;
+  kiwify_product_ids: string[] | null;
+  meta_campaign_ids: string[] | null;
+  benchmark_engagement: number | null;
+  benchmark_ctr: number | null;
+  benchmark_lp_rate: number | null;
+  benchmark_checkout_rate: number | null;
+  benchmark_sale_rate: number | null;
+  campaign_objective: string | null;
+  ad_type: string | null;
+  account_status: string | null;
+  investment_value: number | null;
+  class_date: string | null;
+}
+
 // Type for the public sales view (excludes PII fields)
 interface SalesPublic {
   id: string;
@@ -182,18 +207,17 @@ export default function PublicDashboard() {
   const { slug } = useParams<{ slug: string }>();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
 
-  // Fetch project by slug (no auth required)
+  // Fetch project by slug (no auth required) - using projects_public view to avoid exposing user_id
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: ['public-project', slug],
-    queryFn: async () => {
+    queryFn: async (): Promise<ProjectPublic> => {
       const { data, error } = await supabase
-        .from('projects')
+        .from('projects_public' as any)
         .select('*')
         .eq('slug', slug)
-        .eq('is_public', true)
         .single();
       if (error) throw error;
-      return data;
+      return data as unknown as ProjectPublic;
     },
     enabled: !!slug,
   });

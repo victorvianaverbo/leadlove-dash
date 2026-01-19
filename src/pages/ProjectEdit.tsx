@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, Search, BookOpen, Target } from "lucide-react";
 import { Link } from "react-router-dom";
+import { validateProjectName, validateProjectDescription } from "@/lib/validation";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
@@ -229,12 +230,23 @@ export default function ProjectEdit() {
   // Update project mutation
   const updateProject = useMutation({
     mutationFn: async () => {
+      // Validate inputs before sending to database
+      const nameValidation = validateProjectName(name);
+      if (!nameValidation.valid) {
+        throw new Error(nameValidation.error || 'Nome inválido');
+      }
+      
+      const descValidation = validateProjectDescription(description);
+      if (!descValidation.valid) {
+        throw new Error(descValidation.error || 'Descrição inválida');
+      }
+      
       const allProductIds = getAllProductIds();
       const { error } = await supabase
         .from('projects')
         .update({
-          name,
-          description,
+          name: name.trim(),
+          description: description?.trim() || null,
           kiwify_product_ids: allProductIds,
           meta_campaign_ids: selectedCampaigns,
           benchmark_engagement: benchmarkEngagement,
