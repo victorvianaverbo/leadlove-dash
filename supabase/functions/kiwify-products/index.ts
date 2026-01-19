@@ -15,32 +15,34 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Create a client with anon key for auth verification
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-    // Create a client with service role for database operations (bypasses RLS)
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use getClaims to verify the user token
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims(token);
+    // Create a client with the user's auth header for authentication
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
     
-    if (authError || !claimsData?.claims) {
-      console.error('Auth error:', authError?.message || 'No claims found');
+    // Create a client with service role for database operations (bypasses RLS)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Validate user token by getting user
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError?.message || 'No user found');
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const { project_id } = await req.json();
     if (!project_id) {
