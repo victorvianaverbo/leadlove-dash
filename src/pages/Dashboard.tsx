@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle, Crown, Settings } from "lucide-react";
+import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle, Crown, Settings, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { STRIPE_PLANS } from "@/lib/stripe-plans";
 import { toast } from "@/hooks/use-toast";
+import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { 
@@ -22,6 +23,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, loading, signOut, subscribed, subscriptionTier, subscriptionEnd, subscriptionLoading } = useAuth();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -108,6 +112,42 @@ export default function Dashboard() {
     } finally {
       setPortalLoading(false);
     }
+  };
+
+  const deleteProject = useMutation({
+    mutationFn: async (projectId: string) => {
+      // Delete related data first
+      await supabase.from('daily_reports').delete().eq('project_id', projectId);
+      await supabase.from('integrations').delete().eq('project_id', projectId);
+      await supabase.from('ad_spend').delete().eq('project_id', projectId);
+      await supabase.from('sales').delete().eq('project_id', projectId);
+      // Delete project
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project-metrics'] });
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+      toast({
+        title: 'Projeto excluído!',
+        description: 'O projeto e todos os dados foram removidos.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Erro ao excluir',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, project: { id: string; name: string }) => {
+    e.stopPropagation();
+    setProjectToDelete(project);
+    setDeleteDialogOpen(true);
   };
 
   if (loading) {
@@ -279,11 +319,19 @@ export default function Dashboard() {
                 return (
                   <Card
                     key={project.id}
-                    className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group"
+                    className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group relative"
                     onClick={() => navigate(`/projects/${project.id}`)}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
-                    <CardHeader className="pb-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <CardHeader className="pb-3 pr-12">
                       <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -323,6 +371,22 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Delete Project Dialog */}
+        <DeleteProjectDialog
+          projectName={projectToDelete?.name || ''}
+          isOpen={deleteDialogOpen}
+          onClose={() => {
+            setDeleteDialogOpen(false);
+            setProjectToDelete(null);
+          }}
+          onConfirm={() => {
+            if (projectToDelete) {
+              deleteProject.mutate(projectToDelete.id);
+            }
+          }}
+          isDeleting={deleteProject.isPending}
+        />
       </main>
     </div>
   );
