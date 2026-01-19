@@ -8,8 +8,9 @@ import { KiwifyTutorial } from '@/components/docs/KiwifyTutorial';
 import { HotmartTutorial } from '@/components/docs/HotmartTutorial';
 import { GuruTutorial } from '@/components/docs/GuruTutorial';
 import { EduzzTutorial } from '@/components/docs/EduzzTutorial';
+import { MetaAdsTutorial } from '@/components/docs/MetaAdsTutorial';
 
-export type TutorialId = 'kiwify' | 'hotmart' | 'guru' | 'eduzz';
+export type TutorialId = 'kiwify' | 'hotmart' | 'guru' | 'eduzz' | 'meta-ads';
 
 export default function Documentation() {
   const [activeTutorial, setActiveTutorial] = useState<TutorialId>('kiwify');
@@ -30,6 +31,8 @@ export default function Documentation() {
         return <GuruTutorial />;
       case 'eduzz':
         return <EduzzTutorial />;
+      case 'meta-ads':
+        return <MetaAdsTutorial />;
       default:
         return <KiwifyTutorial />;
     }
