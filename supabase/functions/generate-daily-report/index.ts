@@ -84,6 +84,12 @@ serve(async (req) => {
     if (!project_id) {
       throw new Error('project_id is required');
     }
+    
+    // Validate project_id is a valid UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (typeof project_id !== 'string' || !uuidRegex.test(project_id)) {
+      throw new Error('Invalid project_id format');
+    }
 
     const result = await generateReportForProject(supabase, project_id, lovableApiKey);
 
