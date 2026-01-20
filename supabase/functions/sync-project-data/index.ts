@@ -97,16 +97,18 @@ Deno.serve(async (req) => {
         account_id: string;
       };
 
-      // Get access token
+      // Get access token - Kiwify requires form-urlencoded format
       const tokenResponse = await fetch('https://public-api.kiwify.com/v1/oauth/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
           grant_type: 'client_credentials',
           client_id,
           client_secret,
-        }),
+        }).toString(),
       });
+
+      console.log(`Kiwify token request status: ${tokenResponse.status}`);
 
       if (tokenResponse.ok) {
         const tokenData = await tokenResponse.json();
