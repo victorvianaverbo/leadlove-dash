@@ -136,18 +136,12 @@ export default function Index() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl animate-glow-pulse" />
         
         <div className="container mx-auto px-4 text-center relative z-10 pt-24">
-          {/* AI Badge - Glass */}
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 glass-card-dark rounded-full text-white/95 text-sm mb-8 animate-fade-in">
-            <Sparkles className="h-4 w-4" />
-            <span className="font-medium">Powered by AI</span>
-          </div>
-          
           <h1 className="text-4xl md:text-5xl lg:text-7xl font-bold text-white mb-6 leading-[1.1] tracking-tight animate-fade-in text-shadow-soft">
-            Sua IA Analista de<br />Performance 24/7
+            Sua IA analista de<br />performance 24/7
           </h1>
           <p className="text-lg md:text-xl text-white/85 mb-12 max-w-2xl mx-auto animate-fade-in font-light leading-relaxed" style={{ animationDelay: '0.1s' }}>
-            Conecte suas plataformas e receba análises diárias com IA. 
-            Descubra gargalos no funil, ações prioritárias e otimize suas campanhas automaticamente.
+            Dashboard com ROAS em tempo real + análises diárias com IA. 
+            Conecte suas plataformas, descubra gargalos no funil e receba ações prioritárias para otimizar suas campanhas.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
