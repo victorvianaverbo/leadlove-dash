@@ -177,82 +177,91 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-primary rounded-xl shadow-primary">
-              <BarChart3 className="h-5 w-5 text-white" />
+      <header className="border-b bg-card shadow-sm sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          {/* Mobile: Stack layout */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Logo + Plan Badge */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-gradient-primary rounded-lg sm:rounded-xl shadow-primary">
+                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </div>
+              <span className="font-bold text-lg sm:text-xl">MetrikaPRO</span>
+              {subscribed && currentPlan && (
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                  <Crown className="h-3 w-3" />
+                  <span className="hidden sm:inline">{currentPlan.name}</span>
+                </Badge>
+              )}
+              {subscriptionLoading && (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
-            <span className="font-bold text-xl">MetrikaPRO</span>
-            {subscribed && currentPlan && (
-              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
-                <Crown className="h-3 w-3" />
-                {currentPlan.name}
-              </Badge>
-            )}
-            {subscriptionLoading && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-2" />
-            )}
-          </div>
-          <div className="flex gap-3">
-            <Button variant="ghost" size="icon" asChild title="Documentação">
-              <Link to="/documentacao">
-                <HelpCircle className="h-5 w-5" />
-              </Link>
-            </Button>
-            {subscribed && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleManageSubscription}
-                disabled={portalLoading}
-              >
-                {portalLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Gerenciar Assinatura
-                  </>
-                )}
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" asChild title="Documentação">
+                <Link to="/documentacao">
+                  <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Link>
               </Button>
-            )}
-            {subscribed && (
-              <Button 
-                onClick={() => navigate('/projects/new')}
-                variant={canCreateProject ? 'default' : 'outline'}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {canCreateProject ? 'Novo Projeto' : 'Limite Atingido'}
+              {subscribed && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                >
+                  {portalLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Settings className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Gerenciar</span>
+                    </>
+                  )}
+                </Button>
+              )}
+              {subscribed && (
+                <Button 
+                  onClick={() => navigate('/projects/new')}
+                  variant={canCreateProject ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                >
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">{canCreateProject ? 'Novo Projeto' : 'Limite'}</span>
+                </Button>
+              )}
+              <Button variant="outline" onClick={signOut} size="sm" className="h-8 sm:h-9 px-2 sm:px-3">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sair</span>
               </Button>
-            )}
-            <Button variant="outline" onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Gerencie seus projetos e métricas</p>
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Gerencie seus projetos e métricas</p>
         </div>
 
         {/* Subscription Info */}
         {!subscribed && !subscriptionLoading && (
-          <Card className="mb-8 border-primary/50 bg-primary/5">
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between">
+          <Card className="mb-6 sm:mb-8 border-primary/50 bg-primary/5">
+            <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold text-lg">Você ainda não tem uma assinatura ativa</h3>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    Escolha um plano para começar a criar projetos e acompanhar suas métricas.
+                  <h3 className="font-semibold text-base sm:text-lg">Você ainda não tem uma assinatura ativa</h3>
+                  <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+                    Escolha um plano para começar a criar projetos.
                   </p>
                 </div>
-                <Button asChild>
+                <Button asChild size="sm" className="w-full sm:w-auto">
                   <Link to="/pricing">Ver Planos</Link>
                 </Button>
               </div>
@@ -261,21 +270,21 @@ export default function Dashboard() {
         )}
 
         {subscribed && currentPlan && (
-          <Card className="mb-8 border-success/30 bg-success/5">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
-                    <Crown className="h-5 w-5 text-success" />
+          <Card className="mb-6 sm:mb-8 border-success/30 bg-success/5">
+            <CardContent className="py-3 sm:py-4 px-4 sm:px-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-success/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
                   </div>
-                  <div>
-                    <p className="font-medium">Plano {currentPlan.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm sm:text-base">Plano {currentPlan.name}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {projectLimit === -1 
                         ? 'Projetos ilimitados' 
-                        : `${projects?.length ?? 0} de ${projectLimit} projetos`}
+                        : `${projects?.length ?? 0}/${projectLimit} projetos`}
                       {subscriptionEnd && (
-                        <> • Renova em {new Date(subscriptionEnd).toLocaleDateString('pt-BR')}</>
+                        <span className="hidden sm:inline"> • Renova em {new Date(subscriptionEnd).toLocaleDateString('pt-BR')}</span>
                       )}
                     </p>
                   </div>
@@ -287,7 +296,7 @@ export default function Dashboard() {
 
         {/* Projects */}
         <div>
-          <h2 className="text-xl font-semibold mb-6">Seus Projetos</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Seus Projetos</h2>
           {projectsLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -295,31 +304,31 @@ export default function Dashboard() {
             </div>
           ) : !subscribed ? (
             <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <div className="w-16 h-16 bg-primary-soft rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="h-8 w-8 text-primary" />
+              <CardContent className="py-8 sm:py-12 text-center px-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                 </div>
-                <p className="text-muted-foreground mb-6">Assine um plano para criar projetos</p>
-                <Button asChild>
+                <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">Assine um plano para criar projetos</p>
+                <Button asChild size="sm">
                   <Link to="/pricing">Ver Planos</Link>
                 </Button>
               </CardContent>
             </Card>
           ) : projects?.length === 0 ? (
             <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <div className="w-16 h-16 bg-primary-soft rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="h-8 w-8 text-primary" />
+              <CardContent className="py-8 sm:py-12 text-center px-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                 </div>
-                <p className="text-muted-foreground mb-6">Você ainda não tem projetos</p>
-                <Button onClick={() => navigate('/projects/new')}>
+                <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">Você ainda não tem projetos</p>
+                <Button onClick={() => navigate('/projects/new')} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeiro Projeto
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {projects?.map((project, index) => {
                 const { revenue, spend, roas } = getProjectMetrics(project.id);
                 return (
@@ -332,40 +341,40 @@ export default function Dashboard() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       onClick={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
-                    <CardHeader className="pb-3 pr-12">
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                    <CardHeader className="pb-2 sm:pb-3 pr-10 sm:pr-12 p-3 sm:p-6">
+                      <CardTitle className="text-base sm:text-lg group-hover:text-primary transition-colors truncate">{project.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
-                          <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center mx-auto mb-2">
-                            <DollarSign className="h-4 w-4 text-success" />
+                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/10 rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2">
+                            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Faturamento</p>
-                          <p className="text-sm font-bold text-success mt-1">
+                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Faturamento</p>
+                          <p className="text-[10px] sm:text-sm font-bold text-success mt-0.5 sm:mt-1 truncate">
                             R$ {formatCurrency(revenue)}
                           </p>
                         </div>
-                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
-                          <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center mx-auto mb-2">
-                            <Target className="h-4 w-4 text-info" />
+                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-info/10 rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2">
+                            <Target className="h-3 w-3 sm:h-4 sm:w-4 text-info" />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Investimento</p>
-                          <p className="text-sm font-bold text-info mt-1">
+                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Investimento</p>
+                          <p className="text-[10px] sm:text-sm font-bold text-info mt-0.5 sm:mt-1 truncate">
                             R$ {formatCurrency(spend)}
                           </p>
                         </div>
-                        <div className="text-center p-3 rounded-xl bg-primary-soft/50">
-                          <div className={`w-8 h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center mx-auto mb-2`}>
-                            <TrendingUp className={`h-4 w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
+                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
+                          <div className={`w-6 h-6 sm:w-8 sm:h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2`}>
+                            <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">ROAS</p>
-                          <p className={`text-sm font-bold mt-1 ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">ROAS</p>
+                          <p className={`text-[10px] sm:text-sm font-bold mt-0.5 sm:mt-1 ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
                             {roas.toFixed(2)}x
                           </p>
                         </div>

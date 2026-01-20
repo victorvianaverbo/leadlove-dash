@@ -396,62 +396,68 @@ export default function ProjectView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-xl font-bold">{project.name}</h1>
-              {project.description && (
-                <p className="text-sm text-muted-foreground">{project.description}</p>
-              )}
+      <header className="border-b bg-card shadow-sm sticky top-0 z-40">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Mobile: Stack layout */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Top row: Back button + Project name */}
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <Button variant="ghost" size="sm" className="flex-shrink-0 px-2 sm:px-3" asChild>
+                <Link to="/dashboard">
+                  <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Voltar</span>
+                </Link>
+              </Button>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-bold truncate">{project.name}</h1>
+                {project.description && (
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">{project.description}</p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="yesterday">Ontem</SelectItem>
-                <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Todo período</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={() => syncData.mutate()} disabled={syncData.isPending}>
-              {syncData.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="ml-2 hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button variant="outline" size="icon" asChild>
-              <Link to={`/projects/${id}/edit`}>
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            
+            {/* Bottom row on mobile: Actions */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+                <SelectTrigger className="w-[130px] sm:w-[160px] text-xs sm:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Hoje</SelectItem>
+                  <SelectItem value="yesterday">Ontem</SelectItem>
+                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                  <SelectItem value="all">Todo período</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={() => syncData.mutate()} disabled={syncData.isPending} size="sm" className="px-2 sm:px-3">
+                {syncData.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-1.5 hidden sm:inline">Atualizar</span>
+              </Button>
+              <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" asChild>
+                <Link to={`/projects/${id}/edit`}>
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Project Settings - Editable Fields */}
         <Card className="mb-6">
           <CardHeader className="pb-3">
@@ -615,77 +621,77 @@ export default function ProjectView() {
 
 
         {/* Main KPI Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6 sm:mb-8">
           <Card className="border-l-4 border-l-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Orçamento Diário</CardTitle>
-              <div className="w-8 h-8 bg-primary-soft rounded-lg flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-primary" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Orçamento Diário</CardTitle>
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-soft rounded-lg flex items-center justify-center">
+                <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(dailyBudget)}</div>
-              <p className="text-xs text-muted-foreground">Meta Ads</p>
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(dailyBudget)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
             </CardContent>
           </Card>
 
           <Card className="border-l-4 border-l-success">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Faturamento</CardTitle>
-              <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-4 w-4 text-success" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Faturamento</CardTitle>
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/10 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {totalSales} vendas
               </p>
             </CardContent>
           </Card>
 
           <Card className="border-l-4 border-l-destructive">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Gasto em Ads</CardTitle>
-              <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <Target className="h-4 w-4 text-destructive" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Gasto em Ads</CardTitle>
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
+                <Target className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {totalClicks} cliques
               </p>
             </CardContent>
           </Card>
 
           <Card className={`border-l-4 ${roas >= 1 ? 'border-l-success' : 'border-l-destructive'}`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">ROAS</CardTitle>
-              <div className={`w-8 h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
-                <TrendingUp className={`h-4 w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">ROAS</CardTitle>
+              <div className={`w-6 h-6 sm:w-8 sm:h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
+                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>{roas.toFixed(2)}x</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className={`text-lg sm:text-2xl font-bold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>{roas.toFixed(2)}x</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 Retorno sobre gasto
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-info">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">CPA</CardTitle>
-              <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="h-4 w-4 text-info" />
+          <Card className="border-l-4 border-l-info col-span-2 md:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">CPA</CardTitle>
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-info/10 rounded-lg flex items-center justify-center">
+                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-info" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-info">
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-lg sm:text-2xl font-bold text-info">
                 {totalSales > 0 ? formatCurrency(totalSpend / totalSales) : 'R$ 0,00'}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 Custo por aquisição
               </p>
             </CardContent>
@@ -693,217 +699,217 @@ export default function ProjectView() {
         </div>
 
         {/* Funnel Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
             🎯 Funil de Mídia
           </h2>
           
           {/* Top of Funnel - Awareness */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Impressões</CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Impressões</CardTitle>
+                <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalImpressions.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Meta Ads</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalImpressions.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Alcance</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Alcance</CardTitle>
+                <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalReach.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Pessoas únicas</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalReach.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Pessoas únicas</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Frequência</CardTitle>
-                <Repeat className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Frequência</CardTitle>
+                <Repeat className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{avgFrequency.toFixed(2)}x</div>
-                <p className="text-xs text-muted-foreground">Média por pessoa</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{avgFrequency.toFixed(2)}x</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Média por pessoa</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">CPM</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">CPM</CardTitle>
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(avgCPM)}</div>
-                <p className="text-xs text-muted-foreground">Custo por mil</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(avgCPM)}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Custo por mil</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Video/Creative Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Gancho Inicial (3s)</CardTitle>
-                <Play className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Gancho (3s)</CardTitle>
+                <Play className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalVideo3sViews.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Visualizações 3s</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalVideo3sViews.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Visualizações 3s</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">ThruPlays</CardTitle>
-                <Video className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">ThruPlays</CardTitle>
+                <Video className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalThruplays.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Retenção completa</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalThruplays.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Retenção completa</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Tx. Engajamento Criativo</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Tx. Engajamento</CardTitle>
+                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{creativeEngagementRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">ThruPlays / Gancho 3s</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{creativeEngagementRate.toFixed(1)}%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">ThruPlays / Gancho</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">CTR</CardTitle>
-                <MousePointer className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">CTR</CardTitle>
+                <MousePointer className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{ctr.toFixed(2)}%</div>
-                <p className="text-xs text-muted-foreground">Cliques / Impressões</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{ctr.toFixed(2)}%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Cliques / Impressões</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Middle of Funnel - Consideration */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Cliques no Link</CardTitle>
-                <MousePointer className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Cliques Link</CardTitle>
+                <MousePointer className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalLinkClicks.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Meta Ads</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalLinkClicks.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">CPC</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">CPC</CardTitle>
+                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(avgCPC)}</div>
-                <p className="text-xs text-muted-foreground">Custo por clique</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(avgCPC)}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Custo por clique</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Views na LP</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Views LP</CardTitle>
+                <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalLandingPageViews.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Landing page</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalLandingPageViews.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Landing page</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Taxa LP/Clique</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Taxa LP/Clique</CardTitle>
+                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{lpViewRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">Conversão do clique</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{lpViewRate.toFixed(1)}%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Conversão clique</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Bottom of Funnel - Conversion (Hybrid) */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Checkouts Iniciados</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Checkouts</CardTitle>
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalCheckoutsInitiated.toLocaleString('pt-BR')}</div>
-                <p className="text-xs text-muted-foreground">Meta Ads</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Custo p/ Checkout</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(custoPerCheckout)}</div>
-                <p className="text-xs text-muted-foreground">Gasto ÷ Checkouts</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{totalCheckoutsInitiated.toLocaleString('pt-BR')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Tx. Conv. Checkout</CardTitle>
-                <Percent className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Custo/Checkout</CardTitle>
+                <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{checkoutConversionRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">Vendas / Checkouts</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(custoPerCheckout)}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Gasto ÷ Checkouts</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Conv. Checkout</CardTitle>
+                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold">{checkoutConversionRate.toFixed(1)}%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Vendas / Checkouts</p>
               </CardContent>
             </Card>
 
             <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Vendas</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-green-600" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Vendas</CardTitle>
+                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{totalSales}</div>
-                <p className="text-xs text-muted-foreground">Kiwify</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{totalSales}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Kiwify</p>
               </CardContent>
             </Card>
 
             <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Custo por Venda</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-600" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Custo/Venda</CardTitle>
+                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(custoPerVenda)}</div>
-                <p className="text-xs text-muted-foreground">Meta ÷ Kiwify</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(custoPerVenda)}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta ÷ Kiwify</p>
               </CardContent>
             </Card>
 
             <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Taxa Venda/LP</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Taxa Venda/LP</CardTitle>
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{vendaPerLP.toFixed(2)}%</div>
-                <p className="text-xs text-muted-foreground">Conversão final</p>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{vendaPerLP.toFixed(2)}%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Conversão final</p>
               </CardContent>
             </Card>
           </div>
