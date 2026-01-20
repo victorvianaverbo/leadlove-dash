@@ -227,7 +227,7 @@ export default function ProjectEdit() {
     return [...new Set([...selectedProducts, ...manualIds])];
   };
 
-  // Update project mutation
+  // Update project mutation - agora com auto-sync
   const updateProject = useMutation({
     mutationFn: async () => {
       // Validate inputs before sending to database
@@ -257,14 +257,36 @@ export default function ProjectEdit() {
         } as any)
         .eq('id', id);
       if (error) throw error;
+      
+      // Auto-sync após salvar se há integrações ativas
+      const hasActiveIntegrations = kiwifyIntegration || metaIntegration;
+      if (hasActiveIntegrations) {
+        const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-project-data', {
+          body: { project_id: id }
+        });
+        if (syncError) {
+          console.error('Sync error:', syncError);
+          // Não falha a mutation, apenas loga
+        }
+        return syncData;
+      }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (syncData) => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast({ title: "Projeto atualizado com sucesso!" });
+      
+      if (syncData) {
+        toast({ 
+          title: "Projeto salvo e sincronizado!", 
+          description: `${syncData.salesSynced || 0} vendas e ${syncData.adSpendSynced || 0} gastos importados.`
+        });
+      } else {
+        toast({ title: "Projeto salvo com sucesso!" });
+      }
     },
     onError: (error: Error) => {
-      toast({ title: "Erro ao atualizar projeto", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao salvar projeto", description: error.message, variant: "destructive" });
     },
   });
 
@@ -895,8 +917,17 @@ export default function ProjectEdit() {
             onClick={() => updateProject.mutate()}
             disabled={updateProject.isPending}
           >
-            {updateProject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar Projeto
+            {updateProject.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Salvando e sincronizando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Projeto
+              </>
+            )}
           </Button>
         </div>
       </div>
