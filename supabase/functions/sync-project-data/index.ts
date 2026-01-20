@@ -122,7 +122,13 @@ Deno.serve(async (req) => {
 
         // Format dates as YYYY-MM-DD for Kiwify API v1
         const formattedStartDate = startDate.toISOString().split('T')[0];
-        const formattedEndDate = new Date().toISOString().split('T')[0];
+        
+        // Add 1 day to end_date to ensure it's always greater than start_date
+        // Kiwify API requires end_date > start_date (strictly greater)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const formattedEndDate = tomorrow.toISOString().split('T')[0];
+        
         console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
         // Fetch sales with correct Kiwify API v1 parameters
