@@ -183,12 +183,14 @@ export default function Admin() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center bg-page-gradient relative overflow-hidden">
+        <div className="blur-circle blur-circle-primary absolute top-10 right-10 w-[300px] h-[300px]" />
+        <div className="blur-circle blur-circle-secondary absolute bottom-20 left-10 w-[250px] h-[250px]" />
+        <Card variant="glass" className="max-w-md w-full relative z-10">
           <CardContent className="pt-6 text-center">
             <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Acesso Restrito</h2>
-            <p className="text-muted-foreground mb-4">
+            <h2 className="text-xl font-semibold mb-2 tracking-tight">Acesso Restrito</h2>
+            <p className="text-muted-foreground mb-4 font-light">
               Você não tem permissão para acessar esta página.
             </p>
             <Button onClick={() => navigate("/dashboard")}>
@@ -201,19 +203,22 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
+      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
+      
+      <div className="container mx-auto px-4 py-8 relative z-10">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
+              <h1 className="text-2xl font-bold flex items-center gap-2 tracking-tight">
                 <Shield className="h-6 w-6" />
                 Painel Administrativo
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground font-light">
                 Gerenciar usuários e assinaturas
               </p>
             </div>
@@ -224,7 +229,7 @@ export default function Admin() {
           </Button>
         </div>
 
-        <Card className="mb-6">
+        <Card variant="glass" className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
