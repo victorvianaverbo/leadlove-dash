@@ -161,27 +161,78 @@
       transform: scale(1);
     }
   }
+
+  /* Float Animation */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  /* Glow Pulse */
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+  }
   
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
+    animation: fadeIn 0.5s ease-out forwards;
   }
   
   .animate-slide-up {
-    animation: slideUp 0.4s ease-out forwards;
+    animation: slideUp 0.6s ease-out forwards;
   }
   
   .animate-scale-in {
-    animation: scaleIn 0.2s ease-out forwards;
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-glow-pulse {
+    animation: glowPulse 4s ease-in-out infinite;
+  }
+
+  /* ========================================
+     Apple-Style Glassmorphism
+     ======================================== */
+  
+  /* Glass Card - Frosted glass effect */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 
+      0 4px 24px -1px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  }
+
+  /* Glass Card Dark - For dark backgrounds */
+  .glass-card-dark {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  /* Glass Card Subtle - Very subtle glass */
+  .glass-card-subtle {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
   }
   
   /* Hover Lift Effect */
   .hover-lift {
-    @apply transition-all duration-200;
+    @apply transition-all duration-300;
   }
   
   .hover-lift:hover {
     @apply -translate-y-1;
-    box-shadow: 0 8px 24px hsl(262 83% 58% / 0.15);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   }
   
   /* Card Hover */
@@ -190,28 +241,56 @@
   }
   
   .card-hover:hover {
-    @apply -translate-y-1 shadow-lg;
+    @apply -translate-y-2;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
   }
   
-  /* Primary Shadow */
-  .shadow-primary-glow {
-    box-shadow: 0 8px 16px hsl(262 83% 58% / 0.3);
+  /* Apple-style shadows */
+  .shadow-apple {
+    box-shadow: 
+      0 2px 8px rgba(0, 0, 0, 0.04),
+      0 8px 24px rgba(0, 0, 0, 0.06);
+  }
+
+  .shadow-apple-lg {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.05),
+      0 16px 48px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-glass {
+    box-shadow: 
+      0 4px 30px rgba(0, 0, 0, 0.08),
+      0 0 0 1px rgba(255, 255, 255, 0.5) inset;
   }
   
-  /* Gradient Background for Hero - Elegant Mesh Gradient */
+  /* Gradient Background for Hero - Apple-style mesh gradient */
   .bg-gradient-primary {
     background: 
-      radial-gradient(ellipse 80% 50% at 20% 40%, hsl(280 70% 70% / 0.4) 0%, transparent 50%),
-      radial-gradient(ellipse 60% 60% at 80% 60%, hsl(260 80% 75% / 0.3) 0%, transparent 50%),
-      linear-gradient(160deg, hsl(270 60% 58%) 0%, hsl(280 55% 50%) 50%, hsl(260 65% 55%) 100%);
+      radial-gradient(ellipse 100% 80% at 50% -20%, hsl(280 70% 70% / 0.5) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 80% 50%, hsl(260 80% 75% / 0.4) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 60% at 10% 80%, hsl(270 70% 70% / 0.3) 0%, transparent 50%),
+      linear-gradient(160deg, hsl(270 60% 58%) 0%, hsl(275 55% 52%) 50%, hsl(265 60% 55%) 100%);
   }
   
-  /* Soft gradient background */
+  /* Soft mesh gradient background - Apple style */
   .bg-gradient-soft {
-    background: linear-gradient(180deg, hsl(270 80% 97%) 0%, hsl(0 0% 100%) 100%);
+    background: 
+      radial-gradient(ellipse 80% 50% at 40% 20%, hsl(270 80% 94% / 0.8) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, hsl(260 70% 92% / 0.6) 0%, transparent 50%),
+      linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(270 30% 98%) 100%);
+  }
+
+  /* Hero mesh gradient */
+  .bg-hero-mesh {
+    background: 
+      radial-gradient(ellipse 100% 100% at 50% 0%, hsl(270 60% 70% / 0.3) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 80% at 20% 80%, hsl(280 70% 75% / 0.2) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 60% at 90% 30%, hsl(260 60% 80% / 0.25) 0%, transparent 50%),
+      hsl(0 0% 100%);
   }
   
-  /* Glow overlay effect */
+  /* Glow overlay effect - More subtle */
   .glow-overlay {
     position: relative;
   }
@@ -220,8 +299,18 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.15) 0%, transparent 40%);
+    background: 
+      radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 40%);
     pointer-events: none;
+  }
+
+  /* Gradient border for popular cards */
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(white, white) padding-box,
+                linear-gradient(135deg, hsl(270 60% 62%), hsl(280 70% 70%), hsl(260 60% 65%)) border-box;
+    border: 2px solid transparent;
   }
   
   /* Hide scrollbar but keep functionality */
@@ -243,5 +332,10 @@
   .touch-target {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* Text shadow for hero text */
+  .text-shadow-soft {
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
   }
 }
