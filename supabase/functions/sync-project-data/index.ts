@@ -116,82 +116,94 @@ Deno.serve(async (req) => {
 
         // Always sync last 90 days to ensure we capture all sales
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-
-        // Format dates as YYYY-MM-DD for Kiwify API v1
         const formattedStartDate = startDate.toISOString().split('T')[0];
         
-        // Add 1 day to end_date to ensure it's always greater than start_date
-        // Kiwify API requires end_date > start_date (strictly greater)
+        // end_date must be > start_date (Kiwify requirement)
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const formattedEndDate = tomorrow.toISOString().split('T')[0];
-        
+
         console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
-        // Fetch sales with correct Kiwify API v1 parameters
-        // Endpoint is /v1/sales (not /orders), requires both start_date and end_date
-        const params = new URLSearchParams({
-          start_date: formattedStartDate,
-          end_date: formattedEndDate,
-          page_size: '100'
-        });
+        // Fetch sales for EACH product individually with full pagination
+        let allSales: any[] = [];
+        
+        for (const productId of project.kiwify_product_ids) {
+          let pageNumber = 1;
+          let hasMorePages = true;
+          
+          console.log(`Fetching sales for product: ${productId}`);
+          
+          while (hasMorePages) {
+            const params = new URLSearchParams({
+              start_date: formattedStartDate,
+              end_date: formattedEndDate,
+              page_size: '100',
+              page_number: pageNumber.toString(),
+              product_id: productId,
+            });
 
-        const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
-        console.log(`Fetching sales from URL: ${salesUrl}`);
+            const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
+            console.log(`Fetching page ${pageNumber}: ${salesUrl}`);
 
-        const salesResponse = await fetch(salesUrl, {
-          headers: { 
-            'Authorization': `Bearer ${accessToken}`,
-            'x-kiwify-account-id': account_id
-          },
-        });
+            const salesResponse = await fetch(salesUrl, {
+              headers: { 
+                'Authorization': `Bearer ${accessToken}`,
+                'x-kiwify-account-id': account_id
+              },
+            });
 
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json();
-          const sales = salesData.data || [];
-
-          console.log(`Fetched ${sales.length} sales from Kiwify`);
-
-          // Debug: log product IDs from API vs selected
-          if (sales.length > 0) {
-            console.log(`Sample sale product IDs from API: ${sales.slice(0, 5).map((s: any) => s.product?.id).join(', ')}`);
-            console.log(`Selected product IDs in project: ${project.kiwify_product_ids.join(', ')}`);
+            if (salesResponse.ok) {
+              const salesData = await salesResponse.json();
+              const sales = salesData.data || [];
+              
+              console.log(`Product ${productId} - Page ${pageNumber}: ${sales.length} sales`);
+              allSales = allSales.concat(sales);
+              
+              // Check if there are more pages
+              if (sales.length < 100) {
+                hasMorePages = false;
+              } else {
+                pageNumber++;
+              }
+            } else {
+              const errorText = await salesResponse.text();
+              console.error(`Error fetching sales for product ${productId}:`, errorText);
+              hasMorePages = false;
+            }
           }
+        }
 
-          // Filter by selected product IDs - Kiwify API v1 returns product as nested object
-          const filteredSales = sales.filter((sale: any) => 
-            project.kiwify_product_ids.includes(sale.product?.id)
-          );
+        console.log(`Total sales fetched: ${allSales.length}`);
 
-          console.log(`${filteredSales.length} sales match selected products`);
+        // Insert sales into database
+        for (const sale of allSales) {
+          const tracking = sale.tracking || {};
+          
+          const { error: upsertError } = await supabase
+            .from('sales')
+            .upsert({
+              kiwify_sale_id: sale.id,
+              project_id: project.id,
+              user_id: userId,
+              product_id: sale.product?.id,
+              product_name: sale.product?.name,
+              // net_amount already comes in reais (not cents)
+              amount: sale.net_amount || sale.amount || 0,
+              status: sale.status,
+              payment_method: sale.payment_method,
+              // customer is lowercase in API v1
+              customer_name: sale.customer?.name,
+              customer_email: sale.customer?.email,
+              sale_date: sale.created_at,
+              utm_source: tracking.utm_source,
+              utm_medium: tracking.utm_medium,
+              utm_campaign: tracking.utm_campaign,
+              utm_content: tracking.utm_content,
+              utm_term: tracking.utm_term,
+            }, { onConflict: 'kiwify_sale_id' });
 
-          for (const sale of filteredSales) {
-            const tracking = sale.tracking || {};
-            const { error: upsertError } = await supabase
-              .from('sales')
-              .upsert({
-                kiwify_sale_id: sale.id,
-                project_id: project.id,
-                user_id: userId,
-                product_id: sale.product?.id,
-                product_name: sale.product?.name,
-                amount: (sale.Commissions?.product_base_price || sale.amount || 0) / 100,
-                status: sale.status || sale.order_status,
-                payment_method: sale.payment_method,
-                customer_name: sale.Customer?.name || sale.customer?.name,
-                customer_email: sale.Customer?.email || sale.customer?.email,
-                sale_date: sale.created_at,
-                utm_source: tracking.utm_source,
-                utm_medium: tracking.utm_medium,
-                utm_campaign: tracking.utm_campaign,
-                utm_content: tracking.utm_content,
-                utm_term: tracking.utm_term,
-              }, { onConflict: 'kiwify_sale_id' });
-
-            if (!upsertError) salesSynced++;
-          }
-        } else {
-          console.error('Failed to fetch sales:', await salesResponse.text());
+          if (!upsertError) salesSynced++;
         }
       } else {
         console.error('Failed to get access token:', await tokenResponse.text());
