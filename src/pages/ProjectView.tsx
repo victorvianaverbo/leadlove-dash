@@ -395,8 +395,12 @@ export default function ProjectView() {
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+      {/* Decorative blur circles */}
+      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
+      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
+      
+      <header className="header-glass sticky top-0 z-40">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
           {/* Mobile: Stack layout */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -39,9 +39,13 @@ export default function Documentation() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+      {/* Decorative blur circles */}
+      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
+      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
+      
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="header-glass sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
