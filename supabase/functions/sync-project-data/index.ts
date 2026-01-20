@@ -120,17 +120,20 @@ Deno.serve(async (req) => {
           ? new Date(project.last_sync_at) 
           : ninetyDaysAgo;
 
-        // Format date as YYYY-MM-DD for Kiwify API v1
+        // Format dates as YYYY-MM-DD for Kiwify API v1
         const formattedStartDate = startDate.toISOString().split('T')[0];
-        console.log(`Syncing sales from ${formattedStartDate}`);
+        const formattedEndDate = new Date().toISOString().split('T')[0];
+        console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
         // Fetch sales with correct Kiwify API v1 parameters
+        // Endpoint is /v1/sales (not /orders), requires both start_date and end_date
         const params = new URLSearchParams({
           start_date: formattedStartDate,
+          end_date: formattedEndDate,
           page_size: '100'
         });
 
-        const salesUrl = `https://public-api.kiwify.com/v1/orders?${params.toString()}`;
+        const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
         console.log(`Fetching sales from URL: ${salesUrl}`);
 
         const salesResponse = await fetch(salesUrl, {
