@@ -175,9 +175,13 @@ export default function Dashboard() {
   const canCreateProject = projectLimit === -1 || (projects?.length ?? 0) < projectLimit;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card shadow-sm sticky top-0 z-40">
+    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+      {/* Decorative blur circles */}
+      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
+      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
+      
+      {/* Header with glass effect */}
+      <header className="header-glass sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           {/* Mobile: Stack layout */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -244,15 +248,15 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 relative z-10">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">Gerencie seus projetos e métricas</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-light">Gerencie seus projetos e métricas</p>
         </div>
 
         {/* Subscription Info */}
         {!subscribed && !subscriptionLoading && (
-          <Card className="mb-6 sm:mb-8 border-primary/50 bg-primary/5">
+          <Card variant="glass" className="mb-6 sm:mb-8 border-primary/30">
             <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
@@ -270,7 +274,7 @@ export default function Dashboard() {
         )}
 
         {subscribed && currentPlan && (
-          <Card className="mb-6 sm:mb-8 border-success/30 bg-success/5">
+          <Card variant="glass" className="mb-6 sm:mb-8 border-success/30">
             <CardContent className="py-3 sm:py-4 px-4 sm:px-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 sm:gap-4">
@@ -296,14 +300,14 @@ export default function Dashboard() {
 
         {/* Projects */}
         <div>
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Seus Projetos</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 tracking-tight">Seus Projetos</h2>
           {projectsLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Carregando projetos...
             </div>
           ) : !subscribed ? (
-            <Card className="border-dashed">
+            <Card variant="glass" className="border-dashed">
               <CardContent className="py-8 sm:py-12 text-center px-4">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -315,7 +319,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : projects?.length === 0 ? (
-            <Card className="border-dashed">
+            <Card variant="glass" className="border-dashed">
               <CardContent className="py-8 sm:py-12 text-center px-4">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -334,7 +338,8 @@ export default function Dashboard() {
                 return (
                   <Card
                     key={project.id}
-                    className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group relative"
+                    variant="glass"
+                    className="cursor-pointer hover:shadow-apple-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group relative"
                     onClick={() => navigate(`/projects/${project.id}`)}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >

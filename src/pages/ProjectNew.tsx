@@ -144,8 +144,11 @@ export default function ProjectNew() {
   // Not subscribed - show upgrade prompt with checkout modal
   if (!subscribed) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-card">
+      <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+        <div className="blur-circle blur-circle-primary absolute top-10 right-10 w-[300px] h-[300px]" />
+        <div className="blur-circle blur-circle-secondary absolute bottom-20 left-10 w-[250px] h-[250px]" />
+        
+        <header className="header-glass sticky top-0 z-40">
           <div className="container mx-auto px-4 py-4">
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard">
@@ -156,8 +159,8 @@ export default function ProjectNew() {
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-8 max-w-xl">
-          <Card className="border-primary/50">
+        <main className="container mx-auto px-4 py-8 max-w-xl relative z-10">
+          <Card variant="glass" className="border-primary/30">
             <CardContent className="pt-8 pb-6 text-center">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Crown className="h-8 w-8 text-primary" />
@@ -196,8 +199,11 @@ export default function ProjectNew() {
   // At project limit - show upgrade prompt with checkout modal
   if (isAtLimit) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-card">
+      <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+        <div className="blur-circle blur-circle-primary absolute top-10 right-10 w-[300px] h-[300px]" />
+        <div className="blur-circle blur-circle-secondary absolute bottom-20 left-10 w-[250px] h-[250px]" />
+        
+        <header className="header-glass sticky top-0 z-40">
           <div className="container mx-auto px-4 py-4">
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard">
@@ -208,8 +214,8 @@ export default function ProjectNew() {
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-8 max-w-xl">
-          <Card className="border-warning/50 bg-warning/5">
+        <main className="container mx-auto px-4 py-8 max-w-xl relative z-10">
+          <Card variant="glass" className="border-warning/30">
             <CardContent className="pt-8 pb-6 text-center">
               <div className="w-16 h-16 bg-warning/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="h-8 w-8 text-warning" />
@@ -258,8 +264,11 @@ export default function ProjectNew() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
+    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
+      <div className="blur-circle blur-circle-primary absolute top-10 right-10 w-[300px] h-[300px]" />
+      <div className="blur-circle blur-circle-secondary absolute bottom-20 left-10 w-[250px] h-[250px]" />
+      
+      <header className="header-glass sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" size="sm" asChild>
             <Link to="/dashboard">
@@ -270,17 +279,17 @@ export default function ProjectNew() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-xl">
+      <main className="container mx-auto px-4 py-8 max-w-xl relative z-10">
         {/* Project count info */}
         {projectLimit !== -1 && (
-          <div className="mb-4 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground text-center">
+          <div className="mb-4 p-3 rounded-xl bg-white/50 backdrop-blur-sm text-sm text-muted-foreground text-center border border-white/30">
             Você está usando <strong className="text-foreground">{projectCount} de {projectLimit}</strong> projetos do plano <strong className="text-foreground">{currentPlan?.name}</strong>
           </div>
         )}
 
-        <Card>
+        <Card variant="glass">
           <CardHeader>
-            <CardTitle>Novo Projeto</CardTitle>
+            <CardTitle className="tracking-tight">Novo Projeto</CardTitle>
             <CardDescription>
               Crie um projeto para agrupar produtos e campanhas relacionados
             </CardDescription>
