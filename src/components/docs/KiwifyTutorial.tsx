@@ -1,9 +1,17 @@
-import { Clock, CheckCircle2, AlertTriangle, Info, ShieldAlert, HelpCircle, ExternalLink } from 'lucide-react';
+import { Clock, CheckCircle2, AlertTriangle, Info, ShieldAlert, HelpCircle, ExternalLink, Play, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 
 export function KiwifyTutorial() {
+  const scrollToIntroduction = () => {
+    const element = document.getElementById('kiwify-introduction');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <article className="space-y-8">
       {/* Header */}
@@ -25,8 +33,78 @@ export function KiwifyTutorial() {
         </div>
       </div>
 
+      {/* Choose How to Learn */}
+      <section className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-xl border border-primary/20">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          🎬 Escolha Como Configurar
+        </h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Video Option */}
+          <Card className="border-2 border-primary/30 hover:border-primary/60 transition-colors">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Play className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Tutorial em Vídeo</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Assista ao passo a passo completo em vídeo (recomendado)
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                    <Clock className="h-3 w-3" />
+                    <span>~3 minutos</span>
+                  </div>
+                  <Button asChild className="w-full">
+                    <a 
+                      href="https://www.loom.com/share/cc878e7fab3e4702abfc7d22cedca34e" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      Assistir Vídeo
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Text Option */}
+          <Card className="border hover:border-muted-foreground/30 transition-colors">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">Tutorial Escrito</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Leia o guia detalhado com instruções passo a passo
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                    <FileText className="h-3 w-3" />
+                    <span>6 passos simples</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={scrollToIntroduction}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Continuar Lendo ↓
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* Introduction */}
-      <section>
+      <section id="kiwify-introduction">
         <h2 className="text-xl font-semibold mb-3">Introdução</h2>
         <p className="text-muted-foreground leading-relaxed">
           A API Key da Kiwify permite que o MetrikaPRO sincronize automaticamente suas vendas, 
