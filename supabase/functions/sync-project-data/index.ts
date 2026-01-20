@@ -114,11 +114,8 @@ Deno.serve(async (req) => {
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
 
-        // Determine start date: use last_sync_at or 90 days ago
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const startDate = project.last_sync_at 
-          ? new Date(project.last_sync_at) 
-          : ninetyDaysAgo;
+        // Always sync last 90 days to ensure we capture all sales
+        const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
         // Format dates as YYYY-MM-DD for Kiwify API v1
         const formattedStartDate = startDate.toISOString().split('T')[0];
@@ -155,9 +152,15 @@ Deno.serve(async (req) => {
 
           console.log(`Fetched ${sales.length} sales from Kiwify`);
 
-          // Filter by selected product IDs
-          const filteredSales = sales.filter((sale: { product_id: string }) => 
-            project.kiwify_product_ids.includes(sale.product_id)
+          // Debug: log product IDs from API vs selected
+          if (sales.length > 0) {
+            console.log(`Sample sale product IDs from API: ${sales.slice(0, 5).map((s: any) => s.product?.id).join(', ')}`);
+            console.log(`Selected product IDs in project: ${project.kiwify_product_ids.join(', ')}`);
+          }
+
+          // Filter by selected product IDs - Kiwify API v1 returns product as nested object
+          const filteredSales = sales.filter((sale: any) => 
+            project.kiwify_product_ids.includes(sale.product?.id)
           );
 
           console.log(`${filteredSales.length} sales match selected products`);
@@ -170,13 +173,13 @@ Deno.serve(async (req) => {
                 kiwify_sale_id: sale.id,
                 project_id: project.id,
                 user_id: userId,
-                product_id: sale.product_id,
-                product_name: sale.product_name,
-                amount: (sale.amount || 0) / 100,
-                status: sale.status,
+                product_id: sale.product?.id,
+                product_name: sale.product?.name,
+                amount: (sale.Commissions?.product_base_price || sale.amount || 0) / 100,
+                status: sale.status || sale.order_status,
                 payment_method: sale.payment_method,
-                customer_name: sale.customer?.name,
-                customer_email: sale.customer?.email,
+                customer_name: sale.Customer?.name || sale.customer?.name,
+                customer_email: sale.Customer?.email || sale.customer?.email,
                 sale_date: sale.created_at,
                 utm_source: tracking.utm_source,
                 utm_medium: tracking.utm_medium,
