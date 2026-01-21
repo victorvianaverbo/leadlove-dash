@@ -186,8 +186,8 @@ Deno.serve(async (req) => {
               user_id: userId,
               product_id: sale.product?.id,
               product_name: sale.product?.name,
-              // net_amount already comes in reais (not cents)
-              amount: sale.net_amount || sale.amount || 0,
+              // net_amount comes in centavos, divide by 100 to get reais
+              amount: (sale.net_amount || sale.amount || 0) / 100,
               status: sale.status,
               payment_method: sale.payment_method,
               // customer is lowercase in API v1
@@ -332,7 +332,7 @@ Deno.serve(async (req) => {
               thruplays: thruplays,
               video_3s_views: video3sViews,
               date: insight.date_start,
-            }, { onConflict: 'campaign_id,date,project_id' });
+            }, { onConflict: 'campaign_id,date,project_id,ad_id' });
 
           if (upsertError) {
             console.error(`Failed to upsert insight:`, upsertError);
