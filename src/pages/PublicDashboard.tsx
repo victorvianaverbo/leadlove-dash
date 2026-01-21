@@ -312,11 +312,22 @@ export default function PublicDashboard() {
     
     setIsUpdating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-daily-report', {
+      // Step 1: Sync data from Kiwify + Meta Ads
+      const { error: syncError, data: syncData } = await supabase.functions.invoke('sync-public-project', {
         body: { project_id: project.id }
       });
 
-      if (error) throw error;
+      if (syncError) throw syncError;
+      if (syncData?.error) throw new Error(syncData.error);
+
+      console.log(`Synced ${syncData?.salesSynced || 0} sales, ${syncData?.adSpendSynced || 0} ad records`);
+
+      // Step 2: Generate updated AI report
+      const { error: reportError } = await supabase.functions.invoke('generate-daily-report', {
+        body: { project_id: project.id }
+      });
+
+      if (reportError) throw reportError;
 
       // Invalidate queries to refetch data
       await queryClient.invalidateQueries({ queryKey: ['public-daily-report', project.id] });
@@ -325,10 +336,10 @@ export default function PublicDashboard() {
       await queryClient.invalidateQueries({ queryKey: ['public-sales-total', project.id] });
       await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-total', project.id] });
 
-      toast.success('Relatório atualizado com sucesso!');
+      toast.success('Dados sincronizados e relatório atualizado!');
     } catch (err) {
       console.error('Error updating report:', err);
-      toast.error('Erro ao atualizar relatório');
+      toast.error('Erro ao atualizar dados');
     } finally {
       setIsUpdating(false);
     }

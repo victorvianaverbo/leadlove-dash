@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.sync-project-data]
 verify_jwt = false
 
+[functions.sync-public-project]
+verify_jwt = false
+
 [functions.create-checkout]
 verify_jwt = false
 

@@ -200,22 +200,32 @@ export default function ProjectView() {
         throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
       
+      // Step 1: Sync data from Kiwify + Meta Ads
       const { error, data } = await supabase.functions.invoke('sync-project-data', {
         body: { project_id: id },
       });
       
       if (error) throw error;
       
-      // Check for error in response body (edge function may return 200 with error)
       if (data?.error) {
         throw new Error(data.error);
+      }
+
+      // Step 2: Generate updated AI report
+      const { error: reportError } = await supabase.functions.invoke('generate-daily-report', {
+        body: { project_id: id },
+      });
+
+      if (reportError) {
+        console.error('Error generating report after sync:', reportError);
+        // Don't throw - sync was successful, report generation is secondary
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales', id] });
       queryClient.invalidateQueries({ queryKey: ['ad_spend', id] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
-      toast({ title: 'Dados atualizados!', description: 'Vendas e gastos foram sincronizados.' });
+      toast({ title: 'Dados atualizados!', description: 'Vendas, gastos e relatório foram sincronizados.' });
     },
     onError: (error) => {
       const message = error.message.includes('Invalid token') 
