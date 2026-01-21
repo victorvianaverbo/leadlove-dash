@@ -71,6 +71,21 @@ Deno.serve(async (req) => {
     let salesSynced = 0;
     let adSpendSynced = 0;
 
+    // Determine sync period based on last_sync_at
+    const isFirstSync = !project.last_sync_at;
+    const now = new Date();
+    
+    // For Kiwify: 90 days on first sync, or since last_sync - 2 days margin
+    let kiwifyStartDate: Date;
+    if (isFirstSync) {
+      kiwifyStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      console.log('First sync detected - fetching 90 days of Kiwify data');
+    } else {
+      // Sync from last_sync - 2 days to catch late confirmations
+      kiwifyStartDate = new Date(new Date(project.last_sync_at).getTime() - 2 * 24 * 60 * 60 * 1000);
+      console.log(`Incremental sync - fetching Kiwify data since ${kiwifyStartDate.toISOString()}`);
+    }
+
     // Sync Kiwify sales
     if (kiwifyIntegration && project.kiwify_product_ids?.length > 0) {
       const { client_id, client_secret, account_id } = kiwifyIntegration.credentials as { 
@@ -96,10 +111,8 @@ Deno.serve(async (req) => {
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
 
-        // Sync last 90 days
-        const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-        const formattedStartDate = startDate.toISOString().split('T')[0];
-        const formattedEndDate = new Date().toISOString().split('T')[0];
+        const formattedStartDate = kiwifyStartDate.toISOString().split('T')[0];
+        const formattedEndDate = now.toISOString().split('T')[0];
 
         console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
@@ -191,9 +204,18 @@ Deno.serve(async (req) => {
       console.log(`Starting Meta Ads sync for project ${project_id}`);
       console.log(`Campaign IDs to sync: ${project.meta_campaign_ids.join(', ')}`);
 
+      // Calculate date range based on last_sync_at
       const today = new Date();
-      const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const since = thirtyDaysAgo.toISOString().split('T')[0];
+      let metaStartDate: Date;
+      if (isFirstSync) {
+        metaStartDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+        console.log('First sync - fetching 30 days of Meta Ads data');
+      } else {
+        // Sync from last_sync - 2 days margin
+        metaStartDate = new Date(new Date(project.last_sync_at).getTime() - 2 * 24 * 60 * 60 * 1000);
+        console.log(`Incremental sync - fetching Meta Ads data since ${metaStartDate.toISOString()}`);
+      }
+      const since = metaStartDate.toISOString().split('T')[0];
       const until = today.toISOString().split('T')[0];
 
       console.log(`Date range: ${since} to ${until}`);
