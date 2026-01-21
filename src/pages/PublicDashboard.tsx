@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle, Eye, MousePointer, CreditCard, ShoppingBag } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
+import { toast } from 'sonner';
 
 // Type for the public project view (excludes user_id for privacy)
 interface ProjectPublic {
@@ -150,64 +149,28 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-function FunnelMetricCard({ 
-  label, 
-  value, 
-  benchmark, 
-  status, 
-  change,
-  icon: Icon,
-  suffix = '%'
-}: { 
-  label: string; 
-  value: number; 
-  benchmark: number; 
-  status: 'ok' | 'alert'; 
-  change?: number;
-  icon: React.ElementType;
-  suffix?: string;
-}) {
-  const isOk = status === 'ok';
+// Helper to get date in Brasilia timezone (UTC-3)
+function getBrasiliaDate(daysAgo = 0): string {
+  const now = new Date();
+  const brasiliaOffset = -3 * 60;
+  const utcOffset = now.getTimezoneOffset();
+  const totalOffset = brasiliaOffset + utcOffset;
   
-  return (
-    <div className={`relative rounded-xl p-4 border-2 transition-all ${
-      isOk 
-        ? 'border-success/30 bg-success/5' 
-        : 'border-destructive/30 bg-destructive/5'
-    }`}>
-      <div className="flex items-start justify-between mb-2">
-        <div className={`p-2 rounded-lg ${isOk ? 'bg-success/10' : 'bg-destructive/10'}`}>
-          <Icon className={`h-4 w-4 ${isOk ? 'text-success' : 'text-destructive'}`} />
-        </div>
-        <Badge variant="outline" className={`text-xs ${
-          isOk 
-            ? 'bg-success/10 text-success border-success/30' 
-            : 'bg-destructive/10 text-destructive border-destructive/30'
-        }`}>
-          {isOk ? 'OK' : 'Alerta'}
-        </Badge>
-      </div>
-      
-      <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className={`text-xl font-bold ${isOk ? 'text-success' : 'text-destructive'}`}>
-        {value.toFixed(2)}{suffix}
-      </p>
-      
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-        <span className="text-xs text-muted-foreground">
-          Meta: {benchmark}{suffix}
-        </span>
-        {change !== undefined && <ChangeIndicator value={change} />}
-      </div>
-    </div>
-  );
+  const brasilia = new Date(now.getTime() + totalOffset * 60 * 1000);
+  brasilia.setDate(brasilia.getDate() - daysAgo);
+  
+  return brasilia.toISOString().split('T')[0];
 }
 
 export default function PublicDashboard() {
   const { slug } = useParams<{ slug: string }>();
-  const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const queryClient = useQueryClient();
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Fetch project by slug (no auth required) - using projects_public view to avoid exposing user_id
+  const today = getBrasiliaDate(0);
+  const yesterday = getBrasiliaDate(1);
+
+  // Fetch project by slug (no auth required)
   const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
     queryKey: ['public-project', slug],
     queryFn: async (): Promise<ProjectPublic> => {
@@ -222,7 +185,7 @@ export default function PublicDashboard() {
     enabled: !!slug,
   });
 
-  // Fetch latest daily report
+  // Fetch latest daily report (yesterday's report)
   const { data: latestReport } = useQuery({
     queryKey: ['public-daily-report', project?.id],
     queryFn: async (): Promise<DailyReport | null> => {
@@ -240,108 +203,97 @@ export default function PublicDashboard() {
     enabled: !!project?.id,
   });
 
-  const getDateFilter = () => {
-    const now = new Date();
-    switch (dateRange) {
-      case 'today': {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return today.toISOString();
-      }
-      case 'yesterday': {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(0, 0, 0, 0);
-        return yesterday.toISOString();
-      }
-      case '7d': return new Date(now.setDate(now.getDate() - 7)).toISOString();
-      case '30d': return new Date(now.setDate(now.getDate() - 30)).toISOString();
-      case '90d': return new Date(now.setDate(now.getDate() - 90)).toISOString();
-      case 'all': {
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        return sixMonthsAgo.toISOString();
-      }
-      default: return null;
-    }
-  };
-
-  const getEndDateFilter = () => {
-    if (dateRange === 'yesterday') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return today.toISOString();
-    }
-    return null;
-  };
-
-  // Use sales_public view to avoid exposing PII (customer_email, customer_name)
-  const { data: sales } = useQuery({
-    queryKey: ['public-sales', project?.id, dateRange],
+  // Fetch TODAY's sales (real-time)
+  const { data: todaySales } = useQuery({
+    queryKey: ['public-sales-today', project?.id, today],
     queryFn: async (): Promise<SalesPublic[]> => {
-      const dateFilter = getDateFilter();
-      const endDateFilter = getEndDateFilter();
-      
-      let query = supabase
+      const { data, error } = await supabase
         .from('sales_public' as any)
         .select('*')
         .eq('project_id', project!.id)
-        .order('sale_date', { ascending: false });
+        .gte('sale_date', `${today}T00:00:00`)
+        .lt('sale_date', `${today}T23:59:59`);
       
-      if (dateFilter) {
-        query = query.gte('sale_date', dateFilter);
-      }
-      if (endDateFilter) {
-        query = query.lt('sale_date', endDateFilter);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as SalesPublic[];
     },
     enabled: !!project?.id,
   });
 
-  const { data: adSpend } = useQuery({
-    queryKey: ['public-ad_spend', project?.id, dateRange],
+  // Fetch TODAY's ad spend (real-time)
+  const { data: todayAdSpend } = useQuery({
+    queryKey: ['public-ad-spend-today', project?.id, today],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('ad_spend')
         .select('*')
         .eq('project_id', project!.id)
-        .order('date', { ascending: false });
+        .eq('date', today);
       
-      const dateFilter = getDateFilter();
-      if (dateFilter) {
-        query = query.gte('date', dateFilter.split('T')[0]);
-      }
-      const endDateFilter = getEndDateFilter();
-      if (endDateFilter) {
-        query = query.lt('date', endDateFilter.split('T')[0]);
-      }
-      
-      const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data || [];
+    },
+    enabled: !!project?.id,
+  });
+
+  // Fetch ALL sales (total period)
+  const { data: allSales } = useQuery({
+    queryKey: ['public-sales-total', project?.id],
+    queryFn: async (): Promise<SalesPublic[]> => {
+      const { data, error } = await supabase
+        .from('sales_public' as any)
+        .select('*')
+        .eq('project_id', project!.id);
+      
+      if (error) throw error;
+      return (data || []) as unknown as SalesPublic[];
+    },
+    enabled: !!project?.id,
+  });
+
+  // Fetch ALL ad spend (total period)
+  const { data: allAdSpend } = useQuery({
+    queryKey: ['public-ad-spend-total', project?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ad_spend')
+        .select('*')
+        .eq('project_id', project!.id);
+      
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!project?.id,
   });
 
   // Filter data by project settings
-  const filteredSales = sales?.filter(s => 
-    !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
-  );
+  const filterSales = (sales: SalesPublic[] | undefined) => 
+    sales?.filter(s => 
+      !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
+    ) || [];
 
-  const filteredAdSpend = adSpend?.filter(a =>
-    !project?.meta_campaign_ids?.length || project.meta_campaign_ids.includes(a.campaign_id)
-  );
+  const filterAdSpend = (adSpend: any[] | undefined) =>
+    adSpend?.filter(a =>
+      !project?.meta_campaign_ids?.length || project.meta_campaign_ids.includes(a.campaign_id)
+    ) || [];
 
-  // Calculate metrics
-  const totalRevenue = filteredSales?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
-  const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
-  const totalSales = filteredSales?.length || 0;
-  const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-  const cpa = totalSales > 0 ? totalSpend / totalSales : 0;
+  // Today's metrics
+  const filteredTodaySales = filterSales(todaySales);
+  const filteredTodayAdSpend = filterAdSpend(todayAdSpend);
+  const todayRevenue = filteredTodaySales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const todaySpend = filteredTodayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
+  const todaySalesCount = filteredTodaySales.length;
+  const todayRoas = todaySpend > 0 ? todayRevenue / todaySpend : 0;
+  const todayCpa = todaySalesCount > 0 ? todaySpend / todaySalesCount : 0;
+
+  // Total period metrics
+  const filteredAllSales = filterSales(allSales);
+  const filteredAllAdSpend = filterAdSpend(allAdSpend);
+  const totalRevenue = filteredAllSales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const totalSpend = filteredAllAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
+  const totalSalesCount = filteredAllSales.length;
+  const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+  const totalCpa = totalSalesCount > 0 ? totalSpend / totalSalesCount : 0;
 
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -353,6 +305,33 @@ export default function PublicDashboard() {
       day: 'numeric', 
       month: 'long' 
     });
+  };
+
+  const handleUpdateReport = async () => {
+    if (!project?.id) return;
+    
+    setIsUpdating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-daily-report', {
+        body: { project_id: project.id }
+      });
+
+      if (error) throw error;
+
+      // Invalidate queries to refetch data
+      await queryClient.invalidateQueries({ queryKey: ['public-daily-report', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-sales-today', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-today', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-sales-total', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-total', project.id] });
+
+      toast.success('Relatório atualizado com sucesso!');
+    } catch (err) {
+      console.error('Error updating report:', err);
+      toast.error('Erro ao atualizar relatório');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   // Check if report has funnel metrics (new format)
@@ -394,134 +373,190 @@ export default function PublicDashboard() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Hoje</SelectItem>
-                <SelectItem value="yesterday">Ontem</SelectItem>
-                <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Todo período</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Button 
+            onClick={handleUpdateReport} 
+            disabled={isUpdating}
+            variant="outline"
+            className="gap-2"
+          >
+            {isUpdating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Atualizar
+          </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* AI Daily Report Section */}
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Section 1: Today's Summary (Real-time) */}
+        <Card className="border-2 border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-primary/10 rounded-lg">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Resumo de Hoje</CardTitle>
+              </div>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                Tempo Real
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                <p className="font-semibold text-success">{formatCurrency(todayRevenue)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                <p className="font-semibold text-destructive">{formatCurrency(todaySpend)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                <p className={`font-semibold ${todayRoas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                  {todayRoas.toFixed(2)}x
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                <p className="font-semibold">{formatCurrency(todayCpa)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                <p className="font-semibold">{todaySalesCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Section 2: Yesterday's Report (AI Generated) */}
         {latestReport && (
-          <Card className="mb-8 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <Card className="border-2 border-secondary/30 bg-gradient-to-br from-secondary/5 to-transparent">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-primary/10 rounded-lg">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                  <div className="p-1.5 bg-secondary/10 rounded-lg">
+                    <Sparkles className="h-4 w-4 text-secondary-foreground" />
                   </div>
-                  <CardTitle className="text-lg">Relatório do Dia</CardTitle>
+                  <CardTitle className="text-lg">Resumo de Ontem</CardTitle>
                 </div>
                 <span className="text-sm text-muted-foreground capitalize">
                   {formatReportDate(latestReport.report_date)}
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               {/* Summary */}
               <p className="text-sm leading-relaxed">{latestReport.summary}</p>
 
-              {/* Metrics Summary - 5 Essential Metrics */}
-              {hasFunnelMetrics && latestReport.metrics && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Receita</p>
-                    <p className="font-semibold text-success">{formatCurrency(latestReport.metrics.revenue)}</p>
-                    <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Gasto</p>
-                    <p className="font-semibold text-destructive">{formatCurrency(latestReport.metrics.spend)}</p>
-                    <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                    <p className={`font-semibold ${latestReport.metrics.roas >= 1 ? 'text-success' : 'text-destructive'}`}>
-                      {latestReport.metrics.roas.toFixed(2)}x
-                    </p>
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                    <p className="font-semibold">{formatCurrency(latestReport.metrics.cpa)}</p>
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Vendas</p>
-                    <p className="font-semibold">{latestReport.metrics.sales}</p>
-                    <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
-                  </div>
-                </div>
-              )}
-
-              {/* Legacy format - show old metrics if no funnel data */}
-              {!hasFunnelMetrics && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Receita</p>
-                    <p className="font-semibold text-success">{formatCurrency((latestReport.metrics as any).revenue || 0)}</p>
-                    <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Gasto</p>
-                    <p className="font-semibold text-destructive">{formatCurrency((latestReport.metrics as any).spend || 0)}</p>
-                    <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                    <p className={`font-semibold ${((latestReport.metrics as any).roas || 0) >= 1 ? 'text-success' : 'text-destructive'}`}>
-                      {((latestReport.metrics as any).roas || 0).toFixed(2)}x
-                    </p>
-                    <ChangeIndicator value={latestReport.comparison.roas?.change || 0} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                    <p className="font-semibold">{formatCurrency((latestReport.metrics as any).cpa || 0)}</p>
-                    <ChangeIndicator value={-(latestReport.comparison.cpa?.change || 0)} />
-                  </div>
-                  <div className="bg-card rounded-lg p-3 border">
-                    <p className="text-xs text-muted-foreground mb-1">Vendas</p>
-                    <p className="font-semibold">{(latestReport.metrics as any).sales || 0}</p>
-                    <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              {latestReport.actions && latestReport.actions.length > 0 && (
-                <div className="pt-2">
-                  <p className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4 text-primary" />
-                    Ações Recomendadas
+              {/* Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                  <p className="font-semibold text-success">
+                    {formatCurrency(latestReport.metrics?.revenue || 0)}
                   </p>
-                  <div className="space-y-2">
-                    {latestReport.actions.map((item, index) => (
-                      <div key={index} className="flex items-start gap-2 bg-card rounded-lg p-3 border">
-                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span className="text-sm flex-1">{item.action}</span>
-                        <PriorityBadge priority={item.priority} />
-                      </div>
-                    ))}
-                  </div>
+                  <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
                 </div>
-              )}
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                  <p className="font-semibold text-destructive">
+                    {formatCurrency(latestReport.metrics?.spend || 0)}
+                  </p>
+                  <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                  <p className={`font-semibold ${(latestReport.metrics?.roas || 0) >= 1 ? 'text-success' : 'text-destructive'}`}>
+                    {(latestReport.metrics?.roas || 0).toFixed(2)}x
+                  </p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                  <p className="font-semibold">{formatCurrency(latestReport.metrics?.cpa || 0)}</p>
+                </div>
+                <div className="bg-card rounded-lg p-3 border">
+                  <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                  <p className="font-semibold">{latestReport.metrics?.sales || 0}</p>
+                  <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Section 3: Total Period */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-muted rounded-lg">
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <CardTitle className="text-lg">Acumulado do Período</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Total Faturado</p>
+                <p className="font-semibold text-success">{formatCurrency(totalRevenue)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Total Gasto</p>
+                <p className="font-semibold text-destructive">{formatCurrency(totalSpend)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">ROAS Geral</p>
+                <p className={`font-semibold ${totalRoas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                  {totalRoas.toFixed(2)}x
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">CPA Médio</p>
+                <p className="font-semibold">{formatCurrency(totalCpa)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Total Vendas</p>
+                <p className="font-semibold">{totalSalesCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Section 4: Recommended Actions */}
+        {latestReport?.actions && latestReport.actions.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-primary/10 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Ações Recomendadas</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Baseado na análise dos últimos 3 dias
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {latestReport.actions.map((item, index) => (
+                  <div key={index} className="flex items-start gap-2 bg-muted/50 rounded-lg p-3 border">
+                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span className="text-sm flex-1">{item.action}</span>
+                    <PriorityBadge priority={item.priority} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Powered by badge */}
-        <div className="text-center">
+        <div className="text-center pt-4">
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground px-4 py-2 bg-card rounded-full border">
             Powered by
             <span className="font-semibold text-primary">MetrikaPRO</span>

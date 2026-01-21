@@ -113,12 +113,14 @@ async function generateReportForProject(
   projectId: string,
   lovableApiKey: string
 ) {
+  // Get dates for the last 3 days (excluding today)
   const today = getBrasiliaDate(0);
-  const yesterday = getBrasiliaDate(1);
-  const dayBeforeYesterday = getBrasiliaDate(2);
+  const day1 = getBrasiliaDate(1); // yesterday
+  const day2 = getBrasiliaDate(2); // 2 days ago
+  const day3 = getBrasiliaDate(3); // 3 days ago
 
   console.log(`Generating report for project ${projectId}`);
-  console.log(`Today (Brasilia): ${today}, Yesterday: ${yesterday}`);
+  console.log(`Today (Brasilia): ${today}, Analyzing days: ${day1}, ${day2}, ${day3}`);
 
   // Fetch project details (including benchmarks)
   const { data: project, error: projectError } = await supabase
@@ -142,211 +144,233 @@ async function generateReportForProject(
     saleRate: projectData.benchmark_sale_rate ?? DEFAULT_BENCHMARKS.saleRate,
   };
 
-  // Fetch yesterday's sales
-  const { data: yesterdaySales, error: salesError } = await supabase
+  // Fetch sales for all 3 days
+  const { data: allSales, error: salesError } = await supabase
     .from('sales')
     .select('*')
     .eq('project_id', projectId)
-    .gte('sale_date', `${yesterday}T00:00:00`)
+    .gte('sale_date', `${day3}T00:00:00`)
     .lt('sale_date', `${today}T00:00:00`);
 
   if (salesError) {
     console.error('Error fetching sales:', salesError);
   }
 
-  // Fetch day before yesterday's sales for comparison
-  const { data: dayBeforeSales } = await supabase
-    .from('sales')
-    .select('*')
-    .eq('project_id', projectId)
-    .gte('sale_date', `${dayBeforeYesterday}T00:00:00`)
-    .lt('sale_date', `${yesterday}T00:00:00`);
-
-  // Fetch yesterday's ad spend
-  const { data: yesterdayAdSpend, error: adError } = await supabase
+  // Fetch ad spend for all 3 days
+  const { data: allAdSpend, error: adError } = await supabase
     .from('ad_spend')
     .select('*')
     .eq('project_id', projectId)
-    .eq('date', yesterday);
+    .gte('date', day3)
+    .lte('date', day1);
 
   if (adError) {
     console.error('Error fetching ad spend:', adError);
   }
 
-  // Fetch day before yesterday's ad spend
-  const { data: dayBeforeAdSpend } = await supabase
-    .from('ad_spend')
-    .select('*')
-    .eq('project_id', projectId)
-    .eq('date', dayBeforeYesterday);
-
   // Filter by project settings
   const productIds = projectData.kiwify_product_ids || [];
   const campaignIds = projectData.meta_campaign_ids || [];
 
-  const filterSales = (sales: any[]) => 
-    productIds.length > 0 ? sales?.filter(s => productIds.includes(s.product_id)) : sales;
+  const filterSales = (sales: any[], targetDate: string) => {
+    const filtered = sales?.filter(s => {
+      const saleDate = s.sale_date.split('T')[0];
+      return saleDate === targetDate && (!productIds.length || productIds.includes(s.product_id));
+    }) || [];
+    return filtered;
+  };
   
-  const filterAdSpend = (adSpend: any[]) =>
-    campaignIds.length > 0 ? adSpend?.filter(a => campaignIds.includes(a.campaign_id)) : adSpend;
-
-  const filteredYesterdaySales = filterSales(yesterdaySales || []) || [];
-  const filteredDayBeforeSales = filterSales(dayBeforeSales || []) || [];
-  const filteredYesterdayAdSpend = filterAdSpend(yesterdayAdSpend || []) || [];
-  const filteredDayBeforeAdSpend = filterAdSpend(dayBeforeAdSpend || []) || [];
-
-  // ========== FUNNEL METRICS ==========
-  // Yesterday's funnel data
-  const yImpressions = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
-  const yLinkClicks = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
-  const yLpViews = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.landing_page_views || 0), 0);
-  const yCheckouts = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
-  const ySalesCount = filteredYesterdaySales.length;
-  const yThruplays = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.thruplays || 0), 0);
-  const yRevenue = filteredYesterdaySales.reduce((sum, s) => sum + Number(s.amount), 0);
-  const ySpend = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
-
-  // Day before funnel data
-  const dbImpressions = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
-  const dbLinkClicks = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
-  const dbLpViews = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.landing_page_views || 0), 0);
-  const dbCheckouts = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
-  const dbSalesCount = filteredDayBeforeSales.length;
-  const dbRevenue = filteredDayBeforeSales.reduce((sum, s) => sum + Number(s.amount), 0);
-  const dbSpend = filteredDayBeforeAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
-
-  // Calculate the 5 funnel rates for yesterday
-  // 1. Tx. Engajamento Criativo = (ThruPlays ou Cliques) / Impressões
-  const yEngagementRate = yImpressions > 0 ? (yLinkClicks / yImpressions) * 100 : 0;
-  // 2. CTR (Link) = Link Clicks / Impressões
-  const yCtrRate = yImpressions > 0 ? (yLinkClicks / yImpressions) * 100 : 0;
-  // 3. Taxa LP/Clique = LP Views / Link Clicks
-  const yLpRate = yLinkClicks > 0 ? (yLpViews / yLinkClicks) * 100 : 0;
-  // 4. Tx. Conv. Checkout = Checkouts / LP Views
-  const yCheckoutRate = yLpViews > 0 ? (yCheckouts / yLpViews) * 100 : 0;
-  // 5. Taxa Venda/LP = Vendas / LP Views
-  const ySaleRate = yLpViews > 0 ? (ySalesCount / yLpViews) * 100 : 0;
-
-  // Calculate the 5 funnel rates for day before
-  const dbEngagementRate = dbImpressions > 0 ? (dbLinkClicks / dbImpressions) * 100 : 0;
-  const dbCtrRate = dbImpressions > 0 ? (dbLinkClicks / dbImpressions) * 100 : 0;
-  const dbLpRate = dbLinkClicks > 0 ? (dbLpViews / dbLinkClicks) * 100 : 0;
-  const dbCheckoutRate = dbLpViews > 0 ? (dbCheckouts / dbLpViews) * 100 : 0;
-  const dbSaleRate = dbLpViews > 0 ? (dbSalesCount / dbLpViews) * 100 : 0;
-
-  // Determine status for each metric (ok or alert)
-  const funnelStatus = {
-    engagement: yEngagementRate >= benchmarks.engagement ? 'ok' : 'alert',
-    ctr: yCtrRate >= benchmarks.ctr ? 'ok' : 'alert',
-    lpRate: yLpRate >= benchmarks.lpRate ? 'ok' : 'alert',
-    checkoutRate: yCheckoutRate >= benchmarks.checkoutRate ? 'ok' : 'alert',
-    saleRate: ySaleRate >= benchmarks.saleRate ? 'ok' : 'alert',
+  const filterAdSpend = (adSpend: any[], targetDate: string) => {
+    const filtered = adSpend?.filter(a => {
+      return a.date === targetDate && (!campaignIds.length || campaignIds.includes(a.campaign_id));
+    }) || [];
+    return filtered;
   };
 
-  // Calculate changes from day before
+  // Get data for each of the 3 days
+  const day1Sales = filterSales(allSales || [], day1);
+  const day2Sales = filterSales(allSales || [], day2);
+  const day3Sales = filterSales(allSales || [], day3);
+
+  const day1AdSpend = filterAdSpend(allAdSpend || [], day1);
+  const day2AdSpend = filterAdSpend(allAdSpend || [], day2);
+  const day3AdSpend = filterAdSpend(allAdSpend || [], day3);
+
+  // Calculate metrics for each day
+  const calcDayMetrics = (sales: any[], adSpend: any[]) => {
+    const impressions = adSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
+    const linkClicks = adSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
+    const lpViews = adSpend.reduce((sum, a) => sum + Number(a.landing_page_views || 0), 0);
+    const checkouts = adSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
+    const salesCount = sales.length;
+    const thruplays = adSpend.reduce((sum, a) => sum + Number(a.thruplays || 0), 0);
+    const revenue = sales.reduce((sum, s) => sum + Number(s.amount), 0);
+    const spend = adSpend.reduce((sum, a) => sum + Number(a.spend), 0);
+
+    const engagementRate = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
+    const ctrRate = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
+    const lpRate = linkClicks > 0 ? (lpViews / linkClicks) * 100 : 0;
+    const checkoutRate = lpViews > 0 ? (checkouts / lpViews) * 100 : 0;
+    const saleRate = lpViews > 0 ? (salesCount / lpViews) * 100 : 0;
+    const roas = spend > 0 ? revenue / spend : 0;
+    const cpa = salesCount > 0 ? spend / salesCount : 0;
+
+    return {
+      impressions, linkClicks, lpViews, checkouts, salesCount, thruplays, revenue, spend,
+      engagementRate, ctrRate, lpRate, checkoutRate, saleRate, roas, cpa
+    };
+  };
+
+  const d1 = calcDayMetrics(day1Sales, day1AdSpend);
+  const d2 = calcDayMetrics(day2Sales, day2AdSpend);
+  const d3 = calcDayMetrics(day3Sales, day3AdSpend);
+
+  // Calculate 3-day averages for trend analysis
+  const avg3Days = {
+    engagementRate: (d1.engagementRate + d2.engagementRate + d3.engagementRate) / 3,
+    ctrRate: (d1.ctrRate + d2.ctrRate + d3.ctrRate) / 3,
+    lpRate: (d1.lpRate + d2.lpRate + d3.lpRate) / 3,
+    checkoutRate: (d1.checkoutRate + d2.checkoutRate + d3.checkoutRate) / 3,
+    saleRate: (d1.saleRate + d2.saleRate + d3.saleRate) / 3,
+    revenue: (d1.revenue + d2.revenue + d3.revenue) / 3,
+    spend: (d1.spend + d2.spend + d3.spend) / 3,
+    roas: (d1.roas + d2.roas + d3.roas) / 3,
+    cpa: (d1.cpa + d2.cpa + d3.cpa) / 3,
+    salesCount: (d1.salesCount + d2.salesCount + d3.salesCount) / 3,
+  };
+
+  // Determine trends (comparing day1 to day3)
+  const calcTrend = (recent: number, old: number) => {
+    if (old === 0) return recent > 0 ? 'subindo' : 'estável';
+    const change = ((recent - old) / old) * 100;
+    if (change > 10) return 'subindo';
+    if (change < -10) return 'caindo';
+    return 'estável';
+  };
+
+  const trends = {
+    engagement: calcTrend(d1.engagementRate, d3.engagementRate),
+    ctr: calcTrend(d1.ctrRate, d3.ctrRate),
+    lpRate: calcTrend(d1.lpRate, d3.lpRate),
+    checkoutRate: calcTrend(d1.checkoutRate, d3.checkoutRate),
+    saleRate: calcTrend(d1.saleRate, d3.saleRate),
+    revenue: calcTrend(d1.revenue, d3.revenue),
+    roas: calcTrend(d1.roas, d3.roas),
+  };
+
+  // Determine status for each metric (ok or alert based on 3-day average)
+  const funnelStatus = {
+    engagement: avg3Days.engagementRate >= benchmarks.engagement ? 'ok' : 'alert',
+    ctr: avg3Days.ctrRate >= benchmarks.ctr ? 'ok' : 'alert',
+    lpRate: avg3Days.lpRate >= benchmarks.lpRate ? 'ok' : 'alert',
+    checkoutRate: avg3Days.checkoutRate >= benchmarks.checkoutRate ? 'ok' : 'alert',
+    saleRate: avg3Days.saleRate >= benchmarks.saleRate ? 'ok' : 'alert',
+  };
+
+  // Calculate changes from day before for yesterday
   const calcChange = (current: number, previous: number) => 
     previous > 0 ? ((current - previous) / previous) * 100 : (current > 0 ? 100 : 0);
 
   const funnelComparison = {
-    engagement: { yesterday: yEngagementRate, dayBefore: dbEngagementRate, change: calcChange(yEngagementRate, dbEngagementRate) },
-    ctr: { yesterday: yCtrRate, dayBefore: dbCtrRate, change: calcChange(yCtrRate, dbCtrRate) },
-    lpRate: { yesterday: yLpRate, dayBefore: dbLpRate, change: calcChange(yLpRate, dbLpRate) },
-    checkoutRate: { yesterday: yCheckoutRate, dayBefore: dbCheckoutRate, change: calcChange(yCheckoutRate, dbCheckoutRate) },
-    saleRate: { yesterday: ySaleRate, dayBefore: dbSaleRate, change: calcChange(ySaleRate, dbSaleRate) },
-    revenue: { yesterday: yRevenue, dayBefore: dbRevenue, change: calcChange(yRevenue, dbRevenue) },
-    spend: { yesterday: ySpend, dayBefore: dbSpend, change: calcChange(ySpend, dbSpend) },
-    sales: { yesterday: ySalesCount, dayBefore: dbSalesCount, change: calcChange(ySalesCount, dbSalesCount) },
+    engagement: { yesterday: d1.engagementRate, dayBefore: d2.engagementRate, change: calcChange(d1.engagementRate, d2.engagementRate) },
+    ctr: { yesterday: d1.ctrRate, dayBefore: d2.ctrRate, change: calcChange(d1.ctrRate, d2.ctrRate) },
+    lpRate: { yesterday: d1.lpRate, dayBefore: d2.lpRate, change: calcChange(d1.lpRate, d2.lpRate) },
+    checkoutRate: { yesterday: d1.checkoutRate, dayBefore: d2.checkoutRate, change: calcChange(d1.checkoutRate, d2.checkoutRate) },
+    saleRate: { yesterday: d1.saleRate, dayBefore: d2.saleRate, change: calcChange(d1.saleRate, d2.saleRate) },
+    revenue: { yesterday: d1.revenue, dayBefore: d2.revenue, change: calcChange(d1.revenue, d2.revenue) },
+    spend: { yesterday: d1.spend, dayBefore: d2.spend, change: calcChange(d1.spend, d2.spend) },
+    sales: { yesterday: d1.salesCount, dayBefore: d2.salesCount, change: calcChange(d1.salesCount, d2.salesCount) },
   };
 
-  // ROAS and CPA
-  const yRoas = ySpend > 0 ? yRevenue / ySpend : 0;
-  const yCpa = ySalesCount > 0 ? ySpend / ySalesCount : 0;
-  const dbRoas = dbSpend > 0 ? dbRevenue / dbSpend : 0;
-  const dbCpa = dbSalesCount > 0 ? dbSpend / dbSalesCount : 0;
-
-  // Build funnel metrics object
+  // Build funnel metrics object (for yesterday)
   const funnelMetrics = {
-    // Raw numbers
-    impressions: yImpressions,
-    linkClicks: yLinkClicks,
-    lpViews: yLpViews,
-    checkouts: yCheckouts,
-    sales: ySalesCount,
-    thruplays: yThruplays,
-    revenue: yRevenue,
-    spend: ySpend,
-    roas: yRoas,
-    cpa: yCpa,
-    // Calculated rates
+    impressions: d1.impressions,
+    linkClicks: d1.linkClicks,
+    lpViews: d1.lpViews,
+    checkouts: d1.checkouts,
+    sales: d1.salesCount,
+    thruplays: d1.thruplays,
+    revenue: d1.revenue,
+    spend: d1.spend,
+    roas: d1.roas,
+    cpa: d1.cpa,
     rates: {
-      engagement: yEngagementRate,
-      ctr: yCtrRate,
-      lpRate: yLpRate,
-      checkoutRate: yCheckoutRate,
-      saleRate: ySaleRate,
+      engagement: d1.engagementRate,
+      ctr: d1.ctrRate,
+      lpRate: d1.lpRate,
+      checkoutRate: d1.checkoutRate,
+      saleRate: d1.saleRate,
     },
-    // Benchmarks used
     benchmarks,
-    // Status for each metric
     status: funnelStatus,
   };
 
-  // Generate AI summary focused on funnel metrics
+  // Generate AI summary focused on 3-day trends
   const prompt = `Você é um analista de performance de marketing digital especializado em funil de vendas.
 
-DADOS DO DIA ${yesterday} - PROJETO: ${projectData.name}
+DADOS DOS ÚLTIMOS 3 DIAS (excluindo hoje) - PROJETO: ${projectData.name}
 
-=== MÉTRICAS DE FUNIL ===
+=== DIA 1 (Ontem: ${day1}) ===
+- Receita: R$ ${d1.revenue.toFixed(2)}
+- Gasto: R$ ${d1.spend.toFixed(2)}
+- ROAS: ${d1.roas.toFixed(2)}x
+- Vendas: ${d1.salesCount}
+- CPA: R$ ${d1.cpa.toFixed(2)}
 
-1. Tx. Engajamento Criativo: ${yEngagementRate.toFixed(2)}% (benchmark: ${benchmarks.engagement}%)
-   → ${funnelStatus.engagement === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
-   → Variação: ${funnelComparison.engagement.change > 0 ? '+' : ''}${funnelComparison.engagement.change.toFixed(1)}% vs ontem
+=== DIA 2 (${day2}) ===
+- Receita: R$ ${d2.revenue.toFixed(2)}
+- Gasto: R$ ${d2.spend.toFixed(2)}
+- ROAS: ${d2.roas.toFixed(2)}x
+- Vendas: ${d2.salesCount}
 
-2. CTR (Link Clicks): ${yCtrRate.toFixed(2)}% (benchmark: ${benchmarks.ctr}%)
-   → ${funnelStatus.ctr === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
-   → Variação: ${funnelComparison.ctr.change > 0 ? '+' : ''}${funnelComparison.ctr.change.toFixed(1)}% vs ontem
+=== DIA 3 (${day3}) ===
+- Receita: R$ ${d3.revenue.toFixed(2)}
+- Gasto: R$ ${d3.spend.toFixed(2)}
+- ROAS: ${d3.roas.toFixed(2)}x
+- Vendas: ${d3.salesCount}
 
-3. Taxa LP/Clique: ${yLpRate.toFixed(2)}% (benchmark: ${benchmarks.lpRate}%)
-   → ${funnelStatus.lpRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
-   → Variação: ${funnelComparison.lpRate.change > 0 ? '+' : ''}${funnelComparison.lpRate.change.toFixed(1)}% vs ontem
+=== TENDÊNCIAS (últimos 3 dias) ===
+- Receita: ${trends.revenue}
+- ROAS: ${trends.roas}
+- Engajamento: ${trends.engagement}
+- CTR: ${trends.ctr}
+- Taxa LP/Clique: ${trends.lpRate}
+- Taxa Checkout: ${trends.checkoutRate}
+- Taxa Venda: ${trends.saleRate}
 
-4. Tx. Conv. Checkout: ${yCheckoutRate.toFixed(2)}% (benchmark: ${benchmarks.checkoutRate}%)
-   → ${funnelStatus.checkoutRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
-   → Variação: ${funnelComparison.checkoutRate.change > 0 ? '+' : ''}${funnelComparison.checkoutRate.change.toFixed(1)}% vs ontem
+=== MÉDIAS (3 dias) ===
+- Receita Média: R$ ${avg3Days.revenue.toFixed(2)}
+- Gasto Médio: R$ ${avg3Days.spend.toFixed(2)}
+- ROAS Médio: ${avg3Days.roas.toFixed(2)}x
+- CPA Médio: R$ ${avg3Days.cpa.toFixed(2)}
+- Vendas Média: ${avg3Days.salesCount.toFixed(1)}
 
-5. Taxa Venda/LP: ${ySaleRate.toFixed(2)}% (benchmark: ${benchmarks.saleRate}%)
-   → ${funnelStatus.saleRate === 'ok' ? '✅ DENTRO DO ESPERADO' : '⚠️ ABAIXO DO BENCHMARK'}
-   → Variação: ${funnelComparison.saleRate.change > 0 ? '+' : ''}${funnelComparison.saleRate.change.toFixed(1)}% vs ontem
-
-=== DADOS ABSOLUTOS ===
-- Impressões: ${yImpressions.toLocaleString()}
-- Link Clicks: ${yLinkClicks.toLocaleString()}
-- LP Views: ${yLpViews.toLocaleString()}
-- Checkouts: ${yCheckouts.toLocaleString()}
-- Vendas: ${ySalesCount}
-- Receita: R$ ${yRevenue.toFixed(2)}
-- Gasto: R$ ${ySpend.toFixed(2)}
-- ROAS: ${yRoas.toFixed(2)}x
-- CPA: R$ ${yCpa.toFixed(2)}
+=== MÉTRICAS DE FUNIL (Média 3 dias vs Benchmarks) ===
+1. Tx. Engajamento: ${avg3Days.engagementRate.toFixed(2)}% (benchmark: ${benchmarks.engagement}%) → ${funnelStatus.engagement === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
+2. CTR: ${avg3Days.ctrRate.toFixed(2)}% (benchmark: ${benchmarks.ctr}%) → ${funnelStatus.ctr === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
+3. Taxa LP/Clique: ${avg3Days.lpRate.toFixed(2)}% (benchmark: ${benchmarks.lpRate}%) → ${funnelStatus.lpRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
+4. Taxa Checkout: ${avg3Days.checkoutRate.toFixed(2)}% (benchmark: ${benchmarks.checkoutRate}%) → ${funnelStatus.checkoutRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
+5. Taxa Venda: ${avg3Days.saleRate.toFixed(2)}% (benchmark: ${benchmarks.saleRate}%) → ${funnelStatus.saleRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
 
 === INSTRUÇÕES ===
-1. Analise cada etapa do funil e identifique onde está o gargalo (métrica mais fraca).
-2. Gere recomendações específicas para melhorar as métricas que estão abaixo do benchmark.
-3. Priorize ações para o gargalo principal.
-4. Seja direto e objetivo - o cliente precisa de insights acionáveis.
+1. Analise a TENDÊNCIA dos últimos 3 dias (melhorando, piorando ou estável).
+2. Identifique problemas PERSISTENTES (que aparecem em mais de um dia).
+3. Gere um resumo focado no que o cliente precisa saber.
+4. Priorize ações para problemas que estão PIORANDO ou são consistentes.
+5. Seja direto e objetivo - o cliente precisa de insights acionáveis.
 
 Formato de resposta (JSON):
 {
-  "summary": "Resumo de 2-3 frases focando no gargalo do funil e performance geral",
-  "bottleneck": "nome da métrica que é o maior gargalo (engagement, ctr, lpRate, checkoutRate ou saleRate)",
+  "summary": "Resumo de 2-3 frases sobre a performance dos últimos 3 dias, destacando tendências",
+  "bottleneck": "nome da métrica que é o maior problema persistente",
   "actions": [
-    {"action": "Ação específica para o gargalo", "priority": "alta"},
-    {"action": "Ação secundária", "priority": "média"},
+    {"action": "Ação específica para o problema principal", "priority": "alta"},
+    {"action": "Ação secundária baseada em tendência", "priority": "média"},
     {"action": "Ação complementar", "priority": "baixa"}
   ]
 }`;
 
-  console.log('Calling Lovable AI for funnel-focused report generation...');
+  console.log('Calling Lovable AI for 3-day trend analysis...');
 
   const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -357,7 +381,7 @@ Formato de resposta (JSON):
     body: JSON.stringify({
       model: 'google/gemini-3-flash-preview',
       messages: [
-        { role: 'system', content: 'Você é um analista de marketing digital especializado em funil de vendas. Responda sempre em JSON válido. Foque nas métricas de funil e identifique gargalos.' },
+        { role: 'system', content: 'Você é um analista de marketing digital. Responda sempre em JSON válido. Foque em tendências de 3 dias e problemas persistentes.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
@@ -382,7 +406,6 @@ Formato de resposta (JSON):
 
   let parsedAiResponse;
   try {
-    // Try to extract JSON from the response
     const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       parsedAiResponse = JSON.parse(jsonMatch[0]);
@@ -398,12 +421,12 @@ Formato de resposta (JSON):
     };
   }
 
-  // Save report to database
+  // Save report to database (for yesterday's date)
   const { data: report, error: insertError } = await supabase
     .from('daily_reports')
     .upsert({
       project_id: projectId,
-      report_date: yesterday,
+      report_date: day1,
       summary: parsedAiResponse.summary,
       comparison: funnelComparison,
       actions: parsedAiResponse.actions || [],
@@ -419,14 +442,15 @@ Formato de resposta (JSON):
     throw insertError;
   }
 
-  console.log(`Report saved for project ${projectId}, date ${yesterday}`);
+  console.log(`Report saved for project ${projectId}, date ${day1}`);
 
   return {
     success: true,
     report_id: report.id,
-    report_date: yesterday,
+    report_date: day1,
     summary: parsedAiResponse.summary,
     bottleneck: parsedAiResponse.bottleneck,
     funnel: funnelMetrics,
+    trends,
   };
 }
