@@ -118,10 +118,8 @@ Deno.serve(async (req) => {
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
         const formattedStartDate = startDate.toISOString().split('T')[0];
         
-        // end_date must be > start_date (Kiwify requirement)
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const formattedEndDate = tomorrow.toISOString().split('T')[0];
+        // Use today to stay within 90 days limit (API rejects > 90 days)
+        const formattedEndDate = new Date().toISOString().split('T')[0];
 
         console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
