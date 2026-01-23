@@ -149,6 +149,7 @@ export default function ProjectView() {
         .from('sales')
         .select('*')
         .eq('project_id', id)
+        .eq('status', 'paid')
         .order('sale_date', { ascending: false });
       
       const dateFilter = getDateFilter();

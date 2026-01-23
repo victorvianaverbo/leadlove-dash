@@ -74,7 +74,7 @@ export default function Dashboard() {
       const dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
 
       const [salesResult, spendResult] = await Promise.all([
-        supabase.from('sales').select('project_id, amount').gte('sale_date', dateFilter),
+        supabase.from('sales').select('project_id, amount').eq('status', 'paid').gte('sale_date', dateFilter),
         supabase.from('ad_spend').select('project_id, spend').gte('date', dateFilter)
       ]);
 
