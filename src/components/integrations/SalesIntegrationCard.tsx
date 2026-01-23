@@ -82,7 +82,7 @@ export function SalesIntegrationCard({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [productSearch, setProductSearch] = useState("");
-  const [manualProductIds, setManualProductIds] = useState("");
+  
 
   // Load non-sensitive credentials from existing integration
   useState(() => {
@@ -408,20 +408,6 @@ export function SalesIntegrationCard({
                   <p className="text-sm text-muted-foreground">Nenhum produto na API</p>
                 )}
 
-                {/* Manual Product IDs */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Adicionar IDs Manualmente</label>
-                  <Input
-                    placeholder="Ex: abc123, def456"
-                    value={manualProductIds}
-                    onChange={(e) => setManualProductIds(e.target.value)}
-                  />
-                  {manualProductIds && (
-                    <p className="text-xs text-muted-foreground">
-                      {manualProductIds.split(',').filter(id => id.trim()).length} ID(s) adicionado(s)
-                    </p>
-                  )}
-                </div>
               </div>
             )}
           </div>
