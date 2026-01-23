@@ -39,13 +39,9 @@ export default function Documentation() {
   };
 
   return (
-    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
-      {/* Decorative blur circles */}
-      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
-      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
-      
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="header-glass sticky top-0 z-50">
+      <header className="sticky top-0 z-50 bg-card border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
@@ -54,8 +50,8 @@ export default function Documentation() {
               </Link>
             </Button>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-primary rounded-lg">
-                <BarChart3 className="h-5 w-5 text-white" />
+              <div className="p-2 bg-primary rounded-lg">
+                <BarChart3 className="h-5 w-5 text-primary-foreground" />
               </div>
               <span className="font-bold text-lg">MetrikaPRO</span>
               <span className="text-muted-foreground">/ Documentação</span>
