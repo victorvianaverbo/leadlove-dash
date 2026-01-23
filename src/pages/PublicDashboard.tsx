@@ -162,6 +162,21 @@ function getBrasiliaDate(daysAgo = 0): string {
   return brasilia.toISOString().split('T')[0];
 }
 
+// Converte meia-noite de Brasília para UTC (+3 horas)
+// Mesma lógica usada no ProjectView.tsx para consistência
+function brasiliaToUTC(dateStr: string): string {
+  // dateStr vem como "YYYY-MM-DD"
+  // Meia-noite Brasília (00:00 BRT) = 03:00 UTC
+  return `${dateStr}T03:00:00.000Z`;
+}
+
+// Próximo dia em UTC (usado para filtro < end date)
+function getNextDayUTC(dateStr: string): string {
+  const date = new Date(dateStr);
+  date.setDate(date.getDate() + 1);
+  return `${date.toISOString().split('T')[0]}T03:00:00.000Z`;
+}
+
 export default function PublicDashboard() {
   const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
@@ -203,17 +218,20 @@ export default function PublicDashboard() {
     enabled: !!project?.id,
   });
 
-  // Fetch TODAY's sales (real-time)
+  // Fetch TODAY's sales (real-time) - Usando conversão Brasília → UTC
   const { data: todaySales } = useQuery({
     queryKey: ['public-sales-today', project?.id, today],
     queryFn: async (): Promise<SalesPublic[]> => {
+      const todayStart = brasiliaToUTC(today);
+      const todayEnd = getNextDayUTC(today);
+      
       const { data, error } = await supabase
         .from('sales_public' as any)
         .select('*')
         .eq('project_id', project!.id)
         .eq('status', 'paid')
-        .gte('sale_date', `${today}T00:00:00`)
-        .lt('sale_date', `${today}T23:59:59`);
+        .gte('sale_date', todayStart)
+        .lt('sale_date', todayEnd);
       
       if (error) throw error;
       return (data || []) as unknown as SalesPublic[];
