@@ -143,40 +143,17 @@ export default function ProjectEdit() {
         } as any)
         .eq('id', id);
       if (error) throw error;
-      
-      // Auto-sync if any sales integrations are active
-      const hasActiveIntegrations = 
-        kiwifyIntegration?.is_active || 
-        hotmartIntegration?.is_active || 
-        guruIntegration?.is_active || 
-        metaIntegration?.is_active;
-      
-      if (hasActiveIntegrations) {
-        const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-project-data', {
-          body: { project_id: id }
-        });
-        if (syncError) {
-          console.error('Sync error:', syncError);
-        }
-        return syncData;
-      }
-      return null;
     },
-    onSuccess: (syncData) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      
-      if (syncData) {
-        toast({ 
-          title: "Projeto salvo e sincronizado!", 
-          description: `${syncData.salesSynced || 0} vendas e ${syncData.adSpendSynced || 0} gastos importados.`
-        });
-      } else {
-        toast({ title: "Projeto salvo com sucesso!" });
-      }
+      toast({ 
+        title: "Configurações salvas!", 
+        description: "Use o botão Atualizar no Dashboard para sincronizar os dados."
+      });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro ao salvar projeto", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -392,12 +369,12 @@ export default function ProjectEdit() {
             {updateProject.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Salvando e sincronizando...
+                Salvando...
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Salvar Projeto
+                Salvar Configurações
               </>
             )}
           </Button>
