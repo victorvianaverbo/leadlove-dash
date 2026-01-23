@@ -124,6 +124,23 @@
   }
 }
 
+/* Semantic border colors */
+.border-success {
+  border-color: hsl(var(--success));
+}
+
+.border-destructive {
+  border-color: hsl(var(--destructive));
+}
+
+.border-info {
+  border-color: hsl(var(--info));
+}
+
+.border-primary-color {
+  border-color: hsl(var(--primary));
+}
+
 /* Animações Simples */
 @layer utilities {
   @keyframes fadeIn {
