@@ -34,15 +34,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkSubscription = useCallback(async () => {
     // Verificar se temos uma sessão válida antes de chamar a edge function
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
     
-    if (!currentSession?.access_token) {
+    if (sessionError || !currentSession?.access_token || !currentSession?.user) {
+      console.log('No valid session for subscription check');
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
       setIsAdmin(false);
       setExtraProjects(0);
       return;
+    }
+
+    // Verify token is not expired
+    const tokenExpiry = currentSession.expires_at;
+    if (tokenExpiry && tokenExpiry * 1000 < Date.now()) {
+      console.log('Token expired, attempting refresh');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        console.log('Failed to refresh session');
+        setSubscribed(false);
+        setSubscriptionTier(null);
+        setSubscriptionEnd(null);
+        setIsAdmin(false);
+        setExtraProjects(0);
+        return;
+      }
     }
 
     setSubscriptionLoading(true);
