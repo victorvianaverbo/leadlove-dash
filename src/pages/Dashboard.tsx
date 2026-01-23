@@ -331,39 +331,111 @@ export default function Dashboard() {
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {projects?.map((project, index) => {
                 const { revenue, spend, roas } = getProjectMetrics(project.id);
+                const initials = project.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                const roasPercentage = Math.min(roas * 50, 100); // 2x ROAS = 100%
+                const isPositiveRoas = roas >= 1;
+                
                 return (
                   <Card
                     key={project.id}
-                    className="cursor-pointer hover:shadow-md transition-shadow duration-200 overflow-hidden group relative"
+                    className={`cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden group relative border-l-4 ${
+                      isPositiveRoas ? 'border-l-success' : 'border-l-destructive'
+                    } hover:border-l-primary`}
                     onClick={() => navigate(`/projects/${project.id}`)}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </Button>
-                    <CardHeader className="pb-3 pr-10 sm:pr-12 p-4 sm:p-6 border-b border-border">
-                      <CardTitle className="text-base sm:text-lg group-hover:text-primary transition-colors truncate">{project.name}</CardTitle>
+                    {/* Header with Avatar and Actions */}
+                    <CardHeader className="pb-3 p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Avatar with initials */}
+                          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                            isPositiveRoas 
+                              ? 'bg-success/10 text-success' 
+                              : 'bg-destructive/10 text-destructive'
+                          }`}>
+                            {initials}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="text-base sm:text-lg group-hover:text-primary transition-colors truncate">
+                              {project.name}
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {project.last_sync_at 
+                                ? `Sync: ${new Date(project.last_sync_at).toLocaleDateString('pt-BR')}`
+                                : 'Não sincronizado'}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-70 sm:opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                          onClick={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardHeader>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Faturamento</span>
-                          <span className="font-semibold text-success">R$ {formatCurrency(revenue)}</span>
+
+                    <CardContent className="p-4 sm:p-5 pt-0 sm:pt-0">
+                      {/* Metrics Grid */}
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                        {/* Faturamento */}
+                        <div className="bg-success/5 rounded-lg p-2.5 sm:p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <DollarSign className="h-3 w-3 text-success" />
+                            <span className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide">Receita</span>
+                          </div>
+                          <p className="text-sm sm:text-base font-bold text-success truncate">
+                            R$ {formatCurrency(revenue)}
+                          </p>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Investimento</span>
-                          <span className="font-semibold text-destructive">R$ {formatCurrency(spend)}</span>
+                        
+                        {/* Investimento */}
+                        <div className="bg-destructive/5 rounded-lg p-2.5 sm:p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <TrendingUp className="h-3 w-3 text-destructive" />
+                            <span className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide">Invest.</span>
+                          </div>
+                          <p className="text-sm sm:text-base font-bold text-destructive truncate">
+                            R$ {formatCurrency(spend)}
+                          </p>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">ROAS</span>
-                          <span className={`font-semibold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                        
+                        {/* ROAS */}
+                        <div className={`rounded-lg p-2.5 sm:p-3 text-center ${
+                          isPositiveRoas ? 'bg-success/5' : 'bg-destructive/5'
+                        }`}>
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Target className="h-3 w-3" style={{ color: isPositiveRoas ? 'hsl(var(--success))' : 'hsl(var(--destructive))' }} />
+                            <span className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide">ROAS</span>
+                          </div>
+                          <p className={`text-sm sm:text-base font-bold ${
+                            isPositiveRoas ? 'text-success' : 'text-destructive'
+                          }`}>
                             {roas.toFixed(2)}x
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ROAS Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Performance</span>
+                          <span className={`font-medium ${isPositiveRoas ? 'text-success' : 'text-destructive'}`}>
+                            {isPositiveRoas ? 'Lucrativo' : 'No prejuízo'}
                           </span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isPositiveRoas 
+                                ? 'bg-gradient-to-r from-success/60 to-success' 
+                                : 'bg-gradient-to-r from-destructive/60 to-destructive'
+                            }`}
+                            style={{ width: `${roasPercentage}%` }}
+                          />
                         </div>
                       </div>
                     </CardContent>
