@@ -147,9 +147,11 @@ Deno.serve(async (req) => {
         const accessToken = tokenData.access_token;
 
         const formattedStartDate = kiwifyStartDate.toISOString().split('T')[0];
-        const formattedEndDate = new Date().toISOString().split('T')[0];
+        // Use tomorrow (Brasília) as end_date to ensure today's sales are included
+        const endDateObj = getBrasiliaDate(-1); // -1 = tomorrow in Brasília
+        const formattedEndDate = endDateObj.toISOString().split('T')[0];
 
-        console.log(`Syncing Kiwify sales from ${formattedStartDate} to ${formattedEndDate}`);
+        console.log(`Syncing Kiwify sales from ${formattedStartDate} to ${formattedEndDate} (using tomorrow to include today's sales)`);
 
         let allSales: any[] = [];
         
@@ -181,6 +183,12 @@ Deno.serve(async (req) => {
               const sales = salesData.data || [];
               
               console.log(`Kiwify product ${productId} - Page ${pageNumber}: ${sales.length} sales`);
+              
+              // Debug log each sale to identify missing ones
+              for (const s of sales) {
+                console.log(`  - Sale ${s.id}: customer=${s.customer?.name || 'N/A'}, status=${s.status}, date=${s.created_at}, amount=${s.charges?.net_amount || 'N/A'}`);
+              }
+              
               allSales = allSales.concat(sales);
               
               if (sales.length < 100) {
