@@ -20,6 +20,19 @@ function getBrasiliaDate(daysAgo = 0): string {
   return brasilia.toISOString().split('T')[0];
 }
 
+// Converte meia-noite de Brasília para UTC (+3 horas)
+function brasiliaToUTC(dateStr: string): string {
+  return `${dateStr}T03:00:00.000Z`;
+}
+
+// Converte timestamp UTC para data em Brasília (subtrai 3 horas)
+function utcToBrasiliaDate(utcTimestamp: string): string {
+  const date = new Date(utcTimestamp);
+  // Subtrai 3 horas para converter UTC para Brasília
+  date.setHours(date.getHours() - 3);
+  return date.toISOString().split('T')[0];
+}
+
 // Default benchmarks (market standards)
 const DEFAULT_BENCHMARKS = {
   engagement: 2.0,    // Tx. Engajamento Criativo >= 2%
@@ -149,8 +162,8 @@ async function generateReportForProject(
     .from('sales')
     .select('*')
     .eq('project_id', projectId)
-    .gte('sale_date', `${day3}T00:00:00`)
-    .lt('sale_date', `${today}T00:00:00`);
+    .gte('sale_date', brasiliaToUTC(day3))
+    .lt('sale_date', brasiliaToUTC(today));
 
   if (salesError) {
     console.error('Error fetching sales:', salesError);
@@ -174,7 +187,8 @@ async function generateReportForProject(
 
   const filterSales = (sales: any[], targetDate: string) => {
     const filtered = sales?.filter(s => {
-      const saleDate = s.sale_date.split('T')[0];
+      // Converte timestamp UTC para data em Brasília
+      const saleDate = utcToBrasiliaDate(s.sale_date);
       return saleDate === targetDate && (!productIds.length || productIds.includes(s.product_id));
     }) || [];
     return filtered;
