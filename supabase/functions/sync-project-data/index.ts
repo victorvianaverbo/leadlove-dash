@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
       .eq('is_active', true);
 
     const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
+    const hotmartIntegration = integrations?.find(i => i.type === 'hotmart');
+    const guruIntegration = integrations?.find(i => i.type === 'guru');
     const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
 
     let salesSynced = 0;
@@ -97,14 +99,14 @@ Deno.serve(async (req) => {
     let kiwifyStartDate: Date;
     if (isFirstSync) {
       kiwifyStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      console.log('First sync detected - fetching 90 days of Kiwify data');
+      console.log('First sync detected - fetching 90 days of data');
     } else {
       // Sync from last_sync - 2 days to catch late confirmations
       kiwifyStartDate = new Date(new Date(project.last_sync_at).getTime() - 2 * 24 * 60 * 60 * 1000);
-      console.log(`Incremental sync - fetching Kiwify data since ${kiwifyStartDate.toISOString()}`);
+      console.log(`Incremental sync - fetching data since ${kiwifyStartDate.toISOString()}`);
     }
 
-    // Sync Kiwify sales
+    // ============ KIWIFY SYNC ============
     if (kiwifyIntegration && project.kiwify_product_ids?.length > 0) {
       const { client_id, client_secret, account_id } = kiwifyIntegration.credentials as { 
         client_id: string; 
@@ -130,20 +132,17 @@ Deno.serve(async (req) => {
         const accessToken = tokenData.access_token;
 
         const formattedStartDate = kiwifyStartDate.toISOString().split('T')[0];
-        
-        // Use today to stay within 90 days limit (API rejects > 90 days)
         const formattedEndDate = new Date().toISOString().split('T')[0];
 
-        console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
+        console.log(`Syncing Kiwify sales from ${formattedStartDate} to ${formattedEndDate}`);
 
-        // Fetch sales for EACH product individually with full pagination
         let allSales: any[] = [];
         
         for (const productId of project.kiwify_product_ids) {
           let pageNumber = 1;
           let hasMorePages = true;
           
-          console.log(`Fetching sales for product: ${productId}`);
+          console.log(`Fetching Kiwify sales for product: ${productId}`);
           
           while (hasMorePages) {
             const params = new URLSearchParams({
@@ -155,8 +154,6 @@ Deno.serve(async (req) => {
             });
 
             const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
-            console.log(`Fetching page ${pageNumber}: ${salesUrl}`);
-
             const salesResponse = await fetch(salesUrl, {
               headers: { 
                 'Authorization': `Bearer ${accessToken}`,
@@ -168,10 +165,9 @@ Deno.serve(async (req) => {
               const salesData = await salesResponse.json();
               const sales = salesData.data || [];
               
-              console.log(`Product ${productId} - Page ${pageNumber}: ${sales.length} sales`);
+              console.log(`Kiwify product ${productId} - Page ${pageNumber}: ${sales.length} sales`);
               allSales = allSales.concat(sales);
               
-              // Check if there are more pages
               if (sales.length < 100) {
                 hasMorePages = false;
               } else {
@@ -179,15 +175,14 @@ Deno.serve(async (req) => {
               }
             } else {
               const errorText = await salesResponse.text();
-              console.error(`Error fetching sales for product ${productId}:`, errorText);
+              console.error(`Error fetching Kiwify sales for product ${productId}:`, errorText);
               hasMorePages = false;
             }
           }
         }
 
-        console.log(`Total sales fetched: ${allSales.length}`);
+        console.log(`Total Kiwify sales fetched: ${allSales.length}`);
 
-        // Insert sales into database
         for (const sale of allSales) {
           const tracking = sale.tracking || {};
           
@@ -199,11 +194,9 @@ Deno.serve(async (req) => {
               user_id: userId,
               product_id: sale.product?.id,
               product_name: sale.product?.name,
-              // net_amount comes in centavos, divide by 100 to get reais
               amount: (sale.net_amount || sale.amount || 0) / 100,
               status: sale.status,
               payment_method: sale.payment_method,
-              // customer is lowercase in API v1
               customer_name: sale.customer?.name,
               customer_email: sale.customer?.email,
               sale_date: sale.created_at,
@@ -212,12 +205,185 @@ Deno.serve(async (req) => {
               utm_campaign: tracking.utm_campaign,
               utm_content: tracking.utm_content,
               utm_term: tracking.utm_term,
+              source: 'kiwify',
             }, { onConflict: 'kiwify_sale_id' });
 
           if (!upsertError) salesSynced++;
         }
       } else {
-        console.error('Failed to get access token:', await tokenResponse.text());
+        console.error('Failed to get Kiwify access token:', await tokenResponse.text());
+      }
+    }
+
+    // ============ HOTMART SYNC ============
+    if (hotmartIntegration && project.hotmart_product_ids?.length > 0) {
+      const { client_id, client_secret, basic_token } = hotmartIntegration.credentials as {
+        client_id: string;
+        client_secret: string;
+        basic_token: string;
+      };
+
+      console.log('Starting Hotmart sync...');
+
+      // Get access token from Hotmart
+      const tokenResponse = await fetch('https://api-sec-vlc.hotmart.com/security/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${basic_token}`,
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id,
+          client_secret,
+        }).toString(),
+      });
+
+      if (tokenResponse.ok) {
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        const startTimestamp = kiwifyStartDate.getTime();
+        const endTimestamp = now.getTime();
+
+        console.log(`Syncing Hotmart sales from ${new Date(startTimestamp).toISOString()} to ${new Date(endTimestamp).toISOString()}`);
+
+        // Fetch sales history from Hotmart
+        for (const productId of project.hotmart_product_ids) {
+          let page = 1;
+          let hasMore = true;
+
+          while (hasMore) {
+            const salesUrl = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`;
+            
+            const salesResponse = await fetch(salesUrl, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (salesResponse.ok) {
+              const salesData = await salesResponse.json();
+              const sales = salesData.items || [];
+              
+              console.log(`Hotmart product ${productId} - Page ${page}: ${sales.length} sales`);
+
+              for (const sale of sales) {
+                const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
+                
+                const { error: upsertError } = await supabase
+                  .from('sales')
+                  .upsert({
+                    kiwify_sale_id: saleId,
+                    project_id: project.id,
+                    user_id: userId,
+                    product_id: productId,
+                    product_name: sale.product?.name || sale.product_name,
+                    amount: (sale.purchase?.price?.value || sale.price || 0) / 100,
+                    status: sale.purchase?.status || sale.status || 'approved',
+                    payment_method: sale.purchase?.payment?.type || sale.payment_type,
+                    customer_name: sale.buyer?.name || sale.buyer_name,
+                    customer_email: sale.buyer?.email || sale.buyer_email,
+                    sale_date: sale.purchase?.approved_date || sale.approved_date || sale.order_date,
+                    utm_source: sale.purchase?.tracking?.source || sale.tracking?.source,
+                    utm_medium: sale.purchase?.tracking?.medium || sale.tracking?.medium,
+                    utm_campaign: sale.purchase?.tracking?.utm_campaign,
+                    utm_content: sale.purchase?.tracking?.utm_content,
+                    utm_term: sale.purchase?.tracking?.utm_term,
+                    source: 'hotmart',
+                  }, { onConflict: 'kiwify_sale_id' });
+
+                if (!upsertError) salesSynced++;
+              }
+
+              if (sales.length < 100) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+            } else {
+              const errorText = await salesResponse.text();
+              console.error(`Error fetching Hotmart sales for product ${productId}:`, errorText);
+              hasMore = false;
+            }
+          }
+        }
+      } else {
+        console.error('Failed to get Hotmart access token:', await tokenResponse.text());
+      }
+    }
+
+    // ============ GURU DMG SYNC ============
+    if (guruIntegration && project.guru_product_ids?.length > 0) {
+      const { api_token } = guruIntegration.credentials as { api_token: string };
+
+      console.log('Starting Guru DMG sync...');
+
+      const startDate = kiwifyStartDate.toISOString().split('T')[0];
+      const endDate = new Date().toISOString().split('T')[0];
+
+      for (const productId of project.guru_product_ids) {
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+          const salesUrl = `https://api.digitalmanager.guru/api/v1/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
+          
+          const salesResponse = await fetch(salesUrl, {
+            headers: {
+              'Authorization': `Bearer ${api_token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          });
+
+          if (salesResponse.ok) {
+            const salesData = await salesResponse.json();
+            const sales = salesData.data || salesData.transactions || [];
+            
+            console.log(`Guru product ${productId} - Page ${page}: ${sales.length} sales`);
+
+            for (const sale of sales) {
+              const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
+              
+              const { error: upsertError } = await supabase
+                .from('sales')
+                .upsert({
+                  kiwify_sale_id: saleId,
+                  project_id: project.id,
+                  user_id: userId,
+                  product_id: productId,
+                  product_name: sale.product?.name || sale.product_name,
+                  amount: sale.amount || sale.value || sale.price || 0,
+                  status: sale.status || 'approved',
+                  payment_method: sale.payment_method || sale.payment_type,
+                  customer_name: sale.customer?.name || sale.buyer?.name || sale.customer_name,
+                  customer_email: sale.customer?.email || sale.buyer?.email || sale.customer_email,
+                  sale_date: sale.created_at || sale.date || sale.approved_at,
+                  utm_source: sale.utm_source || sale.tracking?.utm_source,
+                  utm_medium: sale.utm_medium || sale.tracking?.utm_medium,
+                  utm_campaign: sale.utm_campaign || sale.tracking?.utm_campaign,
+                  utm_content: sale.utm_content || sale.tracking?.utm_content,
+                  utm_term: sale.utm_term || sale.tracking?.utm_term,
+                  source: 'guru',
+                }, { onConflict: 'kiwify_sale_id' });
+
+              if (!upsertError) salesSynced++;
+            }
+
+            const totalPages = salesData.meta?.last_page || salesData.last_page || 1;
+            if (page >= totalPages || sales.length < 100) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            const errorText = await salesResponse.text();
+            console.error(`Error fetching Guru sales for product ${productId}:`, errorText);
+            hasMore = false;
+          }
+        }
       }
     }
 

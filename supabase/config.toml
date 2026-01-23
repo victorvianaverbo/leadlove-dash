@@ -3,6 +3,12 @@ project_id = "ohwaygqxelyaytljbcsb"
 [functions.kiwify-products]
 verify_jwt = false
 
+[functions.hotmart-products]
+verify_jwt = false
+
+[functions.guru-products]
+verify_jwt = false
+
 [functions.meta-campaigns]
 verify_jwt = false
 

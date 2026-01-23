@@ -246,6 +246,8 @@ export type Database = {
           class_date: string | null
           created_at: string
           description: string | null
+          guru_product_ids: string[] | null
+          hotmart_product_ids: string[] | null
           id: string
           investment_value: number | null
           is_public: boolean | null
@@ -270,6 +272,8 @@ export type Database = {
           class_date?: string | null
           created_at?: string
           description?: string | null
+          guru_product_ids?: string[] | null
+          hotmart_product_ids?: string[] | null
           id?: string
           investment_value?: number | null
           is_public?: boolean | null
@@ -294,6 +298,8 @@ export type Database = {
           class_date?: string | null
           created_at?: string
           description?: string | null
+          guru_product_ids?: string[] | null
+          hotmart_product_ids?: string[] | null
           id?: string
           investment_value?: number | null
           is_public?: boolean | null
@@ -321,6 +327,7 @@ export type Database = {
           product_name: string | null
           project_id: string
           sale_date: string
+          source: string | null
           status: string
           user_id: string
           utm_campaign: string | null
@@ -341,6 +348,7 @@ export type Database = {
           product_name?: string | null
           project_id: string
           sale_date: string
+          source?: string | null
           status: string
           user_id: string
           utm_campaign?: string | null
@@ -361,6 +369,7 @@ export type Database = {
           product_name?: string | null
           project_id?: string
           sale_date?: string
+          source?: string | null
           status?: string
           user_id?: string
           utm_campaign?: string | null
