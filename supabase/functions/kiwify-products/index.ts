@@ -31,18 +31,27 @@ Deno.serve(async (req) => {
     // Create a client with service role for database operations (bypasses RLS)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate user token by getting user
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
     
-    if (authError || !user) {
-      console.error('Auth error:', authError?.message || 'No user found');
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Use getClaims for more reliable token validation
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    
+    let userId: string;
+    
+    if (claimsError || !claimsData?.claims) {
+      // Fallback to getUser
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        console.error('Auth error:', authError?.message || 'No user found');
+        return new Response(
+          JSON.stringify({ error: 'Invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userId = user.id;
+    } else {
+      userId = claimsData.claims.sub as string;
     }
-
-    const userId = user.id;
 
     const { project_id } = await req.json();
     if (!project_id) {
