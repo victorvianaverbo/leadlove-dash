@@ -60,21 +60,17 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
-      {/* Decorative blur circles */}
-      <div className="blur-circle blur-circle-primary absolute -top-20 right-20 w-[450px] h-[450px]" />
-      <div className="blur-circle blur-circle-secondary absolute bottom-10 -left-20 w-[400px] h-[400px]" />
-      
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="header-glass sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-6 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-card border-b border-border">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-primary rounded-xl shadow-primary">
-              <BarChart3 className="h-6 w-6 text-white" />
+            <div className="p-2 bg-primary rounded-xl">
+              <BarChart3 className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="font-bold text-xl tracking-tight">MetrikaPRO</span>
           </div>
-          <Button variant="outline" asChild className="bg-white/50 backdrop-blur-sm">
+          <Button variant="outline" asChild>
             <Link to="/dashboard">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar ao Dashboard
@@ -102,28 +98,28 @@ export default function Pricing() {
               return (
                 <div
                   key={plan.key}
-                  className={`relative p-8 rounded-2xl border-2 bg-white/75 backdrop-blur-xl text-left transition-all duration-300 hover:-translate-y-2 hover:shadow-apple-lg ${
+                  className={`relative p-7 rounded-xl bg-card text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${
                     isCurrentPlan
-                      ? 'border-success shadow-lg ring-2 ring-success/20'
+                      ? 'border-2 border-success'
                       : plan.popular
-                      ? 'border-primary shadow-primary-lg scale-105 z-10'
-                      : 'border-white/60 hover:border-primary/50'
+                      ? 'border-2 border-primary'
+                      : 'border border-border'
                   }`}
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   {isCurrentPlan && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-success text-white text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-success text-success-foreground text-xs font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5">
                       <Crown className="h-3 w-3" />
                       Seu Plano
                     </div>
                   )}
                   {!isCurrentPlan && plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-primary text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-primary">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full">
                       Mais Popular
                     </div>
                   )}
 
-                  <h3 className="text-xl font-bold mb-2">{planData.name}</h3>
+                  <h3 className="text-xl font-bold mb-1">{planData.name}</h3>
                   <p className="text-muted-foreground text-sm mb-6">{plan.projects}</p>
 
                   <div className="mb-2">
