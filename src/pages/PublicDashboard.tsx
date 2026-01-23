@@ -402,7 +402,7 @@ export default function PublicDashboard() {
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Section 1: Today's Summary (Real-time) */}
-        <Card className="border border-accent/20">
+        <Card className="border border-primary">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -411,7 +411,7 @@ export default function PublicDashboard() {
                 </div>
                 <CardTitle className="text-lg">Resumo de Hoje</CardTitle>
               </div>
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+              <Badge variant="outline" className="border-primary text-primary">
                 Tempo Real
               </Badge>
             </div>
@@ -446,12 +446,12 @@ export default function PublicDashboard() {
 
         {/* Section 2: Yesterday's Report (AI Generated) */}
         {latestReport && (
-          <Card className="border-2 border-secondary/30 bg-gradient-to-br from-secondary/5 to-transparent">
+          <Card className="border border-border">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-secondary/10 rounded-lg">
-                    <Sparkles className="h-4 w-4 text-secondary-foreground" />
+                  <div className="p-1.5 bg-muted rounded-lg">
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <CardTitle className="text-lg">Resumo de Ontem</CardTitle>
                 </div>
