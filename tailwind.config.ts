@@ -86,17 +86,10 @@ export default {
         "3xl": "1.5rem",
       },
       boxShadow: {
-        'sm': '0 1px 3px rgba(0, 0, 0, 0.08)',
-        'md': '0 4px 12px rgba(0, 0, 0, 0.08)',
-        'lg': '0 8px 24px rgba(0, 0, 0, 0.08)',
-        'xl': '0 12px 32px rgba(0, 0, 0, 0.1)',
-        'primary': '0 8px 20px hsl(270 60% 62% / 0.25)',
-        'primary-lg': '0 16px 32px hsl(270 60% 62% / 0.2)',
-        'lilac-glow': '0 0 60px hsl(270 60% 62% / 0.15)',
-        'glass': '0 4px 30px rgba(0, 0, 0, 0.08)',
-        'glass-lg': '0 8px 40px rgba(0, 0, 0, 0.1)',
-        'apple': '0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06)',
-        'apple-lg': '0 4px 12px rgba(0, 0, 0, 0.05), 0 20px 50px rgba(0, 0, 0, 0.1)',
+        'sm': '0 1px 2px rgba(0, 0, 0, 0.05)',
+        'md': '0 2px 8px rgba(0, 0, 0, 0.08)',
+        'lg': '0 4px 16px rgba(0, 0, 0, 0.1)',
+        'xl': '0 8px 24px rgba(0, 0, 0, 0.12)',
       },
       keyframes: {
         "accordion-down": {
@@ -118,7 +111,7 @@ export default {
         "fade-in": {
           from: {
             opacity: "0",
-            transform: "translateY(10px)",
+            transform: "translateY(8px)",
           },
           to: {
             opacity: "1",
@@ -128,7 +121,7 @@ export default {
         "slide-up": {
           from: {
             opacity: "0",
-            transform: "translateY(20px)",
+            transform: "translateY(16px)",
           },
           to: {
             opacity: "1",

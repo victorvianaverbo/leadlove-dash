@@ -175,20 +175,16 @@ export default function Dashboard() {
   const canCreateProject = projectLimit === -1 || (projects?.length ?? 0) < projectLimit;
 
   return (
-    <div className="min-h-screen bg-page-gradient relative overflow-hidden">
-      {/* Decorative blur circles */}
-      <div className="blur-circle blur-circle-primary absolute -top-20 right-10 w-[400px] h-[400px]" />
-      <div className="blur-circle blur-circle-secondary absolute bottom-20 -left-20 w-[350px] h-[350px]" />
-      
-      {/* Header with glass effect */}
-      <header className="header-glass sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="bg-card border-b border-border sticky top-0 z-40">
+          <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           {/* Mobile: Stack layout */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Logo + Plan Badge */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-gradient-primary rounded-lg sm:rounded-xl shadow-primary">
-                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              <div className="p-1.5 sm:p-2 bg-primary rounded-lg sm:rounded-xl">
+                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
               </div>
               <span className="font-bold text-lg sm:text-xl">MetrikaPRO</span>
               {subscribed && currentPlan && (
@@ -248,7 +244,7 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 relative z-10">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1 font-light">Gerencie seus projetos e métricas</p>
@@ -256,7 +252,7 @@ export default function Dashboard() {
 
         {/* Subscription Info */}
         {!subscribed && !subscriptionLoading && (
-          <Card variant="glass" className="mb-6 sm:mb-8 border-primary/30">
+          <Card className="mb-6 sm:mb-8 border-border">
             <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
@@ -274,7 +270,7 @@ export default function Dashboard() {
         )}
 
         {subscribed && currentPlan && (
-          <Card variant="glass" className="mb-6 sm:mb-8 border-success/30">
+          <Card className="mb-6 sm:mb-8 border-success/20 bg-success/5">
             <CardContent className="py-3 sm:py-4 px-4 sm:px-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 sm:gap-4">
@@ -307,7 +303,7 @@ export default function Dashboard() {
               Carregando projetos...
             </div>
           ) : !subscribed ? (
-            <Card variant="glass" className="border-dashed">
+            <Card className="border-dashed">
               <CardContent className="py-8 sm:py-12 text-center px-4">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -319,7 +315,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : projects?.length === 0 ? (
-            <Card variant="glass" className="border-dashed">
+            <Card className="border-dashed">
               <CardContent className="py-8 sm:py-12 text-center px-4">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
@@ -338,8 +334,7 @@ export default function Dashboard() {
                 return (
                   <Card
                     key={project.id}
-                    variant="glass"
-                    className="cursor-pointer hover:shadow-apple-lg hover:-translate-y-1 transition-all duration-300 border-l-4 border-l-primary overflow-hidden group relative"
+                    className="cursor-pointer hover:shadow-md transition-shadow duration-200 overflow-hidden group relative"
                     onClick={() => navigate(`/projects/${project.id}`)}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >

@@ -196,16 +196,12 @@ export default function Auth() {
   // Awaiting payment UI
   if (awaitingPayment) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-page-gradient relative overflow-hidden p-4">
-        {/* Decorative blur circles */}
-        <div className="blur-circle blur-circle-primary absolute top-10 right-10 w-[300px] h-[300px]" />
-        <div className="blur-circle blur-circle-secondary absolute bottom-20 left-10 w-[250px] h-[250px]" />
-        
-        <Card variant="glass" className="max-w-md w-full text-center shadow-apple-lg border-0 relative z-10">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full text-center">
           <CardHeader className="pb-4">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-gradient-primary rounded-2xl shadow-primary">
-                <ExternalLink className="h-10 w-10 text-white" />
+              <div className="p-4 bg-primary rounded-2xl">
+                <ExternalLink className="h-10 w-10 text-primary-foreground" />
               </div>
             </div>
             <CardTitle className="text-2xl font-bold">Complete o pagamento</CardTitle>
@@ -259,16 +255,12 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-page-gradient relative overflow-hidden p-4">
-      {/* Decorative blur circles */}
-      <div className="blur-circle blur-circle-primary absolute top-20 -right-10 w-[350px] h-[350px]" />
-      <div className="blur-circle blur-circle-secondary absolute -bottom-10 left-20 w-[300px] h-[300px]" />
-      
-      <Card variant="glass" className="w-full max-w-md shadow-apple-lg border-0 relative z-10">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-gradient-primary rounded-2xl shadow-primary">
-              <BarChart3 className="h-10 w-10 text-white" />
+            <div className="p-4 bg-primary rounded-2xl">
+              <BarChart3 className="h-10 w-10 text-primary-foreground" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">MetrikaPRO</CardTitle>
