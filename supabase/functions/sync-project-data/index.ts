@@ -465,9 +465,9 @@ Deno.serve(async (req) => {
         metaStartDate = getBrasiliaDate(30);
         console.log('First sync - fetching 30 days of Meta Ads data (Brasília timezone)');
       } else {
-        // Sync from last_sync - 2 days margin
+        // Sync from last_sync - 7 days margin to catch retroactive updates from Meta
         const lastSync = new Date(project.last_sync_at);
-        metaStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
+        metaStartDate = new Date(lastSync.getTime() - 7 * 24 * 60 * 60 * 1000);
         console.log(`Incremental sync - fetching Meta Ads data since ${metaStartDate.toISOString()} (Brasília timezone)`);
       }
       const since = metaStartDate.toISOString().split('T')[0];
