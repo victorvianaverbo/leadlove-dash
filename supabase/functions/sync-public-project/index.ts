@@ -5,6 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Sync configuration
+const FIRST_SYNC_DAYS = 90;
+const INCREMENTAL_MARGIN_DAYS = 7;
+
 // Helper to get date in Brasília timezone (UTC-3)
 function getBrasiliaDate(daysAgo = 0): Date {
   const now = new Date();
@@ -17,6 +21,21 @@ function getBrasiliaDate(daysAgo = 0): Date {
 
 function formatBrasiliaDateString(daysAgo = 0): string {
   return getBrasiliaDate(daysAgo).toISOString().split('T')[0];
+}
+
+// Normalize status across platforms
+function normalizeStatus(status: string, source: string): string {
+  const statusLower = status?.toLowerCase() || '';
+  
+  // Kiwify statuses
+  if (source === 'kiwify') {
+    if (statusLower === 'paid') return 'paid';
+    if (statusLower === 'refunded' || statusLower === 'charged_back') return 'refunded';
+    if (statusLower === 'waiting_payment') return 'pending';
+    return 'canceled';
+  }
+  
+  return statusLower;
 }
 
 Deno.serve(async (req) => {
@@ -89,16 +108,16 @@ Deno.serve(async (req) => {
     const isFirstSync = !project.last_sync_at;
     const nowBrasilia = getBrasiliaDate(0);
     
-    // For Kiwify: 90 days on first sync, or since last_sync - 2 days margin
-    let kiwifyStartDate: Date;
+    // Calculate start date for sync (unified for sales and ads)
+    let syncStartDate: Date;
     if (isFirstSync) {
-      kiwifyStartDate = getBrasiliaDate(90);
-      console.log('First sync detected - fetching 90 days of Kiwify data (Brasília timezone)');
+      syncStartDate = getBrasiliaDate(FIRST_SYNC_DAYS);
+      console.log(`First sync detected - fetching ${FIRST_SYNC_DAYS} days of data (Brasília timezone)`);
     } else {
-      // Sync from last_sync - 2 days to catch late confirmations
+      // Sync from last_sync - 7 days to catch late confirmations and status changes
       const lastSync = new Date(project.last_sync_at);
-      kiwifyStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
-      console.log(`Incremental sync - fetching Kiwify data since ${kiwifyStartDate.toISOString()} (Brasília timezone)`);
+      syncStartDate = new Date(lastSync.getTime() - INCREMENTAL_MARGIN_DAYS * 24 * 60 * 60 * 1000);
+      console.log(`Incremental sync - fetching data since ${syncStartDate.toISOString()} (Brasília timezone)`);
     }
 
     // Sync Kiwify sales
@@ -126,7 +145,7 @@ Deno.serve(async (req) => {
         const tokenData = await tokenResponse.json();
         const accessToken = tokenData.access_token;
 
-        const formattedStartDate = kiwifyStartDate.toISOString().split('T')[0];
+        const formattedStartDate = syncStartDate.toISOString().split('T')[0];
         // Use tomorrow (Brasília) as end_date to ensure today's sales are included
         const endDateObj = getBrasiliaDate(-1); // -1 = tomorrow in Brasília
         const formattedEndDate = endDateObj.toISOString().split('T')[0];
@@ -201,7 +220,7 @@ Deno.serve(async (req) => {
               product_id: sale.product?.id,
               product_name: sale.product?.name,
               amount: (sale.net_amount || sale.amount || 0) / 100,
-              status: sale.status,
+              status: normalizeStatus(sale.status, 'kiwify'),
               payment_method: sale.payment_method,
               customer_name: sale.customer?.name,
               customer_email: sale.customer?.email,
@@ -227,22 +246,11 @@ Deno.serve(async (req) => {
       console.log(`Starting Meta Ads sync for project ${project_id}`);
       console.log(`Campaign IDs to sync: ${project.meta_campaign_ids.join(', ')}`);
 
-      // Calculate date range based on last_sync_at (using Brasília timezone)
-      const todayBrasilia = getBrasiliaDate(0);
-      let metaStartDate: Date;
-      if (isFirstSync) {
-        metaStartDate = getBrasiliaDate(30);
-        console.log('First sync - fetching 30 days of Meta Ads data (Brasília timezone)');
-      } else {
-        // Sync from last_sync - 2 days margin
-        const lastSync = new Date(project.last_sync_at);
-        metaStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
-        console.log(`Incremental sync - fetching Meta Ads data since ${metaStartDate.toISOString()} (Brasília timezone)`);
-      }
-      const since = metaStartDate.toISOString().split('T')[0];
+      // Use unified syncStartDate for Meta Ads (same as sales)
+      const since = syncStartDate.toISOString().split('T')[0];
       const until = formatBrasiliaDateString(0);
 
-      console.log(`Date range: ${since} to ${until}`);
+      console.log(`Meta Ads date range: ${since} to ${until}`);
 
       // Fetch daily_budget for each campaign
       const campaignBudgets: Record<string, number> = {};
