@@ -19,6 +19,46 @@ function formatBrasiliaDateString(daysAgo = 0): string {
   return getBrasiliaDate(daysAgo).toISOString().split('T')[0];
 }
 
+// Normalize status across all platforms to standard values: paid, refunded, pending, canceled
+function normalizeStatus(status: string, source: string): string {
+  const statusLower = (status || '').toLowerCase().trim();
+  
+  // Kiwify status normalization
+  if (source === 'kiwify') {
+    if (statusLower === 'paid' || statusLower === 'approved') return 'paid';
+    if (statusLower === 'refunded' || statusLower === 'refund') return 'refunded';
+    if (statusLower === 'charged_back' || statusLower === 'chargedback' || statusLower === 'chargeback') return 'refunded';
+    if (statusLower === 'waiting_payment' || statusLower === 'pending') return 'pending';
+    if (statusLower === 'refused' || statusLower === 'declined' || statusLower === 'rejected') return 'canceled';
+  }
+  
+  // Hotmart status normalization
+  if (source === 'hotmart') {
+    if (statusLower === 'approved' || statusLower === 'complete' || statusLower === 'completed') return 'paid';
+    if (statusLower === 'refunded') return 'refunded';
+    if (statusLower === 'chargeback' || statusLower === 'dispute' || statusLower === 'chargedback') return 'refunded';
+    if (statusLower === 'waiting_payment' || statusLower === 'billet_printed' || statusLower === 'pending') return 'pending';
+    if (statusLower === 'cancelled' || statusLower === 'canceled' || statusLower === 'expired') return 'canceled';
+  }
+  
+  // Guru status normalization  
+  if (source === 'guru') {
+    if (statusLower === 'approved' || statusLower === 'paid') return 'paid';
+    if (statusLower === 'refunded' || statusLower === 'refund') return 'refunded';
+    if (statusLower === 'chargeback' || statusLower === 'chargedback') return 'refunded';
+    if (statusLower === 'pending' || statusLower === 'waiting') return 'pending';
+    if (statusLower === 'cancelled' || statusLower === 'canceled') return 'canceled';
+  }
+  
+  // Fallback - try common patterns
+  if (statusLower === 'paid' || statusLower === 'approved') return 'paid';
+  if (statusLower.includes('refund') || statusLower.includes('chargeback')) return 'refunded';
+  if (statusLower.includes('pending') || statusLower.includes('waiting')) return 'pending';
+  if (statusLower.includes('cancel') || statusLower.includes('refused')) return 'canceled';
+  
+  return statusLower; // Return as-is if no match
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -115,10 +155,10 @@ Deno.serve(async (req) => {
       kiwifyStartDate = getBrasiliaDate(90);
       console.log('First sync detected - fetching 90 days of data (Brasília timezone)');
     } else {
-      // Sync from last_sync - 2 days to catch late confirmations
+      // Sync from last_sync - 14 days to catch refunds and status changes on older sales
       const lastSync = new Date(project.last_sync_at);
-      kiwifyStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
-      console.log(`Incremental sync - fetching data since ${kiwifyStartDate.toISOString()} (Brasília timezone)`);
+      kiwifyStartDate = new Date(lastSync.getTime() - 14 * 24 * 60 * 60 * 1000);
+      console.log(`Incremental sync - fetching data since ${kiwifyStartDate.toISOString()} (14-day window for status updates)`);
     }
 
     // ============ KIWIFY SYNC ============
@@ -218,7 +258,7 @@ Deno.serve(async (req) => {
               product_id: sale.product?.id,
               product_name: sale.product?.name,
               amount: (sale.net_amount || sale.amount || 0) / 100,
-              status: sale.status,
+              status: normalizeStatus(sale.status, 'kiwify'),
               payment_method: sale.payment_method,
               customer_name: sale.customer?.name,
               customer_email: sale.customer?.email,
@@ -304,7 +344,7 @@ Deno.serve(async (req) => {
                     product_id: productId,
                     product_name: sale.product?.name || sale.product_name,
                     amount: (sale.purchase?.price?.value || sale.price || 0) / 100,
-                    status: sale.purchase?.status || sale.status || 'approved',
+                    status: normalizeStatus(sale.purchase?.status || sale.status || 'approved', 'hotmart'),
                     payment_method: sale.purchase?.payment?.type || sale.payment_type,
                     customer_name: sale.buyer?.name || sale.buyer_name,
                     customer_email: sale.buyer?.email || sale.buyer_email,
@@ -379,7 +419,7 @@ Deno.serve(async (req) => {
                   product_id: productId,
                   product_name: sale.product?.name || sale.product_name,
                   amount: sale.amount || sale.value || sale.price || 0,
-                  status: sale.status || 'approved',
+                  status: normalizeStatus(sale.status || 'approved', 'guru'),
                   payment_method: sale.payment_method || sale.payment_type,
                   customer_name: sale.customer?.name || sale.buyer?.name || sale.customer_name,
                   customer_email: sale.customer?.email || sale.buyer?.email || sale.customer_email,
