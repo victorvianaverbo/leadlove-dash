@@ -632,7 +632,7 @@ export default function ProjectView() {
 
         {/* Main KPI Cards */}
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6 sm:mb-8">
-          <Card className="border-l-4 border-l-primary">
+          <Card className="border border-primary">
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
               <CardTitle className="text-xs sm:text-sm font-medium">Orçamento Diário</CardTitle>
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-soft rounded-lg flex items-center justify-center">
@@ -645,7 +645,7 @@ export default function ProjectView() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-success">
+          <Card className="border border-success">
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
               <CardTitle className="text-xs sm:text-sm font-medium">Faturamento</CardTitle>
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/10 rounded-lg flex items-center justify-center">
@@ -660,7 +660,7 @@ export default function ProjectView() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-destructive">
+          <Card className="border border-destructive">
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
               <CardTitle className="text-xs sm:text-sm font-medium">Gasto em Ads</CardTitle>
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
@@ -675,7 +675,7 @@ export default function ProjectView() {
             </CardContent>
           </Card>
 
-          <Card className={`border-l-4 ${roas >= 1 ? 'border-l-success' : 'border-l-destructive'}`}>
+          <Card className={`border ${roas >= 1 ? 'border-success' : 'border-destructive'}`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
               <CardTitle className="text-xs sm:text-sm font-medium">ROAS</CardTitle>
               <div className={`w-6 h-6 sm:w-8 sm:h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
@@ -690,7 +690,7 @@ export default function ProjectView() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-info col-span-2 md:col-span-1">
+          <Card className="border border-info col-span-2 md:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
               <CardTitle className="text-xs sm:text-sm font-medium">CPA</CardTitle>
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-info/10 rounded-lg flex items-center justify-center">
