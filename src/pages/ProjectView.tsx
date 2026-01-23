@@ -135,20 +135,20 @@ const parseCurrencyInput = (value: string): number => {
         return brasiliaToUTC(yesterday);
       }
       case '7d': {
-        const date = getBrasiliaDate(7);
+        const date = getBrasiliaDate(6); // 7 dias incluindo hoje
         return brasiliaToUTC(date);
       }
       case '30d': {
-        const date = getBrasiliaDate(30);
+        const date = getBrasiliaDate(29); // 30 dias incluindo hoje
         return brasiliaToUTC(date);
       }
       case '90d': {
-        const date = getBrasiliaDate(90);
+        const date = getBrasiliaDate(89); // 90 dias incluindo hoje
         return brasiliaToUTC(date);
       }
       case 'all': {
         // Limitar "Todo período" para os últimos 6 meses
-        const date = getBrasiliaDate(180);
+        const date = getBrasiliaDate(179); // 180 dias incluindo hoje
         return brasiliaToUTC(date);
       }
       default: return null;
