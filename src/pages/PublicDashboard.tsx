@@ -211,6 +211,7 @@ export default function PublicDashboard() {
         .from('sales_public' as any)
         .select('*')
         .eq('project_id', project!.id)
+        .eq('status', 'paid')
         .gte('sale_date', `${today}T00:00:00`)
         .lt('sale_date', `${today}T23:59:59`);
       
@@ -243,7 +244,8 @@ export default function PublicDashboard() {
       const { data, error } = await supabase
         .from('sales_public' as any)
         .select('*')
-        .eq('project_id', project!.id);
+        .eq('project_id', project!.id)
+        .eq('status', 'paid');
       
       if (error) throw error;
       return (data || []) as unknown as SalesPublic[];
