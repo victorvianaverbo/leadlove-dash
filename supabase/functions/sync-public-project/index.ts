@@ -5,6 +5,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper to get date in Brasília timezone (UTC-3)
+function getBrasiliaDate(daysAgo = 0): Date {
+  const now = new Date();
+  const brasiliaOffset = -3 * 60; // UTC-3 in minutes
+  const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+  const brasiliaTime = new Date(utcTime + brasiliaOffset * 60000);
+  brasiliaTime.setDate(brasiliaTime.getDate() - daysAgo);
+  return brasiliaTime;
+}
+
+function formatBrasiliaDateString(daysAgo = 0): string {
+  return getBrasiliaDate(daysAgo).toISOString().split('T')[0];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -71,19 +85,20 @@ Deno.serve(async (req) => {
     let salesSynced = 0;
     let adSpendSynced = 0;
 
-    // Determine sync period based on last_sync_at
+    // Determine sync period based on last_sync_at (using Brasília timezone)
     const isFirstSync = !project.last_sync_at;
-    const now = new Date();
+    const nowBrasilia = getBrasiliaDate(0);
     
     // For Kiwify: 90 days on first sync, or since last_sync - 2 days margin
     let kiwifyStartDate: Date;
     if (isFirstSync) {
-      kiwifyStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      console.log('First sync detected - fetching 90 days of Kiwify data');
+      kiwifyStartDate = getBrasiliaDate(90);
+      console.log('First sync detected - fetching 90 days of Kiwify data (Brasília timezone)');
     } else {
       // Sync from last_sync - 2 days to catch late confirmations
-      kiwifyStartDate = new Date(new Date(project.last_sync_at).getTime() - 2 * 24 * 60 * 60 * 1000);
-      console.log(`Incremental sync - fetching Kiwify data since ${kiwifyStartDate.toISOString()}`);
+      const lastSync = new Date(project.last_sync_at);
+      kiwifyStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
+      console.log(`Incremental sync - fetching Kiwify data since ${kiwifyStartDate.toISOString()} (Brasília timezone)`);
     }
 
     // Sync Kiwify sales
@@ -112,7 +127,7 @@ Deno.serve(async (req) => {
         const accessToken = tokenData.access_token;
 
         const formattedStartDate = kiwifyStartDate.toISOString().split('T')[0];
-        const formattedEndDate = now.toISOString().split('T')[0];
+        const formattedEndDate = formatBrasiliaDateString(0);
 
         console.log(`Syncing sales from ${formattedStartDate} to ${formattedEndDate}`);
 
@@ -204,19 +219,20 @@ Deno.serve(async (req) => {
       console.log(`Starting Meta Ads sync for project ${project_id}`);
       console.log(`Campaign IDs to sync: ${project.meta_campaign_ids.join(', ')}`);
 
-      // Calculate date range based on last_sync_at
-      const today = new Date();
+      // Calculate date range based on last_sync_at (using Brasília timezone)
+      const todayBrasilia = getBrasiliaDate(0);
       let metaStartDate: Date;
       if (isFirstSync) {
-        metaStartDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-        console.log('First sync - fetching 30 days of Meta Ads data');
+        metaStartDate = getBrasiliaDate(30);
+        console.log('First sync - fetching 30 days of Meta Ads data (Brasília timezone)');
       } else {
         // Sync from last_sync - 2 days margin
-        metaStartDate = new Date(new Date(project.last_sync_at).getTime() - 2 * 24 * 60 * 60 * 1000);
-        console.log(`Incremental sync - fetching Meta Ads data since ${metaStartDate.toISOString()}`);
+        const lastSync = new Date(project.last_sync_at);
+        metaStartDate = new Date(lastSync.getTime() - 2 * 24 * 60 * 60 * 1000);
+        console.log(`Incremental sync - fetching Meta Ads data since ${metaStartDate.toISOString()} (Brasília timezone)`);
       }
       const since = metaStartDate.toISOString().split('T')[0];
-      const until = today.toISOString().split('T')[0];
+      const until = formatBrasiliaDateString(0);
 
       console.log(`Date range: ${since} to ${until}`);
 
