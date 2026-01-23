@@ -31,15 +31,31 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new Error("No authorization header provided");
+    }
     logStep("Authorization header found");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    
+    // Use getClaims for more reliable token validation
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      logStep("Claims validation failed, trying getUser as fallback");
+      // Fallback to getUser
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+      if (userError) throw new Error(`Authentication error: ${userError.message}`);
+      if (!userData.user?.email) throw new Error("User not authenticated or email not available");
+      
+      logStep("User authenticated via getUser", { userId: userData.user.id, email: userData.user.email });
+      var userId = userData.user.id;
+      var userEmail = userData.user.email;
+    } else {
+      logStep("User authenticated via getClaims", { userId: claimsData.claims.sub, email: claimsData.claims.email });
+      var userId = claimsData.claims.sub as string;
+      var userEmail = claimsData.claims.email as string;
+      if (!userEmail) throw new Error("User email not available in claims");
+    }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
@@ -47,7 +63,7 @@ serve(async (req) => {
     const { data: roleData } = await supabaseClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("role", "admin")
       .single();
     
@@ -58,14 +74,14 @@ serve(async (req) => {
     const { data: overrideData } = await supabaseClient
       .from("user_overrides")
       .select("extra_projects")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     const extraProjects = overrideData?.extra_projects || 0;
     logStep("Override check", { extraProjects });
 
     // Find customer by email
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
     
     if (customers.data.length === 0) {
       logStep("No customer found, returning unsubscribed");
