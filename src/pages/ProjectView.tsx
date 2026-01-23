@@ -62,12 +62,22 @@ export default function ProjectView() {
     }).format(value);
   };
 
-  const parseCurrencyInput = (value: string): number => {
+const parseCurrencyInput = (value: string): number => {
     const cleanValue = value
       .replace(/[R$\s]/g, '')
       .replace(/\./g, '')
       .replace(',', '.');
     return parseFloat(cleanValue) || 0;
+  };
+
+  // Helper to get date in Brasília timezone (UTC-3)
+  const getBrasiliaDate = (daysAgo = 0): Date => {
+    const now = new Date();
+    const brasiliaOffset = -3 * 60; // UTC-3 in minutes
+    const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+    const brasiliaTime = new Date(utcTime + brasiliaOffset * 60000);
+    brasiliaTime.setDate(brasiliaTime.getDate() - daysAgo);
+    return brasiliaTime;
   };
 
   useEffect(() => {
@@ -107,27 +117,37 @@ export default function ProjectView() {
   }, [project]);
 
   const getDateFilter = () => {
-    const now = new Date();
     switch (dateRange) {
       case 'today': {
-        const today = new Date();
+        const today = getBrasiliaDate(0);
         today.setHours(0, 0, 0, 0);
         return today.toISOString();
       }
       case 'yesterday': {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterday = getBrasiliaDate(1);
         yesterday.setHours(0, 0, 0, 0);
         return yesterday.toISOString();
       }
-      case '7d': return new Date(now.setDate(now.getDate() - 7)).toISOString();
-      case '30d': return new Date(now.setDate(now.getDate() - 30)).toISOString();
-      case '90d': return new Date(now.setDate(now.getDate() - 90)).toISOString();
+      case '7d': {
+        const date = getBrasiliaDate(7);
+        date.setHours(0, 0, 0, 0);
+        return date.toISOString();
+      }
+      case '30d': {
+        const date = getBrasiliaDate(30);
+        date.setHours(0, 0, 0, 0);
+        return date.toISOString();
+      }
+      case '90d': {
+        const date = getBrasiliaDate(90);
+        date.setHours(0, 0, 0, 0);
+        return date.toISOString();
+      }
       case 'all': {
         // Limitar "Todo período" para os últimos 6 meses
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        return sixMonthsAgo.toISOString();
+        const date = getBrasiliaDate(180);
+        date.setHours(0, 0, 0, 0);
+        return date.toISOString();
       }
       default: return null;
     }
@@ -135,7 +155,7 @@ export default function ProjectView() {
 
   const getEndDateFilter = () => {
     if (dateRange === 'yesterday') {
-      const today = new Date();
+      const today = getBrasiliaDate(0);
       today.setHours(0, 0, 0, 0);
       return today.toISOString();
     }
