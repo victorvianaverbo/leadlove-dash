@@ -346,37 +346,24 @@ export default function Dashboard() {
                     >
                       <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
-                    <CardHeader className="pb-2 sm:pb-3 pr-10 sm:pr-12 p-3 sm:p-6">
+                    <CardHeader className="pb-3 pr-10 sm:pr-12 p-4 sm:p-6 border-b border-border">
                       <CardTitle className="text-base sm:text-lg group-hover:text-primary transition-colors truncate">{project.name}</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/10 rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2">
-                            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-                          </div>
-                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Faturamento</p>
-                          <p className="text-[10px] sm:text-sm font-bold text-success mt-0.5 sm:mt-1 truncate">
-                            R$ {formatCurrency(revenue)}
-                          </p>
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Faturamento</span>
+                          <span className="font-semibold text-success">R$ {formatCurrency(revenue)}</span>
                         </div>
-                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-info/10 rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2">
-                            <Target className="h-3 w-3 sm:h-4 sm:w-4 text-info" />
-                          </div>
-                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Investimento</p>
-                          <p className="text-[10px] sm:text-sm font-bold text-info mt-0.5 sm:mt-1 truncate">
-                            R$ {formatCurrency(spend)}
-                          </p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Investimento</span>
+                          <span className="font-semibold text-destructive">R$ {formatCurrency(spend)}</span>
                         </div>
-                        <div className="text-center p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary-soft/50">
-                          <div className={`w-6 h-6 sm:w-8 sm:h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-md sm:rounded-lg flex items-center justify-center mx-auto mb-1 sm:mb-2`}>
-                            <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
-                          </div>
-                          <p className="text-[8px] sm:text-[10px] text-muted-foreground uppercase tracking-wide font-medium">ROAS</p>
-                          <p className={`text-[10px] sm:text-sm font-bold mt-0.5 sm:mt-1 ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">ROAS</span>
+                          <span className={`font-semibold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
                             {roas.toFixed(2)}x
-                          </p>
+                          </span>
                         </div>
                       </div>
                     </CardContent>
