@@ -360,7 +360,7 @@ const parseCurrencyInput = (value: string): number => {
   // Calculate metrics using filtered data
   const totalRevenue = filteredSales?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
   const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
-  const totalClicks = filteredAdSpend?.reduce((sum, a) => sum + a.clicks, 0) || 0;
+  // totalClicks removed - using totalLinkClicks instead for accurate metrics
   const totalSales = filteredSales?.length || 0;
   const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
@@ -380,7 +380,7 @@ const parseCurrencyInput = (value: string): number => {
 
   // Calculated funnel metrics
   const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
-  const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+  const avgCPC = totalLinkClicks > 0 ? totalSpend / totalLinkClicks : 0;
   const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
   const ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
 
@@ -692,7 +692,7 @@ const parseCurrencyInput = (value: string): number => {
             <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
               <div className="text-lg sm:text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">
-                {totalClicks} cliques
+                {totalLinkClicks.toLocaleString('pt-BR')} cliques no link
               </p>
             </CardContent>
           </Card>
