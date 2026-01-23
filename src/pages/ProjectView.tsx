@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all';
+type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all' | 'custom';
 
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +27,8 @@ export default function ProjectView() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
 
   // Editable project settings
   const [investmentValue, setInvestmentValue] = useState<number>(0);
@@ -151,6 +153,12 @@ const parseCurrencyInput = (value: string): number => {
         const date = getBrasiliaDate(179); // 180 dias incluindo hoje
         return brasiliaToUTC(date);
       }
+      case 'custom': {
+        if (customStartDate) {
+          return brasiliaToUTC(new Date(customStartDate));
+        }
+        return null;
+      }
       default: return null;
     }
   };
@@ -160,11 +168,16 @@ const parseCurrencyInput = (value: string): number => {
       const today = getBrasiliaDate(0);
       return brasiliaToUTC(today);
     }
+    if (dateRange === 'custom' && customEndDate) {
+      const endDate = new Date(customEndDate);
+      endDate.setDate(endDate.getDate() + 1); // Incluir o dia final inteiro
+      return brasiliaToUTC(endDate);
+    }
     return null;
   };
 
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales', id, dateRange],
+    queryKey: ['sales', id, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from('sales')
@@ -190,7 +203,7 @@ const parseCurrencyInput = (value: string): number => {
   });
 
   const { data: adSpend, isLoading: adSpendLoading } = useQuery({
-    queryKey: ['ad_spend', id, dateRange],
+    queryKey: ['ad_spend', id, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from('ad_spend')
@@ -461,8 +474,66 @@ const parseCurrencyInput = (value: string): number => {
                   <SelectItem value="30d">Últimos 30 dias</SelectItem>
                   <SelectItem value="90d">Últimos 90 dias</SelectItem>
                   <SelectItem value="all">Todo período</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Custom date range pickers */}
+              {dateRange === 'custom' && (
+                <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-[110px] sm:w-[130px] justify-start text-left font-normal text-xs sm:text-sm",
+                          !customStartDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
+                        {customStartDate ? format(customStartDate, "dd/MM/yy", { locale: ptBR }) : "De"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customStartDate}
+                        onSelect={setCustomStartDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-[110px] sm:w-[130px] justify-start text-left font-normal text-xs sm:text-sm",
+                          !customEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
+                        {customEndDate ? format(customEndDate, "dd/MM/yy", { locale: ptBR }) : "Até"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={setCustomEndDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </>
+              )}
+              
               <Button onClick={() => syncData.mutate()} disabled={syncData.isPending} size="sm" className="px-2 sm:px-3">
                 {syncData.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
