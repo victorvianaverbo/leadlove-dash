@@ -371,11 +371,11 @@ export default function PublicDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card shadow-sm">
+      <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-2 bg-gradient-primary rounded-xl shadow-primary">
-              <BarChart3 className="h-5 w-5 text-white" />
+            <div className="p-2 bg-primary rounded-xl">
+              <BarChart3 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
               <h1 className="text-xl font-bold">{project.name}</h1>
@@ -402,7 +402,7 @@ export default function PublicDashboard() {
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Section 1: Today's Summary (Real-time) */}
-        <Card className="border-2 border-primary/20">
+        <Card className="border border-accent/20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
