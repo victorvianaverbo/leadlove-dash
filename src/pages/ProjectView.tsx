@@ -116,38 +116,40 @@ const parseCurrencyInput = (value: string): number => {
     }
   }, [project]);
 
+  // Converte meia-noite de Brasília para UTC (+3 horas)
+  const brasiliaToUTC = (date: Date): string => {
+    date.setHours(0, 0, 0, 0);
+    // Brasília é UTC-3, então meia-noite em Brasília = 03:00 UTC
+    const utcDate = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+    return utcDate.toISOString();
+  };
+
   const getDateFilter = () => {
     switch (dateRange) {
       case 'today': {
         const today = getBrasiliaDate(0);
-        today.setHours(0, 0, 0, 0);
-        return today.toISOString();
+        return brasiliaToUTC(today);
       }
       case 'yesterday': {
         const yesterday = getBrasiliaDate(1);
-        yesterday.setHours(0, 0, 0, 0);
-        return yesterday.toISOString();
+        return brasiliaToUTC(yesterday);
       }
       case '7d': {
         const date = getBrasiliaDate(7);
-        date.setHours(0, 0, 0, 0);
-        return date.toISOString();
+        return brasiliaToUTC(date);
       }
       case '30d': {
         const date = getBrasiliaDate(30);
-        date.setHours(0, 0, 0, 0);
-        return date.toISOString();
+        return brasiliaToUTC(date);
       }
       case '90d': {
         const date = getBrasiliaDate(90);
-        date.setHours(0, 0, 0, 0);
-        return date.toISOString();
+        return brasiliaToUTC(date);
       }
       case 'all': {
         // Limitar "Todo período" para os últimos 6 meses
         const date = getBrasiliaDate(180);
-        date.setHours(0, 0, 0, 0);
-        return date.toISOString();
+        return brasiliaToUTC(date);
       }
       default: return null;
     }
@@ -156,8 +158,7 @@ const parseCurrencyInput = (value: string): number => {
   const getEndDateFilter = () => {
     if (dateRange === 'yesterday') {
       const today = getBrasiliaDate(0);
-      today.setHours(0, 0, 0, 0);
-      return today.toISOString();
+      return brasiliaToUTC(today);
     }
     return null;
   };
