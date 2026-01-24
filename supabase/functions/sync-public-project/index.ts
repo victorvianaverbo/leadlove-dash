@@ -211,6 +211,16 @@ Deno.serve(async (req) => {
         for (const sale of allSales) {
           const tracking = sale.tracking || {};
           
+          // Valor líquido (parte do produtor após split de coprodução)
+          const netAmount = (sale.net_amount || sale.amount || 0) / 100;
+          
+          // Valor bruto = charge_amount - fee (líquido total antes do split de coprodução)
+          const chargeAmount = sale.payment?.charge_amount || 0;
+          const platformFee = sale.payment?.fee || 0;
+          const grossAmount = chargeAmount > 0 
+            ? (chargeAmount - platformFee) / 100 
+            : netAmount;
+          
           const { error: upsertError } = await supabase
             .from('sales')
             .upsert({
@@ -219,7 +229,8 @@ Deno.serve(async (req) => {
               user_id: project.user_id,
               product_id: sale.product?.id,
               product_name: sale.product?.name,
-              amount: (sale.net_amount || sale.amount || 0) / 100,
+              amount: netAmount,
+              gross_amount: grossAmount,
               status: normalizeStatus(sale.status, 'kiwify'),
               payment_method: sale.payment_method,
               customer_name: sale.customer?.name,
