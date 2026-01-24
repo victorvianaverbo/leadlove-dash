@@ -474,6 +474,7 @@ export type Database = {
           share_token: string | null
           slug: string | null
           updated_at: string | null
+          use_gross_for_roas: boolean | null
         }
         Insert: {
           account_status?: string | null
@@ -497,6 +498,7 @@ export type Database = {
           share_token?: string | null
           slug?: string | null
           updated_at?: string | null
+          use_gross_for_roas?: boolean | null
         }
         Update: {
           account_status?: string | null
@@ -520,6 +522,7 @@ export type Database = {
           share_token?: string | null
           slug?: string | null
           updated_at?: string | null
+          use_gross_for_roas?: boolean | null
         }
         Relationships: []
       }

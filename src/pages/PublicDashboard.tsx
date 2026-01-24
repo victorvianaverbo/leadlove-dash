@@ -31,6 +31,7 @@ interface ProjectPublic {
   account_status: string | null;
   investment_value: number | null;
   class_date: string | null;
+  use_gross_for_roas: boolean | null;
 }
 
 // Type for the public sales view (excludes PII fields)
@@ -299,7 +300,7 @@ export default function PublicDashboard() {
     ) || [];
 
   // Check if project uses gross amount for ROAS calculation
-  const useGrossForRoas = (project as any)?.use_gross_for_roas || false;
+  const useGrossForRoas = project?.use_gross_for_roas || false;
 
   // Helper to get the correct amount based on project settings
   const getSaleValue = (sale: SalesPublic) => {
