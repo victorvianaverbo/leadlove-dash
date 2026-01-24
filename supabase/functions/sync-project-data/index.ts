@@ -253,6 +253,11 @@ Deno.serve(async (req) => {
         for (const sale of allSales) {
           const tracking = sale.tracking || {};
           
+          // Valor líquido (parte do produtor após split de coprodução)
+          const netAmount = (sale.net_amount || sale.amount || 0) / 100;
+          // Valor bruto (total cobrado do cliente, antes do split)
+          const grossAmount = (sale.payment?.charge_amount || sale.charges?.charge_amount || sale.net_amount || sale.amount || 0) / 100;
+          
           const { error: upsertError } = await supabase
             .from('sales')
             .upsert({
@@ -261,7 +266,8 @@ Deno.serve(async (req) => {
               user_id: userId,
               product_id: sale.product?.id,
               product_name: sale.product?.name,
-              amount: (sale.net_amount || sale.amount || 0) / 100,
+              amount: netAmount,
+              gross_amount: grossAmount,
               status: normalizeStatus(sale.status, 'kiwify'),
               payment_method: sale.payment_method,
               customer_name: sale.customer?.name,
@@ -339,6 +345,9 @@ Deno.serve(async (req) => {
               for (const sale of sales) {
                 const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
                 
+                // Hotmart: amount é o valor total, não há split visível na API
+                const saleAmount = (sale.purchase?.price?.value || sale.price || 0) / 100;
+                
                 const { error: upsertError } = await supabase
                   .from('sales')
                   .upsert({
@@ -347,7 +356,8 @@ Deno.serve(async (req) => {
                     user_id: userId,
                     product_id: productId,
                     product_name: sale.product?.name || sale.product_name,
-                    amount: (sale.purchase?.price?.value || sale.price || 0) / 100,
+                    amount: saleAmount,
+                    gross_amount: saleAmount, // Hotmart não expõe split, usar mesmo valor
                     status: normalizeStatus(sale.purchase?.status || sale.status || 'approved', 'hotmart'),
                     payment_method: sale.purchase?.payment?.type || sale.payment_type,
                     customer_name: sale.buyer?.name || sale.buyer_name,
@@ -414,6 +424,9 @@ Deno.serve(async (req) => {
             for (const sale of sales) {
               const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
               
+              // Guru: valor já vem em reais, não em centavos
+              const saleAmount = sale.amount || sale.value || sale.price || 0;
+              
               const { error: upsertError } = await supabase
                 .from('sales')
                 .upsert({
@@ -422,7 +435,8 @@ Deno.serve(async (req) => {
                   user_id: userId,
                   product_id: productId,
                   product_name: sale.product?.name || sale.product_name,
-                  amount: sale.amount || sale.value || sale.price || 0,
+                  amount: saleAmount,
+                  gross_amount: saleAmount, // Guru não expõe split, usar mesmo valor
                   status: normalizeStatus(sale.status || 'approved', 'guru'),
                   payment_method: sale.payment_method || sale.payment_type,
                   customer_name: sale.customer?.name || sale.buyer?.name || sale.customer_name,
