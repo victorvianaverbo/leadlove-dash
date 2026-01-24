@@ -261,8 +261,13 @@ Deno.serve(async (req) => {
           
           // Valor líquido (parte do produtor após split de coprodução)
           const netAmount = (sale.net_amount || sale.amount || 0) / 100;
-          // Valor bruto (total cobrado do cliente, antes do split)
-          const grossAmount = (sale.payment?.charge_amount || sale.charges?.charge_amount || sale.net_amount || sale.amount || 0) / 100;
+          
+          // Valor bruto = charge_amount - fee (líquido total antes do split de coprodução)
+          const chargeAmount = sale.payment?.charge_amount || 0;
+          const platformFee = sale.payment?.fee || 0;
+          const grossAmount = chargeAmount > 0 
+            ? (chargeAmount - platformFee) / 100 
+            : netAmount;
           
           const { error: upsertError } = await supabase
             .from('sales')
