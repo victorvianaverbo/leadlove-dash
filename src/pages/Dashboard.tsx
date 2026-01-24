@@ -66,25 +66,33 @@ export default function Dashboard() {
   }, [projectsError, signOut, navigate]);
 
   const { data: projectMetrics } = useQuery({
-    queryKey: ['project-metrics'],
+    queryKey: ['project-metrics', projects?.map(p => p.id)],
     queryFn: async () => {
+      if (!projects?.length) return {};
+      
       // Limitar aos últimos 30 dias para carregamento mais rápido
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
 
       const [salesResult, spendResult] = await Promise.all([
-        supabase.from('sales').select('project_id, amount').eq('status', 'paid').gte('sale_date', dateFilter),
+        supabase.from('sales').select('project_id, amount, gross_amount').eq('status', 'paid').gte('sale_date', dateFilter),
         supabase.from('ad_spend').select('project_id, spend').gte('date', dateFilter)
       ]);
 
       const metrics: Record<string, { revenue: number; spend: number }> = {};
 
-      salesResult.data?.forEach((sale) => {
+      // Create a map of project settings for quick lookup
+      const projectSettings = new Map(projects.map(p => [p.id, (p as any).use_gross_for_roas || false]));
+
+      salesResult.data?.forEach((sale: any) => {
         if (!metrics[sale.project_id]) {
           metrics[sale.project_id] = { revenue: 0, spend: 0 };
         }
-        metrics[sale.project_id].revenue += Number(sale.amount) || 0;
+        // Use gross_amount when project has use_gross_for_roas enabled
+        const useGross = projectSettings.get(sale.project_id);
+        const valueToUse = useGross ? (sale.gross_amount || sale.amount) : sale.amount;
+        metrics[sale.project_id].revenue += Number(valueToUse) || 0;
       });
 
       spendResult.data?.forEach((ad) => {
@@ -96,7 +104,7 @@ export default function Dashboard() {
 
       return metrics;
     },
-    enabled: !!user,
+    enabled: !!user && !!projects?.length,
     staleTime: 2 * 60 * 1000, // 2 minutos de cache
   });
 
