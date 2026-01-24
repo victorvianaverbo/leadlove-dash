@@ -229,9 +229,14 @@ Deno.serve(async (req) => {
               
               console.log(`Kiwify product ${productId} - Page ${pageNumber}: ${sales.length} sales`);
               
-              // Debug log each sale to identify missing ones
+              // Debug log - Log FULL structure of first sale to investigate fields
               for (const s of sales) {
-                console.log(`  - Sale ${s.id}: customer=${s.customer?.name || 'N/A'}, status=${s.status}, date=${s.created_at}, amount=${s.charges?.net_amount || 'N/A'}`);
+                if (allSales.length === 0 && sales.indexOf(s) === 0) {
+                  console.log('=== KIWIFY FULL SALE STRUCTURE ===');
+                  console.log(JSON.stringify(s, null, 2));
+                  console.log('=== END FULL SALE STRUCTURE ===');
+                }
+                console.log(`  - Sale ${s.id}: customer=${s.customer?.name || 'N/A'}, status=${s.status}, date=${s.created_at}, net_amount=${s.net_amount}, amount=${s.amount}, charges=${JSON.stringify(s.charges)}, payment=${JSON.stringify(s.payment)}`);
               }
               
               allSales = allSales.concat(sales);
