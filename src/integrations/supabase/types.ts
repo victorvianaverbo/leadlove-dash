@@ -527,6 +527,7 @@ export type Database = {
         Row: {
           amount: number | null
           created_at: string | null
+          gross_amount: number | null
           id: string | null
           kiwify_sale_id: string | null
           payment_method: string | null
@@ -544,6 +545,7 @@ export type Database = {
         Insert: {
           amount?: number | null
           created_at?: string | null
+          gross_amount?: number | null
           id?: string | null
           kiwify_sale_id?: string | null
           payment_method?: string | null
@@ -561,6 +563,7 @@ export type Database = {
         Update: {
           amount?: number | null
           created_at?: string | null
+          gross_amount?: number | null
           id?: string | null
           kiwify_sale_id?: string | null
           payment_method?: string | null
