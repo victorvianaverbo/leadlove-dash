@@ -371,7 +371,12 @@ const parseCurrencyInput = (value: string): number => {
   );
 
   // Calculate metrics using filtered data
-  const totalRevenue = filteredSales?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
+  // Use gross_amount for ROAS calculation when use_gross_for_roas is enabled
+  const useGrossForRoas = (project as any)?.use_gross_for_roas || false;
+  const totalRevenue = filteredSales?.reduce((sum, s) => {
+    const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
+    return sum + Number(valueToUse);
+  }, 0) || 0;
   const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
   // totalClicks removed - using totalLinkClicks instead for accurate metrics
   const totalSales = filteredSales?.length || 0;
@@ -414,7 +419,9 @@ const parseCurrencyInput = (value: string): number => {
       acc[key] = { source: sale.utm_source || 'direto', medium: sale.utm_medium || '-', campaign: sale.utm_campaign || '-', count: 0, revenue: 0 };
     }
     acc[key].count++;
-    acc[key].revenue += Number(sale.amount);
+    // Use gross_amount for revenue when configured
+    const saleValue = useGrossForRoas ? ((sale as any).gross_amount || sale.amount) : sale.amount;
+    acc[key].revenue += Number(saleValue);
     return acc;
   }, {} as Record<string, { source: string; medium: string; campaign: string; count: number; revenue: number }>);
 

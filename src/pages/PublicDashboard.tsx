@@ -42,6 +42,7 @@ interface SalesPublic {
   product_id: string;
   product_name: string | null;
   amount: number;
+  gross_amount?: number | null;
   status: string;
   payment_method: string | null;
   sale_date: string;
@@ -297,10 +298,18 @@ export default function PublicDashboard() {
       !project?.meta_campaign_ids?.length || project.meta_campaign_ids.includes(a.campaign_id)
     ) || [];
 
+  // Check if project uses gross amount for ROAS calculation
+  const useGrossForRoas = (project as any)?.use_gross_for_roas || false;
+
+  // Helper to get the correct amount based on project settings
+  const getSaleValue = (sale: SalesPublic) => {
+    return useGrossForRoas ? (sale.gross_amount || sale.amount) : sale.amount;
+  };
+
   // Today's metrics
   const filteredTodaySales = filterSales(todaySales);
   const filteredTodayAdSpend = filterAdSpend(todayAdSpend);
-  const todayRevenue = filteredTodaySales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const todayRevenue = filteredTodaySales.reduce((sum, s) => sum + Number(getSaleValue(s)), 0);
   const todaySpend = filteredTodayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
   const todaySalesCount = filteredTodaySales.length;
   const todayRoas = todaySpend > 0 ? todayRevenue / todaySpend : 0;
@@ -309,7 +318,7 @@ export default function PublicDashboard() {
   // Total period metrics
   const filteredAllSales = filterSales(allSales);
   const filteredAllAdSpend = filterAdSpend(allAdSpend);
-  const totalRevenue = filteredAllSales.reduce((sum, s) => sum + Number(s.amount), 0);
+  const totalRevenue = filteredAllSales.reduce((sum, s) => sum + Number(getSaleValue(s)), 0);
   const totalSpend = filteredAllAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
   const totalSalesCount = filteredAllSales.length;
   const totalRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;

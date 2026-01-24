@@ -258,6 +258,7 @@ export type Database = {
           share_token: string | null
           slug: string | null
           updated_at: string
+          use_gross_for_roas: boolean | null
           user_id: string
         }
         Insert: {
@@ -284,6 +285,7 @@ export type Database = {
           share_token?: string | null
           slug?: string | null
           updated_at?: string
+          use_gross_for_roas?: boolean | null
           user_id: string
         }
         Update: {
@@ -310,6 +312,7 @@ export type Database = {
           share_token?: string | null
           slug?: string | null
           updated_at?: string
+          use_gross_for_roas?: boolean | null
           user_id?: string
         }
         Relationships: []
@@ -320,6 +323,7 @@ export type Database = {
           created_at: string
           customer_email: string | null
           customer_name: string | null
+          gross_amount: number | null
           id: string
           kiwify_sale_id: string
           payment_method: string | null
@@ -341,6 +345,7 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
+          gross_amount?: number | null
           id?: string
           kiwify_sale_id: string
           payment_method?: string | null
@@ -362,6 +367,7 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
+          gross_amount?: number | null
           id?: string
           kiwify_sale_id?: string
           payment_method?: string | null

@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Loader2, BookOpen, Target, ShoppingCart, BarChart3 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, BookOpen, Target, ShoppingCart, BarChart3, Info, TrendingUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
 import { validateProjectName, validateProjectDescription } from "@/lib/validation";
 import { SalesIntegrationCard } from "@/components/integrations/SalesIntegrationCard";
@@ -36,6 +38,9 @@ export default function ProjectEdit() {
   const [benchmarkCtr, setBenchmarkCtr] = useState<number>(1.0);
   const [benchmarkLpRate, setBenchmarkLpRate] = useState<number>(70.0);
   const [benchmarkCheckoutRate, setBenchmarkCheckoutRate] = useState<number>(5.0);
+  
+  // ROAS config
+  const [useGrossForRoas, setUseGrossForRoas] = useState<boolean>(false);
   const [benchmarkSaleRate, setBenchmarkSaleRate] = useState<number>(2.0);
 
   // Collapsible states - connected integrations start collapsed
@@ -90,6 +95,8 @@ export default function ProjectEdit() {
       setBenchmarkLpRate((project as any).benchmark_lp_rate ?? 70.0);
       setBenchmarkCheckoutRate((project as any).benchmark_checkout_rate ?? 5.0);
       setBenchmarkSaleRate((project as any).benchmark_sale_rate ?? 2.0);
+      // ROAS config
+      setUseGrossForRoas((project as any).use_gross_for_roas ?? false);
     }
   }, [project]);
 
@@ -140,6 +147,7 @@ export default function ProjectEdit() {
           benchmark_lp_rate: benchmarkLpRate,
           benchmark_checkout_rate: benchmarkCheckoutRate,
           benchmark_sale_rate: benchmarkSaleRate,
+          use_gross_for_roas: useGrossForRoas,
         } as any)
         .eq('id', id);
       if (error) throw error;
@@ -266,6 +274,49 @@ export default function ProjectEdit() {
                 <p className="text-xs text-muted-foreground">Padrão: 2%</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ROAS Config Card */}
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Configuração de ROAS
+            </CardTitle>
+            <CardDescription>
+              Configure como o faturamento é calculado para projetos com coprodução.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TooltipProvider>
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium">Usar valor bruto para ROAS</label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Ative se você tem coprodução. Isso faz o ROAS ser calculado com o valor total da venda, não apenas sua parte.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {useGrossForRoas 
+                        ? "ROAS calculado com o valor total cobrado do cliente" 
+                        : "ROAS calculado com sua parte líquida (após split)"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={useGrossForRoas}
+                  onCheckedChange={setUseGrossForRoas}
+                />
+              </div>
+            </TooltipProvider>
           </CardContent>
         </Card>
 
