@@ -211,6 +211,9 @@ async function generateReportForProject(
   const day3AdSpend = filterAdSpend(allAdSpend || [], day3);
 
   // Calculate metrics for each day
+  // Usar gross_amount quando use_gross_for_roas está ativado
+  const useGrossForRevenue = projectData.use_gross_for_roas || false;
+  
   const calcDayMetrics = (sales: any[], adSpend: any[]) => {
     const impressions = adSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
     const linkClicks = adSpend.reduce((sum, a) => sum + Number(a.link_clicks || 0), 0);
@@ -218,7 +221,13 @@ async function generateReportForProject(
     const checkouts = adSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
     const salesCount = sales.length;
     const thruplays = adSpend.reduce((sum, a) => sum + Number(a.thruplays || 0), 0);
-    const revenue = sales.reduce((sum, s) => sum + Number(s.amount), 0);
+    
+    // Usar gross_amount quando configurado para coprodução
+    const revenue = sales.reduce((sum, s) => {
+      const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
+      return sum + value;
+    }, 0);
+    
     const spend = adSpend.reduce((sum, a) => sum + Number(a.spend), 0);
 
     const engagementRate = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
