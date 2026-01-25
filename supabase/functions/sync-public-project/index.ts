@@ -167,6 +167,7 @@ Deno.serve(async (req) => {
               page_size: '100',
               page_number: pageNumber.toString(),
               product_id: productId,
+              view_full_sale_details: 'true',
             });
 
             const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
