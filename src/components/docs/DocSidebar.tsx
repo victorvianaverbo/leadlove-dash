@@ -23,9 +23,9 @@ const tutorialCategories: TutorialCategory[] = [
     name: 'Integrações de Vendas',
     items: [
       { id: 'kiwify', name: 'Kiwify', available: true },
-      { id: 'hotmart', name: 'Hotmart', available: false },
-      { id: 'guru', name: 'Guru', available: false },
-      { id: 'eduzz', name: 'Eduzz', available: false },
+      { id: 'hotmart', name: 'Hotmart', available: true },
+      { id: 'guru', name: 'Guru', available: true },
+      { id: 'eduzz', name: 'Eduzz', available: true },
     ],
   },
   {
