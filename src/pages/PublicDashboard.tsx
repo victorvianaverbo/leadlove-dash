@@ -302,8 +302,15 @@ export default function PublicDashboard() {
   // Check if project uses gross amount for ROAS calculation
   const useGrossForRoas = project?.use_gross_for_roas || false;
 
+  // When ticket price is configured, use it for revenue calculation (quantity × ticket price)
+  const ticketPrice = (project as any)?.kiwify_ticket_price 
+    ? parseFloat((project as any).kiwify_ticket_price) 
+    : null;
+
   // Helper to get the correct amount based on project settings
   const getSaleValue = (sale: SalesPublic) => {
+    // If ticket price configured and useGrossForRoas, return ticket price for each sale
+    if (ticketPrice && useGrossForRoas) return ticketPrice;
     return useGrossForRoas ? (sale.gross_amount || sale.amount) : sale.amount;
   };
 
