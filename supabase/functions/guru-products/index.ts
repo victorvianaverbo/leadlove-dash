@@ -91,8 +91,8 @@ Deno.serve(async (req) => {
 
     console.log('Fetching Guru products...');
 
-    // Fetch products from Guru DMG
-    const productsResponse = await fetch('https://api.digitalmanager.guru/api/v1/products', {
+    // Fetch products from Guru DMG - API v2
+    const productsResponse = await fetch('https://digitalmanager.guru/api/v2/products', {
       headers: {
         'Authorization': `Bearer ${api_token}`,
         'Content-Type': 'application/json',

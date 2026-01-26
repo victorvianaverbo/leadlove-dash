@@ -28,12 +28,12 @@ export function GuruTutorial() {
       <section>
         <h2 className="text-xl font-semibold mb-3">Introdução</h2>
         <p className="text-muted-foreground leading-relaxed mb-4">
-          A Digital Manager Guru (Guru DMG) utiliza autenticação <strong>Basic Auth</strong> para suas integrações. 
-          O MetrikaPRO precisa da sua <strong>API Key</strong> e do <strong>Access Token</strong> para sincronizar 
+          A Digital Manager Guru (Guru DMG) utiliza autenticação via <strong>Bearer Token</strong> para suas integrações. 
+          O MetrikaPRO precisa do seu <strong>API Token</strong> para sincronizar 
           automaticamente suas vendas e dados de produtos.
         </p>
         <InfoCard>
-          Você precisará de 2 credenciais: <strong>API Key</strong> (senha) e <strong>Access Token</strong> (identificador do administrador).
+          Você precisará de 1 credencial: o <strong>API Token</strong> (User Token ou Account Token).
         </InfoCard>
       </section>
 
@@ -179,8 +179,7 @@ export function GuruTutorial() {
             <li>Acesse o MetrikaPRO e vá para seu projeto</li>
             <li>Clique em <strong>"Editar"</strong></li>
             <li>Na seção <strong>"Integrações de Vendas"</strong>, expanda <strong>"Guru (DMG)"</strong></li>
-            <li>Cole a <strong>API Key</strong> no campo correspondente</li>
-            <li>Cole o <strong>Access Token</strong> no campo correspondente</li>
+            <li>Cole o <strong>API Token</strong> no campo correspondente</li>
             <li>Clique em <strong>"Salvar Integração"</strong></li>
           </ol>
         </div>
