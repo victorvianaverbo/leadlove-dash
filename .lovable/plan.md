@@ -1,198 +1,74 @@
 
-# Plano de Correção: Dashboard Loading + Valores Kiwify
 
-## Visão Geral
+# Plano de Correção: Valor do Ticket Kiwify
 
-Três problemas distintos a resolver:
-1. Melhorar experiência de loading no Dashboard
-2. Usar preço fixo do produto Kiwify ao invés de cálculo dinâmico
-3. Evitar que sync sobrescreva valores corretos
+## Diagnóstico do Problema
 
----
+**Encontrado:** O campo `kiwify_ticket_price` está com valor **R$27,00** ao invés de **R$22,08**.
 
-## Problema 1: Loading Lento do Dashboard
+| Métrica | Valor |
+|---------|-------|
+| Total de vendas pagas | 57 |
+| Vendas com R$22,08 | 33 |
+| Vendas com R$27,00 | 24 |
+| Faturamento atual | R$1.376,64 (33×22,08 + 24×27) |
+| Faturamento correto | R$1.258,56 (57×22,08) |
 
-### Situação Atual
-- Quando `subscriptionLoading = true`, o usuário vê apenas um spinner pequeno
-- Os projetos demoram a carregar e não há feedback visual adequado
-- A imagem mostra a tela em estado intermediário confuso
+## Mudanças Necessárias
 
-### Solução
-Criar um loading state visual com Skeleton cards enquanto carrega:
+### 1. Corrigir dados no banco
 
-**Arquivo:** `src/pages/Dashboard.tsx`
-
-```text
-Mudanças:
-1. Adicionar import do Skeleton
-2. Criar componente DashboardSkeleton para mostrar durante carregamento
-3. Mostrar skeleton enquanto `subscriptionLoading || projectsLoading`
-```
-
-**Layout do Skeleton:**
-- Header fixo (já carregado)
-- Card de plano com skeleton animado
-- 3 cards de projetos com skeleton (receita, investimento, ROAS)
-
----
-
-## Problema 2 & 3: Valores Kiwify Voltando ao Valor Errado
-
-### Situação Atual
-
-```typescript
-// sync-project-data e sync-public-project (linhas 262-270 e 215-223)
-const chargeAmount = sale.payment?.charge_amount || 0;
-const platformFee = sale.payment?.fee || 0;
-const grossAmount = chargeAmount > 0 
-  ? (chargeAmount - platformFee) / 100 
-  : netAmount;  // FALLBACK para valor errado!
-```
-
-**Problema:** Se a API Kiwify não retornar `payment.charge_amount` em algum momento, o `grossAmount` cai para `netAmount` (valor com coprodução), sobrescrevendo o valor correto.
-
-### Solução Proposta
-
-Adicionar um campo `ticket_price` no projeto para o preço fixo do produto Kiwify. Quando configurado, usar esse valor como `gross_amount`:
-
-**Passo 1: Adicionar coluna no banco**
-
+**Atualizar projeto:**
 ```sql
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS kiwify_ticket_price DECIMAL(10,2);
+UPDATE projects SET kiwify_ticket_price = 22.08 WHERE id = '17e6cbd5-a59a-41ec-91af-eb5e9e351789'
 ```
 
-**Passo 2: UI para configurar preço do ticket**
-
-No `ProjectEdit.tsx`, adicionar campo:
-
-```text
-Configurações Kiwify
-├── Produtos selecionados (já existe)
-├── [Novo] Preço do Ticket: R$ _____
-│   Tooltip: "Valor fixo do produto. Será usado como faturamento bruto para cada venda."
-└── Usar valor bruto para ROAS (toggle já existe)
+**Corrigir todas as vendas:**
+```sql
+UPDATE sales SET gross_amount = 22.08 WHERE project_id = '17e6cbd5-a59a-41ec-91af-eb5e9e351789' AND status = 'paid'
 ```
 
-**Passo 3: Modificar funções de sync**
+### 2. Ajustar lógica de sync (como você pediu)
 
-**Arquivo:** `supabase/functions/sync-project-data/index.ts`
+Se o campo de ticket **não estiver preenchido**, usar o **valor líquido** (`amount`) de cada venda ao invés de tentar calcular:
+
+**Arquivo:** `supabase/functions/sync-project-data/index.ts`  
 **Arquivo:** `supabase/functions/sync-public-project/index.ts`
 
 ```typescript
-// Antes (problemático)
-const grossAmount = chargeAmount > 0 
-  ? (chargeAmount - platformFee) / 100 
-  : netAmount;
-
-// Depois (com preço fixo)
-const ticketPrice = project.kiwify_ticket_price;
-
-const grossAmount = ticketPrice 
-  ? ticketPrice  // Preço fixo do produto
-  : (chargeAmount > 0 
+// ANTES (problemático)
+if (ticketPrice !== null) {
+  grossAmount = ticketPrice;
+} else {
+  grossAmount = chargeAmount > 0 
     ? (chargeAmount - platformFee) / 100 
-    : netAmount);
+    : netAmount;
+}
+
+// DEPOIS (simplificado)
+// Se tem preço de ticket configurado, usa ele
+// Senão, usa o valor líquido (netAmount)
+const grossAmount = ticketPrice !== null ? ticketPrice : netAmount;
 ```
 
----
+### 3. Cálculo de receita no dashboard
 
-## Resumo das Alterações
+O código em `ProjectView.tsx` linha 376-378 já usa corretamente:
+```typescript
+const valueToUse = useGrossForRoas ? gross_amount : amount;
+```
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/pages/Dashboard.tsx` | Adicionar skeleton loading visual |
-| `projects` table | Adicionar coluna `kiwify_ticket_price` |
-| `src/pages/ProjectEdit.tsx` | Campo para configurar preço do ticket |
-| `sync-project-data/index.ts` | Usar preço fixo quando configurado |
-| `sync-public-project/index.ts` | Usar preço fixo quando configurado |
+Com `use_gross_for_roas = true`, ele usa `gross_amount` que será o valor do ticket quando configurado.
 
----
+## Resumo
+
+| Ação | Arquivo |
+|------|---------|
+| Corrigir kiwify_ticket_price para 22.08 | Banco de dados |
+| Atualizar gross_amount de todas vendas | Banco de dados |
+| Simplificar fallback (usar netAmount) | sync-project-data + sync-public-project |
 
 ## Resultado Esperado
 
-1. **Dashboard:** Loading visual com skeletons animados
-2. **Kiwify:** Campo para definir preço fixo R$22,08
-3. **Sync:** Nunca mais sobrescreve com valor errado
+Faturamento correto: **R$1.258,56** (57 vendas × R$22,08)
 
----
-
-## Seção Técnica
-
-### Skeleton Component Structure
-
-```tsx
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Plan Card Skeleton */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <Skeleton className="w-10 h-10 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Project Cards Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-5 w-3/4" />
-              <Skeleton className="h-3 w-1/2 mt-2" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between py-2 border-b">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-              <div className="flex justify-between py-2">
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-```
-
-### Sync Logic Update
-
-```typescript
-// Em sync-project-data e sync-public-project
-const ticketPrice = project.kiwify_ticket_price 
-  ? parseFloat(project.kiwify_ticket_price) 
-  : null;
-
-// Na loop de vendas:
-const grossAmount = ticketPrice !== null
-  ? ticketPrice
-  : (chargeAmount > 0 
-      ? (chargeAmount - platformFee) / 100 
-      : netAmount);
-
-console.log(`Sale ${sale.id}: using ${ticketPrice ? 'ticket price' : 'calculated'} gross_amount = ${grossAmount}`);
-```
-
-### Database Migration
-
-```sql
--- Add ticket price column
-ALTER TABLE projects 
-ADD COLUMN IF NOT EXISTS kiwify_ticket_price DECIMAL(10,2);
-
--- Comment for documentation
-COMMENT ON COLUMN projects.kiwify_ticket_price IS 
-  'Fixed product price for Kiwify. When set, used as gross_amount instead of dynamic calculation.';
-```
