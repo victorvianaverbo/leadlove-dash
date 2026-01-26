@@ -432,7 +432,8 @@ Deno.serve(async (req) => {
         let hasMore = true;
 
         while (hasMore) {
-          const salesUrl = `https://api.digitalmanager.guru/api/v1/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
+          // API v2 - Updated endpoint
+          const salesUrl = `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
           
           const salesResponse = await fetch(salesUrl, {
             headers: {
