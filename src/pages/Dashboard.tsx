@@ -6,11 +6,61 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle, Crown, Settings, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { STRIPE_PLANS } from "@/lib/stripe-plans";
 import { toast } from "@/hooks/use-toast";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+
+// Skeleton component for loading state
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Plan Card Skeleton */}
+      <Card className="border-border">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-10 h-10 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Projects Section */}
+      <div>
+        <Skeleton className="h-6 w-32 mb-6" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-4">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-3 w-1/2 mt-2" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between py-2 border-b border-border">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex justify-between py-2 border-b border-border">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex justify-between py-2">
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { 
@@ -302,15 +352,14 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Projects */}
+        {/* Show skeleton while loading subscription or projects */}
+        {(subscriptionLoading || projectsLoading) ? (
+          <DashboardSkeleton />
+        ) : (
+        /* Projects */
         <div>
           <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 tracking-tight">Seus Projetos</h2>
-          {projectsLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando projetos...
-            </div>
-          ) : !subscribed ? (
+          {!subscribed ? (
             <Card className="border-dashed">
               <CardContent className="py-8 sm:py-12 text-center px-4">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -413,6 +462,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
 
         {/* Delete Project Dialog */}
         <DeleteProjectDialog
