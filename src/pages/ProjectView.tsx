@@ -373,10 +373,23 @@ const parseCurrencyInput = (value: string): number => {
   // Calculate metrics using filtered data
   // Use gross_amount for ROAS calculation when use_gross_for_roas is enabled
   const useGrossForRoas = (project as any)?.use_gross_for_roas || false;
-  const totalRevenue = filteredSales?.reduce((sum, s) => {
-    const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
-    return sum + Number(valueToUse);
-  }, 0) || 0;
+  
+  // When ticket price is configured, use it for revenue calculation (quantity × ticket price)
+  const ticketPrice = (project as any)?.kiwify_ticket_price 
+    ? parseFloat((project as any).kiwify_ticket_price) 
+    : null;
+  
+  const totalRevenue = (() => {
+    if (ticketPrice && useGrossForRoas) {
+      // Use fixed ticket: quantity × price
+      return (filteredSales?.length || 0) * ticketPrice;
+    }
+    // Fallback: sum individual values
+    return filteredSales?.reduce((sum, s) => {
+      const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
+      return sum + Number(valueToUse);
+    }, 0) || 0;
+  })();
   const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
   // totalClicks removed - using totalLinkClicks instead for accurate metrics
   const totalSales = filteredSales?.length || 0;
@@ -419,8 +432,10 @@ const parseCurrencyInput = (value: string): number => {
       acc[key] = { source: sale.utm_source || 'direto', medium: sale.utm_medium || '-', campaign: sale.utm_campaign || '-', count: 0, revenue: 0 };
     }
     acc[key].count++;
-    // Use gross_amount for revenue when configured
-    const saleValue = useGrossForRoas ? ((sale as any).gross_amount || sale.amount) : sale.amount;
+    // Use ticket price when configured, otherwise use gross_amount/amount
+    const saleValue = (ticketPrice && useGrossForRoas) 
+      ? ticketPrice 
+      : (useGrossForRoas ? ((sale as any).gross_amount || sale.amount) : sale.amount);
     acc[key].revenue += Number(saleValue);
     return acc;
   }, {} as Record<string, { source: string; medium: string; campaign: string; count: number; revenue: number }>);
