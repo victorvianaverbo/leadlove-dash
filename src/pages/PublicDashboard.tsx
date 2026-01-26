@@ -106,7 +106,15 @@ interface DailyReport {
     roas?: { yesterday: number; dayBefore: number; change: number };
     cpa?: { yesterday: number; dayBefore: number; change: number };
   };
-  actions: Array<{ action: string; priority: string }>;
+  actions: Array<{ 
+    action: string; 
+    priority: string; 
+    metric?: string;
+    metric_label?: string;
+    metric_value?: string;
+    benchmark?: string;
+    reason?: string;
+  }>;
   metrics: FunnelMetrics;
   created_at: string;
 }
@@ -590,12 +598,29 @@ export default function PublicDashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+            <div className="space-y-3">
                 {latestReport.actions.map((item, index) => (
-                  <div key={index} className="flex items-start gap-2 bg-muted/50 rounded-lg p-3 border">
-                    <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-sm flex-1">{item.action}</span>
-                    <PriorityBadge priority={item.priority} />
+                  <div key={index} className="bg-muted/50 rounded-lg p-4 border space-y-2">
+                    {/* Linha 1: Métrica + Prioridade */}
+                    <div className="flex items-center justify-between gap-2">
+                      {item.metric_label && item.metric_value ? (
+                        <Badge variant="secondary" className="text-xs font-medium">
+                          {item.metric_label}: {item.metric_value} {item.benchmark && `(meta: ${item.benchmark})`}
+                        </Badge>
+                      ) : (
+                        <div />
+                      )}
+                      <PriorityBadge priority={item.priority} />
+                    </div>
+                    {/* Linha 2: Ação */}
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{item.action}</span>
+                    </div>
+                    {/* Linha 3: Motivo (opcional) */}
+                    {item.reason && (
+                      <p className="text-xs text-muted-foreground pl-6">{item.reason}</p>
+                    )}
                   </div>
                 ))}
               </div>
