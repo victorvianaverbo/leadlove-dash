@@ -481,21 +481,35 @@ Formato de resposta (JSON):
   "bottleneck_value": "valor atual da métrica",
   "bottleneck_status": "critical/attention/good/excellent",
   "actions": [
-    {"action": "Ação específica do plano acima para o gargalo principal", "priority": "alta", "metric": "métrica afetada"},
-    {"action": "Segunda ação do plano", "priority": "alta", "metric": "métrica afetada"},
-    {"action": "Ação para segundo maior problema", "priority": "média", "metric": "métrica afetada"},
-    {"action": "Ação complementar", "priority": "média", "metric": "métrica afetada"},
-    {"action": "Ação de otimização geral", "priority": "baixa", "metric": "métrica afetada"}
+    {
+      "action": "Ação específica do plano acima",
+      "priority": "alta",
+      "metric": "hook_rate",
+      "metric_label": "Hook Rate",
+      "metric_value": "15.2%",
+      "benchmark": "20%",
+      "reason": "Frase curta explicando por que essa métrica impacta os resultados"
+    }
   ],
   "metrics_summary": {
-    "hook_rate": {"value": ${avg3Days.hookRate.toFixed(1)}, "status": "${funnelStatus.hookRate}", "trend": "${trends.hookRate}"},
-    "hold_rate": {"value": ${avg3Days.holdRate.toFixed(1)}, "status": "${funnelStatus.holdRate}", "trend": "${trends.holdRate}"},
-    "close_rate": {"value": ${avg3Days.closeRate.toFixed(1)}, "status": "${funnelStatus.closeRate}", "trend": "${trends.closeRate}"},
-    "connect_rate": {"value": ${avg3Days.connectRate.toFixed(1)}, "status": "${funnelStatus.connectRate}", "trend": "${trends.connectRate}"},
-    "ctr": {"value": ${avg3Days.ctrRate.toFixed(2)}, "status": "${funnelStatus.ctr}", "trend": "${trends.ctr}"},
-    "cpm": {"value": ${avg3Days.cpmValue.toFixed(2)}, "trend": "${trends.cpm}"}
+    "hook_rate": {"value": ${avg3Days.hookRate.toFixed(1)}, "status": "${funnelStatus.hookRate}", "trend": "${trends.hookRate}", "benchmark": "20%"},
+    "hold_rate": {"value": ${avg3Days.holdRate.toFixed(1)}, "status": "${funnelStatus.holdRate}", "trend": "${trends.holdRate}", "benchmark": "40%"},
+    "close_rate": {"value": ${avg3Days.closeRate.toFixed(1)}, "status": "${funnelStatus.closeRate}", "trend": "${trends.closeRate}", "benchmark": "50%"},
+    "connect_rate": {"value": ${avg3Days.connectRate.toFixed(1)}, "status": "${funnelStatus.connectRate}", "trend": "${trends.connectRate}", "benchmark": "60%"},
+    "ctr": {"value": ${avg3Days.ctrRate.toFixed(2)}, "status": "${funnelStatus.ctr}", "trend": "${trends.ctr}", "benchmark": "${benchmarks.ctr}%"},
+    "cpm": {"value": ${avg3Days.cpmValue.toFixed(2)}, "trend": "${trends.cpm}", "benchmark": "R$ 50"},
+    "checkout_rate": {"value": ${avg3Days.checkoutRate.toFixed(2)}, "status": "${funnelStatus.checkoutRate}", "trend": "estável", "benchmark": "${benchmarks.checkoutRate}%"},
+    "sale_rate": {"value": ${avg3Days.saleRate.toFixed(2)}, "status": "${funnelStatus.saleRate}", "trend": "estável", "benchmark": "${benchmarks.saleRate}%"}
   }
-}`;
+}
+
+IMPORTANTE para actions:
+- Para CADA ação, inclua: action, priority, metric, metric_label, metric_value, benchmark, reason
+- metric_label: nome amigável da métrica (Hook Rate, Hold Rate, Close Rate, Connect Rate, CTR, CPM, Taxa Checkout, Taxa Conversão)
+- metric_value: valor ATUAL com % ou R$
+- benchmark: meta com % ou R$
+- reason: 1 frase curta explicando o impacto (ex: "Apenas 15% das pessoas passam dos 3 segundos iniciais")
+- Gere 3-5 ações cobrindo TODAS as etapas do funil com problemas, não só vídeo`;
 
   console.log('Calling Lovable AI for 3-day trend analysis...');
 
