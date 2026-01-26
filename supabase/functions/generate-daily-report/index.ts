@@ -221,6 +221,13 @@ async function generateReportForProject(
     const checkouts = adSpend.reduce((sum, a) => sum + Number(a.checkouts_initiated || 0), 0);
     const salesCount = sales.length;
     const thruplays = adSpend.reduce((sum, a) => sum + Number(a.thruplays || 0), 0);
+    const video3sViews = adSpend.reduce((sum, a) => sum + Number(a.video_3s_views || 0), 0);
+    
+    // Novas métricas de vídeo para análise de funil
+    const videoP25Views = adSpend.reduce((sum, a) => sum + Number(a.video_p25_views || 0), 0);
+    const videoP50Views = adSpend.reduce((sum, a) => sum + Number(a.video_p50_views || 0), 0);
+    const videoP75Views = adSpend.reduce((sum, a) => sum + Number(a.video_p75_views || 0), 0);
+    const videoP100Views = adSpend.reduce((sum, a) => sum + Number(a.video_p100_views || 0), 0);
     
     // Usar gross_amount quando configurado para coprodução
     const revenue = sales.reduce((sum, s) => {
@@ -230,6 +237,7 @@ async function generateReportForProject(
     
     const spend = adSpend.reduce((sum, a) => sum + Number(a.spend), 0);
 
+    // Taxas de funil existentes
     const engagementRate = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
     const ctrRate = impressions > 0 ? (linkClicks / impressions) * 100 : 0;
     const lpRate = linkClicks > 0 ? (lpViews / linkClicks) * 100 : 0;
@@ -237,10 +245,20 @@ async function generateReportForProject(
     const saleRate = lpViews > 0 ? (salesCount / lpViews) * 100 : 0;
     const roas = spend > 0 ? revenue / spend : 0;
     const cpa = salesCount > 0 ? spend / salesCount : 0;
+    
+    // Novas métricas de engajamento de vídeo (PRD v2.0)
+    const hookRate = impressions > 0 ? (video3sViews / impressions) * 100 : 0;
+    const holdRate = videoP25Views > 0 ? (videoP75Views / videoP25Views) * 100 : 0;
+    const closeRate = videoP75Views > 0 ? (videoP100Views / videoP75Views) * 100 : 0;
+    const connectRate = linkClicks > 0 ? (lpViews / linkClicks) * 100 : 0;
+    const cpmValue = impressions > 0 ? (spend / impressions) * 1000 : 0;
 
     return {
       impressions, linkClicks, lpViews, checkouts, salesCount, thruplays, revenue, spend,
-      engagementRate, ctrRate, lpRate, checkoutRate, saleRate, roas, cpa
+      engagementRate, ctrRate, lpRate, checkoutRate, saleRate, roas, cpa,
+      // Novas métricas de vídeo
+      video3sViews, videoP25Views, videoP50Views, videoP75Views, videoP100Views,
+      hookRate, holdRate, closeRate, connectRate, cpmValue
     };
   };
 
@@ -260,6 +278,12 @@ async function generateReportForProject(
     roas: (d1.roas + d2.roas + d3.roas) / 3,
     cpa: (d1.cpa + d2.cpa + d3.cpa) / 3,
     salesCount: (d1.salesCount + d2.salesCount + d3.salesCount) / 3,
+    // Novas métricas de vídeo
+    hookRate: (d1.hookRate + d2.hookRate + d3.hookRate) / 3,
+    holdRate: (d1.holdRate + d2.holdRate + d3.holdRate) / 3,
+    closeRate: (d1.closeRate + d2.closeRate + d3.closeRate) / 3,
+    connectRate: (d1.connectRate + d2.connectRate + d3.connectRate) / 3,
+    cpmValue: (d1.cpmValue + d2.cpmValue + d3.cpmValue) / 3,
   };
 
   // Determine trends (comparing day1 to day3)
@@ -279,6 +303,28 @@ async function generateReportForProject(
     saleRate: calcTrend(d1.saleRate, d3.saleRate),
     revenue: calcTrend(d1.revenue, d3.revenue),
     roas: calcTrend(d1.roas, d3.roas),
+    // Novas tendências de vídeo
+    hookRate: calcTrend(d1.hookRate, d3.hookRate),
+    holdRate: calcTrend(d1.holdRate, d3.holdRate),
+    closeRate: calcTrend(d1.closeRate, d3.closeRate),
+    connectRate: calcTrend(d1.connectRate, d3.connectRate),
+    cpm: calcTrend(d1.cpmValue, d3.cpmValue),
+  };
+
+  // Benchmarks de vídeo (PRD v2.0)
+  const videoBenchmarks = {
+    hookRate: { critical: 20, attention: 35, good: 50 },
+    holdRate: { critical: 40, attention: 60, good: 75 },
+    closeRate: { critical: 50, attention: 70, good: 85 },
+    connectRate: { critical: 60, attention: 75, good: 90 },
+  };
+
+  // Função para determinar status de métrica de vídeo
+  const getVideoStatus = (value: number, bench: { critical: number; attention: number; good: number }) => {
+    if (value < bench.critical) return 'critical';
+    if (value < bench.attention) return 'attention';
+    if (value < bench.good) return 'good';
+    return 'excellent';
   };
 
   // Determine status for each metric (ok or alert based on 3-day average)
@@ -288,6 +334,11 @@ async function generateReportForProject(
     lpRate: avg3Days.lpRate >= benchmarks.lpRate ? 'ok' : 'alert',
     checkoutRate: avg3Days.checkoutRate >= benchmarks.checkoutRate ? 'ok' : 'alert',
     saleRate: avg3Days.saleRate >= benchmarks.saleRate ? 'ok' : 'alert',
+    // Novas métricas de vídeo
+    hookRate: getVideoStatus(avg3Days.hookRate, videoBenchmarks.hookRate),
+    holdRate: getVideoStatus(avg3Days.holdRate, videoBenchmarks.holdRate),
+    closeRate: getVideoStatus(avg3Days.closeRate, videoBenchmarks.closeRate),
+    connectRate: getVideoStatus(avg3Days.connectRate, videoBenchmarks.connectRate),
   };
 
   // Calculate changes from day before for yesterday
@@ -328,69 +379,122 @@ async function generateReportForProject(
     status: funnelStatus,
   };
 
-  // Generate AI summary focused on 3-day trends
-  const prompt = `Você é um analista de performance de marketing digital especializado em funil de vendas.
+  // Generate AI summary focused on 3-day trends with video engagement metrics
+  const prompt = `Você é um analista de performance de marketing digital especializado em funil de vendas de vídeo.
 
 DADOS DOS ÚLTIMOS 3 DIAS (excluindo hoje) - PROJETO: ${projectData.name}
 
 === DIA 1 (Ontem: ${day1}) ===
-- Receita: R$ ${d1.revenue.toFixed(2)}
-- Gasto: R$ ${d1.spend.toFixed(2)}
-- ROAS: ${d1.roas.toFixed(2)}x
-- Vendas: ${d1.salesCount}
-- CPA: R$ ${d1.cpa.toFixed(2)}
+- Receita: R$ ${d1.revenue.toFixed(2)} | Gasto: R$ ${d1.spend.toFixed(2)} | ROAS: ${d1.roas.toFixed(2)}x | Vendas: ${d1.salesCount}
+- CPM: R$ ${d1.cpmValue.toFixed(2)} | CPA: R$ ${d1.cpa.toFixed(2)}
+- Hook Rate: ${d1.hookRate.toFixed(1)}% | Hold Rate: ${d1.holdRate.toFixed(1)}% | Close Rate: ${d1.closeRate.toFixed(1)}%
+- Connect Rate: ${d1.connectRate.toFixed(1)}% | CTR: ${d1.ctrRate.toFixed(2)}%
 
 === DIA 2 (${day2}) ===
-- Receita: R$ ${d2.revenue.toFixed(2)}
-- Gasto: R$ ${d2.spend.toFixed(2)}
-- ROAS: ${d2.roas.toFixed(2)}x
-- Vendas: ${d2.salesCount}
+- Receita: R$ ${d2.revenue.toFixed(2)} | Gasto: R$ ${d2.spend.toFixed(2)} | ROAS: ${d2.roas.toFixed(2)}x | Vendas: ${d2.salesCount}
+- Hook Rate: ${d2.hookRate.toFixed(1)}% | Hold Rate: ${d2.holdRate.toFixed(1)}% | Close Rate: ${d2.closeRate.toFixed(1)}%
 
 === DIA 3 (${day3}) ===
-- Receita: R$ ${d3.revenue.toFixed(2)}
-- Gasto: R$ ${d3.spend.toFixed(2)}
-- ROAS: ${d3.roas.toFixed(2)}x
-- Vendas: ${d3.salesCount}
+- Receita: R$ ${d3.revenue.toFixed(2)} | Gasto: R$ ${d3.spend.toFixed(2)} | ROAS: ${d3.roas.toFixed(2)}x | Vendas: ${d3.salesCount}
+- Hook Rate: ${d3.hookRate.toFixed(1)}% | Hold Rate: ${d3.holdRate.toFixed(1)}% | Close Rate: ${d3.closeRate.toFixed(1)}%
 
-=== TENDÊNCIAS (últimos 3 dias) ===
-- Receita: ${trends.revenue}
-- ROAS: ${trends.roas}
-- Engajamento: ${trends.engagement}
-- CTR: ${trends.ctr}
-- Taxa LP/Clique: ${trends.lpRate}
-- Taxa Checkout: ${trends.checkoutRate}
-- Taxa Venda: ${trends.saleRate}
+=== MÉTRICAS DE VÍDEO (Média 3 dias) ===
+📊 ENGAJAMENTO DE VÍDEO:
+1. Hook Rate (3s / Impressões): ${avg3Days.hookRate.toFixed(1)}% → ${funnelStatus.hookRate === 'critical' ? '🔴 CRÍTICO (<20%)' : funnelStatus.hookRate === 'attention' ? '🟡 ATENÇÃO (20-35%)' : funnelStatus.hookRate === 'good' ? '🟢 BOM (35-50%)' : '✨ EXCELENTE (>50%)'}
+   Tendência: ${trends.hookRate}
+2. Hold Rate (75% / 25%): ${avg3Days.holdRate.toFixed(1)}% → ${funnelStatus.holdRate === 'critical' ? '🔴 CRÍTICO (<40%)' : funnelStatus.holdRate === 'attention' ? '🟡 ATENÇÃO (40-60%)' : funnelStatus.holdRate === 'good' ? '🟢 BOM (60-75%)' : '✨ EXCELENTE (>75%)'}
+   Tendência: ${trends.holdRate}
+3. Close Rate (100% / 75%): ${avg3Days.closeRate.toFixed(1)}% → ${funnelStatus.closeRate === 'critical' ? '🔴 CRÍTICO (<50%)' : funnelStatus.closeRate === 'attention' ? '🟡 ATENÇÃO (50-70%)' : funnelStatus.closeRate === 'good' ? '🟢 BOM (70-85%)' : '✨ EXCELENTE (>85%)'}
+   Tendência: ${trends.closeRate}
 
-=== MÉDIAS (3 dias) ===
-- Receita Média: R$ ${avg3Days.revenue.toFixed(2)}
-- Gasto Médio: R$ ${avg3Days.spend.toFixed(2)}
-- ROAS Médio: ${avg3Days.roas.toFixed(2)}x
-- CPA Médio: R$ ${avg3Days.cpa.toFixed(2)}
-- Vendas Média: ${avg3Days.salesCount.toFixed(1)}
+📊 CONEXÃO E CONVERSÃO:
+4. Connect Rate (LP / Cliques): ${avg3Days.connectRate.toFixed(1)}% → ${funnelStatus.connectRate === 'critical' ? '🔴 CRÍTICO (<60%)' : funnelStatus.connectRate === 'attention' ? '🟡 ATENÇÃO (60-75%)' : funnelStatus.connectRate === 'good' ? '🟢 BOM (75-90%)' : '✨ EXCELENTE (>90%)'}
+   Tendência: ${trends.connectRate}
+5. CTR (Link): ${avg3Days.ctrRate.toFixed(2)}% → ${funnelStatus.ctr === 'ok' ? '✅ OK (≥1%)' : '⚠️ BAIXO (<1%)'}
+   Tendência: ${trends.ctr}
+6. CPM Médio: R$ ${avg3Days.cpmValue.toFixed(2)} | Tendência: ${trends.cpm}
 
-=== MÉTRICAS DE FUNIL (Média 3 dias vs Benchmarks) ===
-1. Tx. Engajamento: ${avg3Days.engagementRate.toFixed(2)}% (benchmark: ${benchmarks.engagement}%) → ${funnelStatus.engagement === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
-2. CTR: ${avg3Days.ctrRate.toFixed(2)}% (benchmark: ${benchmarks.ctr}%) → ${funnelStatus.ctr === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
-3. Taxa LP/Clique: ${avg3Days.lpRate.toFixed(2)}% (benchmark: ${benchmarks.lpRate}%) → ${funnelStatus.lpRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
-4. Taxa Checkout: ${avg3Days.checkoutRate.toFixed(2)}% (benchmark: ${benchmarks.checkoutRate}%) → ${funnelStatus.checkoutRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
-5. Taxa Venda: ${avg3Days.saleRate.toFixed(2)}% (benchmark: ${benchmarks.saleRate}%) → ${funnelStatus.saleRate === 'ok' ? '✅ OK' : '⚠️ ALERTA'}
+📊 CONVERSÃO FINAL:
+7. Taxa LP → Venda: ${avg3Days.saleRate.toFixed(2)}% → ${funnelStatus.saleRate === 'ok' ? '✅ OK (≥2%)' : '⚠️ BAIXO (<2%)'}
+8. Taxa Checkout: ${avg3Days.checkoutRate.toFixed(2)}% → ${funnelStatus.checkoutRate === 'ok' ? '✅ OK (≥5%)' : '⚠️ BAIXO (<5%)'}
 
-=== INSTRUÇÕES ===
-1. Analise a TENDÊNCIA dos últimos 3 dias (melhorando, piorando ou estável).
-2. Identifique problemas PERSISTENTES (que aparecem em mais de um dia).
-3. Gere um resumo focado no que o cliente precisa saber.
-4. Priorize ações para problemas que estão PIORANDO ou são consistentes.
-5. Seja direto e objetivo - o cliente precisa de insights acionáveis.
+=== RESUMO FINANCEIRO (Média 3 dias) ===
+- Receita: R$ ${avg3Days.revenue.toFixed(2)} | Gasto: R$ ${avg3Days.spend.toFixed(2)}
+- ROAS: ${avg3Days.roas.toFixed(2)}x | CPA: R$ ${avg3Days.cpa.toFixed(2)} | Vendas: ${avg3Days.salesCount.toFixed(1)}
+
+=== PLANOS DE AÇÃO POR PROBLEMA ===
+Use estes planos específicos baseados no problema identificado:
+
+🔴 HOOK BAIXO (<20%): O início do vídeo não prende atenção
+- Otimizar thumbnail com contraste alto e elemento de curiosidade
+- Reescrever hook verbal com pergunta provocativa nos primeiros 3 segundos
+- Testar pattern interrupt visual (zoom, corte rápido, texto impactante)
+
+🔴 HOLD BAIXO (<40%): Pessoas abandonam no meio do vídeo
+- Encurtar vídeo em 30-40% (remover partes sem valor)
+- Adicionar cortes a cada 2-3 segundos para manter ritmo
+- Criar micro-hooks no meio (curiosidade sobre o que vem a seguir)
+
+🔴 CLOSE BAIXO (<50%): Pessoas não assistem até o final
+- Fortalecer CTA com verbos de ação claros ("Clique agora", "Garanta sua vaga")
+- Criar urgência e escassez genuína no final
+- Reforçar CTA visualmente (animação, destaque, seta)
+
+🔴 CONNECT RATE BAIXO (<60%): Cliques não chegam na página
+- Verificar velocidade da página (deve carregar em <3s)
+- Testar todos os links e redirects
+- Otimizar para mobile (60%+ do tráfego)
+- Verificar compatibilidade de navegadores
+
+🔴 CTR BAIXO (<0.8%): Vídeo não gera cliques
+- Mencionar CTA múltiplas vezes no vídeo (não só no final)
+- Melhorar oferta com isca digital irresistível
+- Qualificar melhor o público-alvo
+
+🔴 CPM ALTO (>R$ 50 para infoprodutos): Custo por mil impressões elevado
+- Expandir público-alvo (lookalike, interesses mais amplos)
+- Melhorar qualidade do criativo (reduz custo)
+- Ajustar estratégia de lances
+- Testar outros posicionamentos (Stories, Reels)
+
+🔴 TAXA CONVERSÃO BAIXA (<1%): Página não converte
+- Otimizar copy da página (headline, benefícios, prova social)
+- Adicionar elementos de confiança (depoimentos, garantia)
+- Simplificar processo de compra
+
+🔴 TAXA CHECKOUT BAIXA (<40%): Abandono no checkout
+- Simplificar formulário de checkout
+- Transparência total de custos (sem surpresas)
+- Adicionar mais opções de pagamento
+- Implementar recuperação de carrinhos abandonados
+
+=== INSTRUÇÕES PARA ANÁLISE ===
+1. Identifique o MAIOR GARGALO do funil (métrica crítica que mais impacta o ROI)
+2. Analise TENDÊNCIAS dos 3 dias (piorando = prioridade alta)
+3. Gere 3-5 ações ESPECÍFICAS usando os planos acima
+4. Priorize por impacto no ROI (Hook/Hold afetam tudo, Close/Connect são mais específicos)
 
 Formato de resposta (JSON):
 {
-  "summary": "Resumo de 2-3 frases sobre a performance dos últimos 3 dias, destacando tendências",
-  "bottleneck": "nome da métrica que é o maior problema persistente",
+  "summary": "Análise de 3-4 frases: desempenho geral, principal gargalo identificado e tendência. Mencione métricas específicas.",
+  "bottleneck": "nome da métrica principal (hook_rate, hold_rate, close_rate, connect_rate, ctr, cpm, conversion_rate, checkout_rate)",
+  "bottleneck_value": "valor atual da métrica",
+  "bottleneck_status": "critical/attention/good/excellent",
   "actions": [
-    {"action": "Ação específica para o problema principal", "priority": "alta"},
-    {"action": "Ação secundária baseada em tendência", "priority": "média"},
-    {"action": "Ação complementar", "priority": "baixa"}
-  ]
+    {"action": "Ação específica do plano acima para o gargalo principal", "priority": "alta", "metric": "métrica afetada"},
+    {"action": "Segunda ação do plano", "priority": "alta", "metric": "métrica afetada"},
+    {"action": "Ação para segundo maior problema", "priority": "média", "metric": "métrica afetada"},
+    {"action": "Ação complementar", "priority": "média", "metric": "métrica afetada"},
+    {"action": "Ação de otimização geral", "priority": "baixa", "metric": "métrica afetada"}
+  ],
+  "metrics_summary": {
+    "hook_rate": {"value": ${avg3Days.hookRate.toFixed(1)}, "status": "${funnelStatus.hookRate}", "trend": "${trends.hookRate}"},
+    "hold_rate": {"value": ${avg3Days.holdRate.toFixed(1)}, "status": "${funnelStatus.holdRate}", "trend": "${trends.holdRate}"},
+    "close_rate": {"value": ${avg3Days.closeRate.toFixed(1)}, "status": "${funnelStatus.closeRate}", "trend": "${trends.closeRate}"},
+    "connect_rate": {"value": ${avg3Days.connectRate.toFixed(1)}, "status": "${funnelStatus.connectRate}", "trend": "${trends.connectRate}"},
+    "ctr": {"value": ${avg3Days.ctrRate.toFixed(2)}, "status": "${funnelStatus.ctr}", "trend": "${trends.ctr}"},
+    "cpm": {"value": ${avg3Days.cpmValue.toFixed(2)}, "trend": "${trends.cpm}"}
+  }
 }`;
 
   console.log('Calling Lovable AI for 3-day trend analysis...');
