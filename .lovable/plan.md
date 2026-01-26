@@ -1,79 +1,144 @@
 
+# Plano: Melhorar Ações Recomendadas com Contexto Completo do Funil
 
-# Plano: Correção do Cálculo de Faturamento com Ticket Price
+## Problema Atual
 
-## Problema Identificado
+A seção "Ações Recomendadas" mostra apenas ações de vídeo sem explicar o PORQUÊ de cada recomendação:
+- Não mostra qual métrica está ruim
+- Não mostra o valor atual vs benchmark
+- Não apresenta todas as etapas do funil
 
-O faturamento está calculando **R$1.376,64** quando deveria ser **R$1.539,00** (57 vendas × R$27).
+## Solucao Proposta
 
-**Causa raiz**: Quando você alterou o preço do ticket de R$22,08 para R$27:
-- 33 vendas antigas mantiveram `gross_amount = R$22,08`
-- 24 vendas novas estão com `gross_amount = R$27,00`
-- O dashboard soma os valores individuais em vez de usar o ticket configurado
+### 1. Melhorar o Prompt da IA
 
-## Solução Proposta
+Atualizar `supabase/functions/generate-daily-report/index.ts` para que a IA:
+- Analise TODAS as 8 metricas do funil (nao so video)
+- Inclua na acao o CONTEXTO (qual metrica, valor atual, benchmark)
+- Priorize por impacto no ROI
 
-Modificar a lógica do dashboard para:
-- **Quando o ticket price estiver configurado**: calcular faturamento como `quantidade de vendas × ticket_price`
-- **Quando NÃO estiver configurado**: manter o comportamento atual (soma de gross_amount ou amount)
+**Novo formato de acao:**
+```json
+{
+  "action": "Reescrever hook com pergunta provocativa nos primeiros 3 segundos",
+  "priority": "alta",
+  "metric": "hook_rate",
+  "metric_value": "15.2%",
+  "benchmark": "20%",
+  "reason": "Hook Rate critico - apenas 15.2% das pessoas assistem alem dos 3 segundos (meta: 20%)"
+}
+```
 
-### Mudanças Necessárias
+### 2. Atualizar Exibicao no Dashboard
 
-**Arquivo: `src/pages/ProjectView.tsx`**
+Modificar `src/pages/PublicDashboard.tsx` para mostrar o contexto:
+
+**Layout proposto para cada acao:**
+```
++------------------------------------------------------------------+
+|  [Badge METRICA: Hook Rate 15.2% (meta: 20%)]      [ALTA]        |
+|  ----------------------------------------------------------------|
+|  Reescrever hook com pergunta provocativa nos primeiros 3 seg.   |
++------------------------------------------------------------------+
+```
+
+### Mudancas Tecnicas
+
+**Arquivo: `supabase/functions/generate-daily-report/index.ts`**
+
+1. Atualizar o formato JSON pedido a IA (linhas 477-498):
 
 ```typescript
-// ANTES (linha ~376-379)
-const totalRevenue = filteredSales?.reduce((sum, s) => {
-  const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
-  return sum + Number(valueToUse);
-}, 0) || 0;
-
-// DEPOIS
-const ticketPrice = (project as any)?.kiwify_ticket_price 
-  ? parseFloat((project as any).kiwify_ticket_price) 
-  : null;
-
-const totalRevenue = (() => {
-  if (ticketPrice && useGrossForRoas) {
-    // Usar ticket fixo: quantidade × preço
-    return (filteredSales?.length || 0) * ticketPrice;
+"actions": [
+  {
+    "action": "Descricao da acao especifica",
+    "priority": "alta",
+    "metric": "hook_rate",
+    "metric_label": "Hook Rate",
+    "metric_value": "15.2%",
+    "benchmark": "20%",
+    "reason": "Frase curta explicando porque isso e problema"
   }
-  // Fallback: somar valores individuais
-  return filteredSales?.reduce((sum, s) => {
-    const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
-    return sum + Number(valueToUse);
-  }, 0) || 0;
-})();
+]
 ```
 
-**Também atualizar cálculo por UTM (linha ~422-424)**:
+2. Adicionar instrucao para IA analisar TODAS as metricas:
+- Hook Rate, Hold Rate, Close Rate (video)
+- Connect Rate, CTR (cliques)
+- Taxa Conversao LP, Taxa Checkout (conversao)
+- CPM (custo)
 
-```typescript
-// Usar ticket fixo quando configurado
-const saleValue = (ticketPrice && useGrossForRoas) 
-  ? ticketPrice 
-  : (useGrossForRoas ? ((sale as any).gross_amount || sale.amount) : sale.amount);
-acc[key].revenue += Number(saleValue);
-```
+3. Priorizar acoes pelo impacto:
+- ALTA: Metricas criticas que afetam tudo (Hook, Hold)
+- MEDIA: Metricas intermediarias (Connect, CTR)
+- BAIXA: Otimizacoes especificas (Checkout, CPM)
 
 **Arquivo: `src/pages/PublicDashboard.tsx`**
 
-Aplicar a mesma lógica para o dashboard público.
+Atualizar o card de Acoes Recomendadas (linhas 594-600):
 
-## Resultado Esperado
+```tsx
+{latestReport.actions.map((item, index) => (
+  <div key={index} className="bg-muted/50 rounded-lg p-4 border space-y-2">
+    {/* Linha 1: Metrica + Prioridade */}
+    <div className="flex items-center justify-between">
+      <Badge variant="secondary" className="text-xs">
+        {item.metric_label}: {item.metric_value} (meta: {item.benchmark})
+      </Badge>
+      <PriorityBadge priority={item.priority} />
+    </div>
+    {/* Linha 2: Acao */}
+    <div className="flex items-start gap-2">
+      <CheckCircle className="h-4 w-4 text-primary mt-0.5" />
+      <span className="text-sm">{item.action}</span>
+    </div>
+    {/* Linha 3: Motivo (opcional) */}
+    {item.reason && (
+      <p className="text-xs text-muted-foreground pl-6">{item.reason}</p>
+    )}
+  </div>
+))}
+```
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| 57 vendas × R$27 | R$1.376,64 | R$1.539,00 |
-| Mudança de ticket | Valores antigos permanecem | Recalcula automaticamente |
+## Exemplo de Saida Esperada
 
-## Benefícios
+Antes:
+```
+[x] Reescrever hook verbal com pergunta provocativa...  [alta]
+[x] Testar pattern interrupt visual...                  [alta]
+```
 
-1. **Consistência**: Sempre usa o valor configurado no ticket
-2. **Flexibilidade**: Mudar o ticket reflete imediatamente no dashboard
-3. **Simplicidade**: Não precisa atualizar vendas antigas manualmente
+Depois:
+```
++------------------------------------------------------------------+
+| Hook Rate: 15.2% (meta: 20%)                           [ALTA]    |
+| [x] Reescrever hook verbal com pergunta provocativa nos 3 seg    |
+|     Apenas 15% das pessoas passam dos 3 segundos do video        |
++------------------------------------------------------------------+
+| Connect Rate: 58% (meta: 60%)                          [MEDIA]   |
+| [x] Verificar velocidade da pagina e otimizar mobile             |
+|     42% dos cliques nao chegam na pagina de destino              |
++------------------------------------------------------------------+
+| Taxa Checkout: 35% (meta: 40%)                         [BAIXA]   |
+| [x] Simplificar formulario e adicionar mais formas de pagamento  |
+|     Abandono no checkout esta acima do normal                    |
++------------------------------------------------------------------+
+```
 
-## Tempo Estimado
+## Cronograma
 
-~10 minutos para implementar em ambos os dashboards.
+| Fase | Descricao | Tempo |
+|------|-----------|-------|
+| 1 | Atualizar prompt da IA com novo formato | 15 min |
+| 2 | Atualizar exibicao no PublicDashboard | 10 min |
+| 3 | Deploy e teste | 5 min |
 
+**Total estimado:** ~30 minutos
+
+## Resultado
+
+Apos implementacao:
+1. Usuario entende PORQUE cada acao foi recomendada
+2. Ve qual metrica esta ruim e quanto precisa melhorar
+3. Acoes cobrem TODAS as etapas do funil (nao so video)
+4. Prioridades claras por impacto no ROI
