@@ -1,64 +1,80 @@
 
-# Plano: Corrigir Configuração do Projeto Adri
+
+# Plano: Adicionar kiwify_ticket_price à View projects_public
 
 ## Problema Identificado
 
-O projeto "CA 01 - Adri e Katia" tem o ticket price configurado (R$27), mas o flag `use_gross_for_roas` está **desativado**, o que impede o uso do ticket price no cálculo do faturamento.
+A view `projects_public` não inclui a coluna `kiwify_ticket_price`:
+
+```sql
+-- View atual (falta kiwify_ticket_price)
+CREATE VIEW public.projects_public AS
+  SELECT 
+    id, name, description, slug, is_public, share_token,
+    created_at, updated_at, last_sync_at, kiwify_product_ids,
+    meta_campaign_ids, benchmark_engagement, benchmark_ctr,
+    benchmark_lp_rate, benchmark_checkout_rate, benchmark_sale_rate,
+    campaign_objective, ad_type, account_status, investment_value,
+    class_date, use_gross_for_roas  -- <-- FALTA kiwify_ticket_price!
+  FROM public.projects
+  WHERE is_public = true;
+```
+
+O código em `PublicDashboard.tsx` tenta ler `project.kiwify_ticket_price` mas a view retorna `null` porque o campo não está incluído.
 
 ## Solução
 
-Duas opções:
+Criar uma migração para atualizar a view `projects_public` incluindo o campo `kiwify_ticket_price`.
 
-### Opção 1: Ativar o Flag na Base de Dados (Rápido)
+## Mudança Técnica
 
-Executar SQL para ativar `use_gross_for_roas` no projeto da Adri:
+**Nova migração SQL:**
 
 ```sql
-UPDATE projects 
-SET use_gross_for_roas = true 
-WHERE id = '2caa79a7-1af8-48f9-b839-6e4ab58739b2';
+-- Drop and recreate the view to include kiwify_ticket_price
+DROP VIEW IF EXISTS public.projects_public;
+
+CREATE VIEW public.projects_public
+WITH (security_invoker=on) AS
+  SELECT 
+    id,
+    name,
+    description,
+    slug,
+    is_public,
+    share_token,
+    created_at,
+    updated_at,
+    last_sync_at,
+    kiwify_product_ids,
+    meta_campaign_ids,
+    benchmark_engagement,
+    benchmark_ctr,
+    benchmark_lp_rate,
+    benchmark_checkout_rate,
+    benchmark_sale_rate,
+    campaign_objective,
+    ad_type,
+    account_status,
+    investment_value,
+    class_date,
+    use_gross_for_roas,
+    kiwify_ticket_price  -- NOVO CAMPO
+  FROM public.projects
+  WHERE is_public = true AND (share_token IS NOT NULL OR slug IS NOT NULL);
 ```
-
-### Opção 2: Mudar a Lógica do Código (Recomendado)
-
-Alterar o código para usar o ticket price **sempre que ele estiver configurado**, independente do flag `use_gross_for_roas`.
-
-**Mudança em `src/pages/ProjectView.tsx` e `src/pages/PublicDashboard.tsx`:**
-
-```typescript
-// ANTES: Exige ambas as condições
-const totalRevenue = (ticketPrice && useGrossForRoas) 
-  ? (filteredSales?.length || 0) * ticketPrice 
-  : ...
-
-// DEPOIS: Ticket price tem prioridade
-const totalRevenue = ticketPrice 
-  ? (filteredSales?.length || 0) * ticketPrice 
-  : useGrossForRoas 
-    ? filteredSales?.reduce((sum, s) => sum + Number((s as any).gross_amount || s.amount), 0) || 0
-    : filteredSales?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
-```
-
-**Lógica proposta:**
-1. Se tem ticket price configurado → usa `vendas × ticket`
-2. Se não tem ticket mas `use_gross_for_roas` → usa soma de `gross_amount`
-3. Senão → usa soma de `amount` (líquido individual)
-
-## Recomendação
-
-A **Opção 2** é melhor porque:
-- Ticket price sempre tem prioridade quando configurado
-- `use_gross_for_roas` passa a controlar apenas qual valor somar (bruto vs líquido) quando não há ticket
-- Comportamento mais intuitivo para o usuário
-
-## Arquivos a Modificar
-
-1. `src/pages/ProjectView.tsx` - Linha ~382
-2. `src/pages/PublicDashboard.tsx` - Linha ~277
 
 ## Resultado Esperado
 
-Após a mudança, o projeto da Adri vai calcular:
-- **57 vendas × R$27 = R$1.539,00** (igual ao Sexólogo)
+Após a migração:
+1. O dashboard público da Adri vai ler `kiwify_ticket_price = 27`
+2. O cálculo de faturamento vai usar **57 vendas × R$27 = R$1.539,00**
+3. Todos os projetos com ticket price configurado vão funcionar corretamente no dashboard público
 
-Ambos os projetos terão comportamento consistente.
+## Verificação
+
+| Projeto | Ticket Price | Resultado Esperado |
+|---------|--------------|-------------------|
+| Sexólogo | R$27 | Faturamento = vendas × 27 |
+| Adri | R$27 | Faturamento = vendas × 27 |
+
