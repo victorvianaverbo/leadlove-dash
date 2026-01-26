@@ -1,80 +1,69 @@
 
 
-# Plano: Adicionar kiwify_ticket_price à View projects_public
+# Plano: Ajustes na Interface do Projeto
 
-## Problema Identificado
+## Resumo dos 3 Pedidos
 
-A view `projects_public` não inclui a coluna `kiwify_ticket_price`:
+1. **Ticket price no dashboard público**: ✅ Já corrigido na migração anterior
+2. **Remover seção "Benchmarks de Funil"**: Excluir o Card inteiro das linhas 219-284
+3. **Integrações sempre recolhidas**: Mudar lógica para iniciar todas fechadas
 
-```sql
--- View atual (falta kiwify_ticket_price)
-CREATE VIEW public.projects_public AS
-  SELECT 
-    id, name, description, slug, is_public, share_token,
-    created_at, updated_at, last_sync_at, kiwify_product_ids,
-    meta_campaign_ids, benchmark_engagement, benchmark_ctr,
-    benchmark_lp_rate, benchmark_checkout_rate, benchmark_sale_rate,
-    campaign_objective, ad_type, account_status, investment_value,
-    class_date, use_gross_for_roas  -- <-- FALTA kiwify_ticket_price!
-  FROM public.projects
-  WHERE is_public = true;
+---
+
+## Mudanças Técnicas
+
+### 1. Remover Card de Benchmarks de Funil
+**Arquivo:** `src/pages/ProjectEdit.tsx`
+
+Excluir o Card completo (linhas 219-284) que contém:
+- Engajamento (%)
+- CTR Link (%)
+- Taxa LP (%)
+- Checkout (%)
+- Venda/LP (%)
+
+O estado e a lógica de save dos benchmarks podem permanecer no código (usados pela IA nos relatórios), mas a interface de edição será removida.
+
+### 2. Integrações Sempre Recolhidas
+**Arquivo:** `src/pages/ProjectEdit.tsx`
+
+Alterar a lógica no `useEffect` (linhas 108-118):
+
+```typescript
+// ANTES: Abre apenas integrações desconectadas
+useEffect(() => {
+  if (integrations) {
+    const disconnected: string[] = [];
+    if (!kiwifyIntegration?.is_active) disconnected.push('kiwify');
+    // ...
+    setOpenIntegrations(disconnected);
+  }
+}, [...]);
+
+// DEPOIS: Todas fechadas por padrão
+useEffect(() => {
+  if (integrations) {
+    setOpenIntegrations([]); // Sempre vazio = tudo fechado
+  }
+}, [integrations]);
 ```
 
-O código em `PublicDashboard.tsx` tenta ler `project.kiwify_ticket_price` mas a view retorna `null` porque o campo não está incluído.
+---
 
-## Solução
+## Arquivos a Modificar
 
-Criar uma migração para atualizar a view `projects_public` incluindo o campo `kiwify_ticket_price`.
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/ProjectEdit.tsx` | Remover Card de Benchmarks (linhas 219-284) |
+| `src/pages/ProjectEdit.tsx` | Alterar useEffect para fechar todas integrações |
 
-## Mudança Técnica
-
-**Nova migração SQL:**
-
-```sql
--- Drop and recreate the view to include kiwify_ticket_price
-DROP VIEW IF EXISTS public.projects_public;
-
-CREATE VIEW public.projects_public
-WITH (security_invoker=on) AS
-  SELECT 
-    id,
-    name,
-    description,
-    slug,
-    is_public,
-    share_token,
-    created_at,
-    updated_at,
-    last_sync_at,
-    kiwify_product_ids,
-    meta_campaign_ids,
-    benchmark_engagement,
-    benchmark_ctr,
-    benchmark_lp_rate,
-    benchmark_checkout_rate,
-    benchmark_sale_rate,
-    campaign_objective,
-    ad_type,
-    account_status,
-    investment_value,
-    class_date,
-    use_gross_for_roas,
-    kiwify_ticket_price  -- NOVO CAMPO
-  FROM public.projects
-  WHERE is_public = true AND (share_token IS NOT NULL OR slug IS NOT NULL);
-```
+---
 
 ## Resultado Esperado
 
-Após a migração:
-1. O dashboard público da Adri vai ler `kiwify_ticket_price = 27`
-2. O cálculo de faturamento vai usar **57 vendas × R$27 = R$1.539,00**
-3. Todos os projetos com ticket price configurado vão funcionar corretamente no dashboard público
+1. ✅ Dashboard público usa ticket price (já implementado)
+2. ✅ Seção "Benchmarks de Funil" removida da tela de edição
+3. ✅ Todas as integrações (Kiwify, Hotmart, Guru, Meta) aparecem **fechadas** por padrão
 
-## Verificação
-
-| Projeto | Ticket Price | Resultado Esperado |
-|---------|--------------|-------------------|
-| Sexólogo | R$27 | Faturamento = vendas × 27 |
-| Adri | R$27 | Faturamento = vendas × 27 |
+A configuração de benchmarks continua salva no banco de dados e disponível para os relatórios da IA, apenas a interface de edição é removida para simplificar a tela.
 
