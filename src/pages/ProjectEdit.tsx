@@ -105,17 +105,12 @@ export default function ProjectEdit() {
     }
   }, [project]);
 
-  // Set initial open state - disconnected integrations open by default
+  // Set initial open state - all integrations collapsed by default
   useEffect(() => {
     if (integrations) {
-      const disconnected: string[] = [];
-      if (!kiwifyIntegration?.is_active) disconnected.push('kiwify');
-      if (!hotmartIntegration?.is_active) disconnected.push('hotmart');
-      if (!guruIntegration?.is_active) disconnected.push('guru');
-      if (!metaIntegration?.is_active) disconnected.push('meta_ads');
-      setOpenIntegrations(disconnected);
+      setOpenIntegrations([]);
     }
-  }, [integrations, kiwifyIntegration, hotmartIntegration, guruIntegration, metaIntegration]);
+  }, [integrations]);
 
   const toggleIntegration = (type: string) => {
     setOpenIntegrations(prev => 
@@ -216,72 +211,6 @@ export default function ProjectEdit() {
           </CardContent>
         </Card>
 
-        {/* Benchmarks Card */}
-        <Card className="border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Benchmarks de Funil
-            </CardTitle>
-            <CardDescription>
-              Defina os valores mínimos esperados para cada métrica do funil.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Engajamento (%)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={benchmarkEngagement}
-                  onChange={(e) => setBenchmarkEngagement(parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">Padrão: 2%</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">CTR Link (%)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={benchmarkCtr}
-                  onChange={(e) => setBenchmarkCtr(parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">Padrão: 1%</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Taxa LP (%)</label>
-                <Input
-                  type="number"
-                  step="1"
-                  value={benchmarkLpRate}
-                  onChange={(e) => setBenchmarkLpRate(parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">Padrão: 70%</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Checkout (%)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={benchmarkCheckoutRate}
-                  onChange={(e) => setBenchmarkCheckoutRate(parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">Padrão: 5%</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Venda/LP (%)</label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={benchmarkSaleRate}
-                  onChange={(e) => setBenchmarkSaleRate(parseFloat(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground">Padrão: 2%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* ROAS Config Card */}
         <Card className="border-border">
