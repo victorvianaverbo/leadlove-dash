@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { BarChart3, Sparkles, LineChart, Users, Loader2, Check, ArrowRight, Crown, Brain, Zap, ChevronRight } from 'lucide-react';
+import { BarChart3, ScanSearch, Target, Share2, Loader2, Check, ArrowRight, Crown, BrainCircuit, Cpu, ChevronRight, Activity, DollarSign, TrendingUp, ShoppingCart, Calculator, Link2 } from 'lucide-react';
 import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
 import { toast } from '@/hooks/use-toast';
 
@@ -131,11 +131,11 @@ export default function Index() {
       <section className="bg-primary py-24 md:py-32">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary-foreground mb-6 leading-[1.1] tracking-tight animate-fade-in">
-            Sua IA analista de<br />performance 24/7
+            O sistema de IA que analisa<br />seu funil enquanto você dorme
           </h1>
           <p className="text-lg md:text-xl text-primary-foreground/80 mb-12 max-w-2xl mx-auto animate-fade-in font-light leading-relaxed" style={{ animationDelay: '0.1s' }}>
-            Dashboard com ROAS em tempo real + análises diárias com IA. 
-            Conecte suas plataformas, descubra gargalos no funil e receba ações prioritárias para otimizar suas campanhas.
+            De "não sei onde está o problema" para "sei exatamente o que fazer" em 5 minutos. 
+            A IA escaneia 100% do seu funil, compara com benchmarks do seu nicho e entrega as 3 ações prioritárias para aumentar seu ROAS hoje.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
@@ -182,7 +182,7 @@ export default function Index() {
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <Card className="p-8 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                <Sparkles className="h-6 w-6 text-primary" />
+                <ScanSearch className="h-6 w-6 text-primary" />
               </div>
               <h3 className="font-semibold text-xl mb-3 tracking-tight">Análise Inteligente Diária</h3>
               <p className="text-muted-foreground leading-relaxed font-light">
@@ -192,7 +192,7 @@ export default function Index() {
             
             <Card className="p-8 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                <LineChart className="h-6 w-6 text-primary" />
+                <Target className="h-6 w-6 text-primary" />
               </div>
               <h3 className="font-semibold text-xl mb-3 tracking-tight">Tudo em Um Só Lugar</h3>
               <p className="text-muted-foreground leading-relaxed font-light">
@@ -202,7 +202,7 @@ export default function Index() {
             
             <Card className="p-8 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                <Users className="h-6 w-6 text-primary" />
+                <Share2 className="h-6 w-6 text-primary" />
               </div>
               <h3 className="font-semibold text-xl mb-3 tracking-tight">Para Você ou Sua Agência</h3>
               <p className="text-muted-foreground leading-relaxed font-light">
@@ -213,12 +213,90 @@ export default function Index() {
         </div>
       </section>
 
-      {/* How AI Works Section */}
+      {/* Dashboard Section - NEW */}
       <section className="py-24 bg-muted/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-full text-primary text-sm mb-6">
-              <Brain className="h-4 w-4" />
+              <Activity className="h-4 w-4" />
+              <span className="font-medium">Dashboard em Tempo Real</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Acompanhe seus resultados minuto a minuto</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto text-lg font-light">
+              Chega de esperar relatórios mensais ou calcular ROAS na planilha. Todas as métricas que importam, atualizadas automaticamente.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">Faturamento</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Vendas de todas as plataformas somadas em tempo real
+              </p>
+            </Card>
+            
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">Investimento</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Gastos do Meta Ads sincronizados automaticamente
+              </p>
+            </Card>
+            
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">ROAS</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Calculado automaticamente: faturamento ÷ investimento
+              </p>
+            </Card>
+            
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <ShoppingCart className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">Vendas</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Total de vendas por período, com detalhamento por dia
+              </p>
+            </Card>
+            
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <Calculator className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">CPA</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Custo por aquisição calculado sem planilhas
+              </p>
+            </Card>
+            
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <Link2 className="h-5 w-5 text-primary" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 tracking-tight">Dashboard Público</h3>
+              <p className="text-muted-foreground text-sm font-light">
+                Compartilhe resultados com clientes via link
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* How AI Works Section */}
+      <section className="py-24 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-full text-primary text-sm mb-6">
+              <BrainCircuit className="h-4 w-4" />
               <span className="font-medium">Inteligência Artificial</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Como Funciona a IA</h2>
@@ -271,7 +349,7 @@ export default function Index() {
           <div className="mt-16 text-center">
             <div className="inline-flex items-center gap-3 px-5 py-3 bg-card border border-border rounded-xl">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-primary" />
+                <Cpu className="h-5 w-5 text-primary" />
               </div>
               <span className="text-sm text-muted-foreground font-light">
                 <strong className="text-foreground font-medium">Economize horas</strong> toda semana com análises automáticas
