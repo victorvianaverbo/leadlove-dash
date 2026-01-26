@@ -486,6 +486,7 @@ export type Database = {
           investment_value: number | null
           is_public: boolean | null
           kiwify_product_ids: string[] | null
+          kiwify_ticket_price: number | null
           last_sync_at: string | null
           meta_campaign_ids: string[] | null
           name: string | null
@@ -510,6 +511,7 @@ export type Database = {
           investment_value?: number | null
           is_public?: boolean | null
           kiwify_product_ids?: string[] | null
+          kiwify_ticket_price?: number | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name?: string | null
@@ -534,6 +536,7 @@ export type Database = {
           investment_value?: number | null
           is_public?: boolean | null
           kiwify_product_ids?: string[] | null
+          kiwify_ticket_price?: number | null
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name?: string | null
