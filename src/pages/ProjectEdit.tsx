@@ -42,6 +42,9 @@ export default function ProjectEdit() {
   // ROAS config
   const [useGrossForRoas, setUseGrossForRoas] = useState<boolean>(false);
   const [benchmarkSaleRate, setBenchmarkSaleRate] = useState<number>(2.0);
+  
+  // Kiwify ticket price (fixed product price)
+  const [kiwifyTicketPrice, setKiwifyTicketPrice] = useState<string>("");
 
   // Collapsible states - connected integrations start collapsed
   const [openIntegrations, setOpenIntegrations] = useState<string[]>([]);
@@ -97,6 +100,8 @@ export default function ProjectEdit() {
       setBenchmarkSaleRate((project as any).benchmark_sale_rate ?? 2.0);
       // ROAS config
       setUseGrossForRoas((project as any).use_gross_for_roas ?? false);
+      // Kiwify ticket price
+      setKiwifyTicketPrice((project as any).kiwify_ticket_price ? String((project as any).kiwify_ticket_price) : "");
     }
   }, [project]);
 
@@ -148,6 +153,7 @@ export default function ProjectEdit() {
           benchmark_checkout_rate: benchmarkCheckoutRate,
           benchmark_sale_rate: benchmarkSaleRate,
           use_gross_for_roas: useGrossForRoas,
+          kiwify_ticket_price: kiwifyTicketPrice ? parseFloat(kiwifyTicketPrice) : null,
         } as any)
         .eq('id', id);
       if (error) throw error;
@@ -288,7 +294,41 @@ export default function ProjectEdit() {
               Configure como o faturamento é calculado para projetos com coprodução.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Kiwify Ticket Price */}
+            <TooltipProvider>
+              <div className="p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="text-sm font-medium">Preço do Ticket (Kiwify)</label>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Valor fixo do produto Kiwify. Quando definido, será usado como faturamento bruto para cada venda, evitando cálculos incorretos.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">R$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 22.08"
+                    value={kiwifyTicketPrice}
+                    onChange={(e) => setKiwifyTicketPrice(e.target.value)}
+                    className="max-w-[150px]"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {kiwifyTicketPrice 
+                    ? `Cada venda Kiwify será registrada com R$ ${parseFloat(kiwifyTicketPrice).toFixed(2)} de faturamento bruto.`
+                    : "Deixe vazio para calcular automaticamente a partir da API."}
+                </p>
+              </div>
+            </TooltipProvider>
+
+            {/* Use Gross Toggle */}
             <TooltipProvider>
               <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                 <div className="flex items-center gap-3">

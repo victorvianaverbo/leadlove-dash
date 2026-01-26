@@ -256,18 +256,34 @@ Deno.serve(async (req) => {
 
         console.log(`Total Kiwify sales fetched: ${allSales.length}`);
 
+        // Get fixed ticket price if configured
+        const ticketPrice = (project as any).kiwify_ticket_price 
+          ? parseFloat((project as any).kiwify_ticket_price) 
+          : null;
+        
+        if (ticketPrice) {
+          console.log(`Using fixed ticket price for Kiwify: R$ ${ticketPrice}`);
+        }
+
         for (const sale of allSales) {
           const tracking = sale.tracking || {};
           
           // Valor líquido (parte do produtor após split de coprodução)
           const netAmount = (sale.net_amount || sale.amount || 0) / 100;
           
-          // Valor bruto = charge_amount - fee (líquido total antes do split de coprodução)
-          const chargeAmount = sale.payment?.charge_amount || 0;
-          const platformFee = sale.payment?.fee || 0;
-          const grossAmount = chargeAmount > 0 
-            ? (chargeAmount - platformFee) / 100 
-            : netAmount;
+          // Valor bruto: usar preço fixo se configurado, senão calcular
+          let grossAmount: number;
+          if (ticketPrice !== null) {
+            grossAmount = ticketPrice;
+          } else {
+            const chargeAmount = sale.payment?.charge_amount || 0;
+            const platformFee = sale.payment?.fee || 0;
+            grossAmount = chargeAmount > 0 
+              ? (chargeAmount - platformFee) / 100 
+              : netAmount;
+          }
+          
+          console.log(`Sale ${sale.id}: gross_amount = ${grossAmount} (${ticketPrice ? 'fixed price' : 'calculated'})`);
           
           const { error: upsertError } = await supabase
             .from('sales')
