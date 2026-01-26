@@ -288,13 +288,13 @@ export default function ProjectEdit() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Configuração de ROAS
+              Configuração de Faturamento
             </CardTitle>
             <CardDescription>
-              Configure como o faturamento é calculado para projetos com coprodução.
+              Configure o valor do ticket para cálculo correto do faturamento.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {/* Kiwify Ticket Price */}
             <TooltipProvider>
               <div className="p-4 border rounded-lg bg-muted/30">
@@ -305,7 +305,7 @@ export default function ProjectEdit() {
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p>Valor fixo do produto Kiwify. Quando definido, será usado como faturamento bruto para cada venda, evitando cálculos incorretos.</p>
+                      <p>Valor fixo do produto Kiwify. Será usado como faturamento para cada venda.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -322,39 +322,9 @@ export default function ProjectEdit() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {kiwifyTicketPrice 
-                    ? `Cada venda Kiwify será registrada com R$ ${parseFloat(kiwifyTicketPrice).toFixed(2)} de faturamento bruto.`
-                    : "Deixe vazio para calcular automaticamente a partir da API."}
+                    ? `Cada venda será registrada com R$ ${parseFloat(kiwifyTicketPrice).toFixed(2)}.`
+                    : "Deixe vazio para usar o valor da API."}
                 </p>
-              </div>
-            </TooltipProvider>
-
-            {/* Use Gross Toggle */}
-            <TooltipProvider>
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium">Usar valor bruto para ROAS</label>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>Ative se você tem coprodução. Isso faz o ROAS ser calculado com o valor total da venda, não apenas sua parte.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {useGrossForRoas 
-                        ? "ROAS calculado com o valor total cobrado do cliente" 
-                        : "ROAS calculado com sua parte líquida (após split)"}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={useGrossForRoas}
-                  onCheckedChange={setUseGrossForRoas}
-                />
               </div>
             </TooltipProvider>
           </CardContent>
