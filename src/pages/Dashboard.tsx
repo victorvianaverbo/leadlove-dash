@@ -132,17 +132,40 @@ export default function Dashboard() {
 
       const metrics: Record<string, { revenue: number; spend: number }> = {};
 
-      // Create a map of project settings for quick lookup
-      const projectSettings = new Map(projects.map(p => [p.id, (p as any).use_gross_for_roas || false]));
+      // Create a map of project settings for quick lookup (including ticket price)
+      const projectSettings = new Map(projects.map(p => [
+        p.id,
+        {
+          useGross: (p as any).use_gross_for_roas || false,
+          ticketPrice: (p as any).kiwify_ticket_price || null
+        }
+      ]));
 
+      // First, count sales by project (for projects with ticket price)
+      const salesCountByProject: Record<string, number> = {};
+      salesResult.data?.forEach((sale: any) => {
+        salesCountByProject[sale.project_id] = (salesCountByProject[sale.project_id] || 0) + 1;
+      });
+
+      // Calculate revenue with priority logic: ticketPrice > gross > amount
       salesResult.data?.forEach((sale: any) => {
         if (!metrics[sale.project_id]) {
           metrics[sale.project_id] = { revenue: 0, spend: 0 };
         }
-        // Use gross_amount when project has use_gross_for_roas enabled
-        const useGross = projectSettings.get(sale.project_id);
-        const valueToUse = useGross ? (sale.gross_amount || sale.amount) : sale.amount;
-        metrics[sale.project_id].revenue += Number(valueToUse) || 0;
+        
+        const settings = projectSettings.get(sale.project_id);
+        const ticketPrice = settings?.ticketPrice;
+        
+        // If has ticket price, calculate only once per project
+        if (ticketPrice && metrics[sale.project_id].revenue === 0) {
+          const salesCount = salesCountByProject[sale.project_id] || 0;
+          metrics[sale.project_id].revenue = salesCount * ticketPrice;
+        } else if (!ticketPrice) {
+          // No ticket price: use gross or amount
+          const useGross = settings?.useGross;
+          const valueToUse = useGross ? (sale.gross_amount || sale.amount) : sale.amount;
+          metrics[sale.project_id].revenue += Number(valueToUse) || 0;
+        }
       });
 
       spendResult.data?.forEach((ad) => {
