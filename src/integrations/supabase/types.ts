@@ -40,6 +40,10 @@ export type Database = {
           thruplays: number | null
           user_id: string
           video_3s_views: number | null
+          video_p100_views: number | null
+          video_p25_views: number | null
+          video_p50_views: number | null
+          video_p75_views: number | null
         }
         Insert: {
           ad_id?: string | null
@@ -66,6 +70,10 @@ export type Database = {
           thruplays?: number | null
           user_id: string
           video_3s_views?: number | null
+          video_p100_views?: number | null
+          video_p25_views?: number | null
+          video_p50_views?: number | null
+          video_p75_views?: number | null
         }
         Update: {
           ad_id?: string | null
@@ -92,6 +100,10 @@ export type Database = {
           thruplays?: number | null
           user_id?: string
           video_3s_views?: number | null
+          video_p100_views?: number | null
+          video_p25_views?: number | null
+          video_p50_views?: number | null
+          video_p75_views?: number | null
         }
         Relationships: [
           {
@@ -256,6 +268,7 @@ export type Database = {
           last_sync_at: string | null
           meta_campaign_ids: string[] | null
           name: string
+          niche: string | null
           share_token: string | null
           slug: string | null
           updated_at: string
@@ -284,6 +297,7 @@ export type Database = {
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name: string
+          niche?: string | null
           share_token?: string | null
           slug?: string | null
           updated_at?: string
@@ -312,6 +326,7 @@ export type Database = {
           last_sync_at?: string | null
           meta_campaign_ids?: string[] | null
           name?: string
+          niche?: string | null
           share_token?: string | null
           slug?: string | null
           updated_at?: string
