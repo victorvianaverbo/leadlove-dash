@@ -527,7 +527,7 @@ Deno.serve(async (req) => {
       }
 
       for (const campaignId of project.meta_campaign_ids) {
-        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions,video_thruplay_watched_actions,video_p25_watched_actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
+        const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${access_token}`;
         
         console.log(`Fetching insights for campaign ${campaignId}`);
         
@@ -581,16 +581,21 @@ Deno.serve(async (req) => {
             ? parseInt(thruplayAction.value || '0') 
             : 0;
 
-          // Extract 3-second video views from video_p25_watched_actions (approximation for hook)
-          const video3sActions = insight.video_p25_watched_actions || [];
-          const video3sAction = video3sActions.find(
-            (a: { action_type: string }) => a.action_type === 'video_view'
-          );
-          const video3sViews = video3sAction 
-            ? parseInt(video3sAction.value || '0') 
-            : 0;
+          // Extract video percentage views helper
+          const extractVideoViews = (videoActions: any[]) => {
+            if (!videoActions) return 0;
+            const action = videoActions.find((a: { action_type: string }) => a.action_type === 'video_view');
+            return action ? parseInt(action.value || '0') : 0;
+          };
 
-          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}, lpViews=${landingPageViews}, checkouts=${checkoutsInitiated}, thruplays=${thruplays}, 3s=${video3sViews}`);
+          // Extract 3-second video views from video_p25_watched_actions (approximation for hook)
+          const video3sViews = extractVideoViews(insight.video_p25_watched_actions);
+          const videoP25Views = extractVideoViews(insight.video_p25_watched_actions);
+          const videoP50Views = extractVideoViews(insight.video_p50_watched_actions);
+          const videoP75Views = extractVideoViews(insight.video_p75_watched_actions);
+          const videoP100Views = extractVideoViews(insight.video_p100_watched_actions);
+
+          console.log(`Upserting insight: date=${insight.date_start}, spend=${insight.spend}, campaign=${insight.campaign_name}, lpViews=${landingPageViews}, checkouts=${checkoutsInitiated}, thruplays=${thruplays}, 3s=${video3sViews}, p75=${videoP75Views}, p100=${videoP100Views}`);
           
           const { error: upsertError } = await supabase
             .from('ad_spend')
@@ -616,6 +621,10 @@ Deno.serve(async (req) => {
               checkouts_initiated: checkoutsInitiated,
               thruplays: thruplays,
               video_3s_views: video3sViews,
+              video_p25_views: videoP25Views,
+              video_p50_views: videoP50Views,
+              video_p75_views: videoP75Views,
+              video_p100_views: videoP100Views,
               date: insight.date_start,
             }, { onConflict: 'campaign_id,date,project_id,ad_id' });
 
