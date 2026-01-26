@@ -213,6 +213,7 @@ async function generateReportForProject(
   // Calculate metrics for each day
   // Usar gross_amount quando use_gross_for_roas está ativado
   const useGrossForRevenue = projectData.use_gross_for_roas || false;
+  const ticketPrice = projectData.kiwify_ticket_price || null;
   
   const calcDayMetrics = (sales: any[], adSpend: any[]) => {
     const impressions = adSpend.reduce((sum, a) => sum + Number(a.impressions || 0), 0);
@@ -230,10 +231,13 @@ async function generateReportForProject(
     const videoP100Views = adSpend.reduce((sum, a) => sum + Number(a.video_p100_views || 0), 0);
     
     // Usar gross_amount quando configurado para coprodução
-    const revenue = sales.reduce((sum, s) => {
-      const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
-      return sum + value;
-    }, 0);
+      // Ticket price tem prioridade, depois gross_amount, depois amount
+      const revenue = ticketPrice 
+        ? sales.length * ticketPrice
+        : sales.reduce((sum, s) => {
+            const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
+            return sum + value;
+          }, 0);
     
     const spend = adSpend.reduce((sum, a) => sum + Number(a.spend), 0);
 
