@@ -1,144 +1,64 @@
 
-# Plano: Melhorar Ações Recomendadas com Contexto Completo do Funil
+# Plano: Corrigir Configuração do Projeto Adri
 
-## Problema Atual
+## Problema Identificado
 
-A seção "Ações Recomendadas" mostra apenas ações de vídeo sem explicar o PORQUÊ de cada recomendação:
-- Não mostra qual métrica está ruim
-- Não mostra o valor atual vs benchmark
-- Não apresenta todas as etapas do funil
+O projeto "CA 01 - Adri e Katia" tem o ticket price configurado (R$27), mas o flag `use_gross_for_roas` está **desativado**, o que impede o uso do ticket price no cálculo do faturamento.
 
-## Solucao Proposta
+## Solução
 
-### 1. Melhorar o Prompt da IA
+Duas opções:
 
-Atualizar `supabase/functions/generate-daily-report/index.ts` para que a IA:
-- Analise TODAS as 8 metricas do funil (nao so video)
-- Inclua na acao o CONTEXTO (qual metrica, valor atual, benchmark)
-- Priorize por impacto no ROI
+### Opção 1: Ativar o Flag na Base de Dados (Rápido)
 
-**Novo formato de acao:**
-```json
-{
-  "action": "Reescrever hook com pergunta provocativa nos primeiros 3 segundos",
-  "priority": "alta",
-  "metric": "hook_rate",
-  "metric_value": "15.2%",
-  "benchmark": "20%",
-  "reason": "Hook Rate critico - apenas 15.2% das pessoas assistem alem dos 3 segundos (meta: 20%)"
-}
+Executar SQL para ativar `use_gross_for_roas` no projeto da Adri:
+
+```sql
+UPDATE projects 
+SET use_gross_for_roas = true 
+WHERE id = '2caa79a7-1af8-48f9-b839-6e4ab58739b2';
 ```
 
-### 2. Atualizar Exibicao no Dashboard
+### Opção 2: Mudar a Lógica do Código (Recomendado)
 
-Modificar `src/pages/PublicDashboard.tsx` para mostrar o contexto:
+Alterar o código para usar o ticket price **sempre que ele estiver configurado**, independente do flag `use_gross_for_roas`.
 
-**Layout proposto para cada acao:**
-```
-+------------------------------------------------------------------+
-|  [Badge METRICA: Hook Rate 15.2% (meta: 20%)]      [ALTA]        |
-|  ----------------------------------------------------------------|
-|  Reescrever hook com pergunta provocativa nos primeiros 3 seg.   |
-+------------------------------------------------------------------+
-```
-
-### Mudancas Tecnicas
-
-**Arquivo: `supabase/functions/generate-daily-report/index.ts`**
-
-1. Atualizar o formato JSON pedido a IA (linhas 477-498):
+**Mudança em `src/pages/ProjectView.tsx` e `src/pages/PublicDashboard.tsx`:**
 
 ```typescript
-"actions": [
-  {
-    "action": "Descricao da acao especifica",
-    "priority": "alta",
-    "metric": "hook_rate",
-    "metric_label": "Hook Rate",
-    "metric_value": "15.2%",
-    "benchmark": "20%",
-    "reason": "Frase curta explicando porque isso e problema"
-  }
-]
+// ANTES: Exige ambas as condições
+const totalRevenue = (ticketPrice && useGrossForRoas) 
+  ? (filteredSales?.length || 0) * ticketPrice 
+  : ...
+
+// DEPOIS: Ticket price tem prioridade
+const totalRevenue = ticketPrice 
+  ? (filteredSales?.length || 0) * ticketPrice 
+  : useGrossForRoas 
+    ? filteredSales?.reduce((sum, s) => sum + Number((s as any).gross_amount || s.amount), 0) || 0
+    : filteredSales?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
 ```
 
-2. Adicionar instrucao para IA analisar TODAS as metricas:
-- Hook Rate, Hold Rate, Close Rate (video)
-- Connect Rate, CTR (cliques)
-- Taxa Conversao LP, Taxa Checkout (conversao)
-- CPM (custo)
+**Lógica proposta:**
+1. Se tem ticket price configurado → usa `vendas × ticket`
+2. Se não tem ticket mas `use_gross_for_roas` → usa soma de `gross_amount`
+3. Senão → usa soma de `amount` (líquido individual)
 
-3. Priorizar acoes pelo impacto:
-- ALTA: Metricas criticas que afetam tudo (Hook, Hold)
-- MEDIA: Metricas intermediarias (Connect, CTR)
-- BAIXA: Otimizacoes especificas (Checkout, CPM)
+## Recomendação
 
-**Arquivo: `src/pages/PublicDashboard.tsx`**
+A **Opção 2** é melhor porque:
+- Ticket price sempre tem prioridade quando configurado
+- `use_gross_for_roas` passa a controlar apenas qual valor somar (bruto vs líquido) quando não há ticket
+- Comportamento mais intuitivo para o usuário
 
-Atualizar o card de Acoes Recomendadas (linhas 594-600):
+## Arquivos a Modificar
 
-```tsx
-{latestReport.actions.map((item, index) => (
-  <div key={index} className="bg-muted/50 rounded-lg p-4 border space-y-2">
-    {/* Linha 1: Metrica + Prioridade */}
-    <div className="flex items-center justify-between">
-      <Badge variant="secondary" className="text-xs">
-        {item.metric_label}: {item.metric_value} (meta: {item.benchmark})
-      </Badge>
-      <PriorityBadge priority={item.priority} />
-    </div>
-    {/* Linha 2: Acao */}
-    <div className="flex items-start gap-2">
-      <CheckCircle className="h-4 w-4 text-primary mt-0.5" />
-      <span className="text-sm">{item.action}</span>
-    </div>
-    {/* Linha 3: Motivo (opcional) */}
-    {item.reason && (
-      <p className="text-xs text-muted-foreground pl-6">{item.reason}</p>
-    )}
-  </div>
-))}
-```
+1. `src/pages/ProjectView.tsx` - Linha ~382
+2. `src/pages/PublicDashboard.tsx` - Linha ~277
 
-## Exemplo de Saida Esperada
+## Resultado Esperado
 
-Antes:
-```
-[x] Reescrever hook verbal com pergunta provocativa...  [alta]
-[x] Testar pattern interrupt visual...                  [alta]
-```
+Após a mudança, o projeto da Adri vai calcular:
+- **57 vendas × R$27 = R$1.539,00** (igual ao Sexólogo)
 
-Depois:
-```
-+------------------------------------------------------------------+
-| Hook Rate: 15.2% (meta: 20%)                           [ALTA]    |
-| [x] Reescrever hook verbal com pergunta provocativa nos 3 seg    |
-|     Apenas 15% das pessoas passam dos 3 segundos do video        |
-+------------------------------------------------------------------+
-| Connect Rate: 58% (meta: 60%)                          [MEDIA]   |
-| [x] Verificar velocidade da pagina e otimizar mobile             |
-|     42% dos cliques nao chegam na pagina de destino              |
-+------------------------------------------------------------------+
-| Taxa Checkout: 35% (meta: 40%)                         [BAIXA]   |
-| [x] Simplificar formulario e adicionar mais formas de pagamento  |
-|     Abandono no checkout esta acima do normal                    |
-+------------------------------------------------------------------+
-```
-
-## Cronograma
-
-| Fase | Descricao | Tempo |
-|------|-----------|-------|
-| 1 | Atualizar prompt da IA com novo formato | 15 min |
-| 2 | Atualizar exibicao no PublicDashboard | 10 min |
-| 3 | Deploy e teste | 5 min |
-
-**Total estimado:** ~30 minutos
-
-## Resultado
-
-Apos implementacao:
-1. Usuario entende PORQUE cada acao foi recomendada
-2. Ve qual metrica esta ruim e quanto precisa melhorar
-3. Acoes cobrem TODAS as etapas do funil (nao so video)
-4. Prioridades claras por impacto no ROI
+Ambos os projetos terão comportamento consistente.
