@@ -1,102 +1,113 @@
 
 
-# Plano: Atualizar Landing Page - Nova Copy, Ícones de IA e Dobra do Dashboard
+# Plano: Corrigir Isolamento de Dados - Usuários Vendo Projetos de Outros
 
-## Resumo das Mudanças
+## Problema Identificado
 
-1. **Nova copy do hero** - Foco na transformação e nas 3 ações prioritárias
-2. **Ícones mais "IA"** - Trocar ícones genéricos por ícones que remetem a inteligência artificial
-3. **Nova dobra do Dashboard** - Seção destacando o dashboard em tempo real
+O usuário `contato@vianamidias` está vendo os projetos do `vianavictor` porque:
 
----
+1. **Políticas RLS muito permissivas**: As políticas "Public can view shared projects" permitem que QUALQUER pessoa (incluindo usuários autenticados) veja projetos que têm `is_public = true`
 
-## 1. Nova Copy do Hero
+2. **Query sem filtro de user_id**: O Dashboard busca todos os projetos que o RLS permite, sem filtrar pelo usuário atual
 
-### Headline Principal
-**Antes:** "Sua IA analista de performance 24/7"
-
-**Depois:** "O sistema de IA que analisa seu funil enquanto você dorme"
-
-### Subtítulo
-**Antes:** "Dashboard com ROAS em tempo real + análises diárias com IA..."
-
-**Depois:** "De 'não sei onde está o problema' para 'sei exatamente o que fazer' em 5 minutos. A IA escaneia 100% do seu funil, compara com benchmarks do seu nicho e entrega as 3 ações prioritárias para aumentar seu ROAS hoje."
-
----
-
-## 2. Novos Ícones com Cara de IA
-
-| Local | Icone Atual | Novo Icone | Conceito |
-|-------|-------------|------------|----------|
-| Features - Card 1 | `Sparkles` | `ScanSearch` | IA escaneando/analisando |
-| Features - Card 2 | `LineChart` | `Target` | Foco nos resultados |
-| Features - Card 3 | `Users` | `Share2` | Compartilhamento |
-| How AI Works - Badge | `Brain` | `BrainCircuit` | Cerebro com circuitos |
-| Social Proof | `Zap` | `Cpu` | Processamento automatico |
-
----
-
-## 3. Nova Dobra: Dashboard em Tempo Real
-
-### Posicionamento
-Inserir **entre a seção Features e a seção "Como Funciona a IA"**
-
-### Estrutura da Seção
-
-```text
-+----------------------------------------------------------+
-|                    DASHBOARD EM TEMPO REAL               |
-|                                                          |
-|  "Veja seu ROAS atualizado a cada minuto"               |
-|  "Chega de esperar relatórios mensais..."               |
-|                                                          |
-|  +----------------+  +----------------+  +---------------+
-|  | Faturamento    |  | Investimento   |  | ROAS         |
-|  | Em tempo real  |  | Meta Ads sync  |  | Automatico   |
-|  +----------------+  +----------------+  +---------------+
-|                                                          |
-|  +----------------+  +----------------+  +---------------+
-|  | Vendas         |  | CPA            |  | Dashboard    |
-|  | Por plataforma |  | Calculado      |  | Publico      |
-|  +----------------+  +----------------+  +---------------+
-|                                                          |
-+----------------------------------------------------------+
+```sql
+-- Políticas atuais (PROBLEMÁTICAS):
+"Public can view shared projects" → (is_public = true AND share_token IS NOT NULL)
+"Public can view shared projects by slug" → (is_public = true AND slug IS NOT NULL)
 ```
 
-### Copy da Nova Dobra
-
-**Badge:** "Dashboard em Tempo Real"
-**Titulo:** "Acompanhe seus resultados minuto a minuto"
-**Subtitulo:** "Chega de esperar relatorios mensais ou calcular ROAS na planilha. Todas as metricas que importam, atualizadas automaticamente."
-
-**6 Metricas Destacadas (grid 3x2 ou 2x3):**
-
-| Metrica | Descricao |
-|---------|-----------|
-| Faturamento | Vendas de todas as plataformas somadas em tempo real |
-| Investimento | Gastos do Meta Ads sincronizados automaticamente |
-| ROAS | Calculado automaticamente: faturamento / investimento |
-| Vendas | Total de vendas por periodo, com detalhamento por dia |
-| CPA | Custo por aquisicao calculado sem planilhas |
-| Dashboard Publico | Compartilhe resultados com clientes via link |
+Resultado: Projetos públicos aparecem para TODOS os usuários logados, não apenas para o dono.
 
 ---
 
-## Arquivos a Modificar
+## Solução em Duas Partes
 
-| Arquivo | Alteracoes |
-|---------|------------|
-| `src/pages/Index.tsx` | Nova copy hero + troca de icones + nova secao Dashboard |
+### Parte 1: Adicionar Filtro no Dashboard (Correção Imediata)
+
+**Arquivo:** `src/pages/Dashboard.tsx`
+
+Adicionar filtro `.eq('user_id', user.id)` na query de projetos:
+
+```typescript
+// ANTES (linha 95-98)
+const { data, error } = await supabase
+  .from('projects')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+// DEPOIS
+const { data, error } = await supabase
+  .from('projects')
+  .select('*')
+  .eq('user_id', user.id)  // ← FILTRAR PELO USUÁRIO ATUAL
+  .order('created_at', { ascending: false });
+```
+
+### Parte 2: Ajustar Políticas RLS (Defesa em Profundidade)
+
+As políticas de projetos públicos devem permitir acesso apenas para usuários **não autenticados** (acesso via link público). Usuários autenticados devem ver apenas seus próprios projetos.
+
+**Opção A: Restringir políticas públicas ao role `anon`**
+
+```sql
+-- Dropar políticas atuais
+DROP POLICY IF EXISTS "Public can view shared projects" ON projects;
+DROP POLICY IF EXISTS "Public can view shared projects by slug" ON projects;
+
+-- Recriar com role anon (apenas usuários não logados)
+CREATE POLICY "Anon can view shared projects by token"
+ON projects FOR SELECT TO anon
+USING (is_public = true AND share_token IS NOT NULL);
+
+CREATE POLICY "Anon can view shared projects by slug"
+ON projects FOR SELECT TO anon
+USING (is_public = true AND slug IS NOT NULL);
+```
+
+**Opção B: Manter políticas mas combinar condições**
+
+```sql
+-- Usuários autenticados: apenas seus projetos
+-- Ou: projetos públicos sem estar logado
+CREATE POLICY "View projects policy"
+ON projects FOR SELECT
+USING (
+  (auth.uid() = user_id)  -- Próprios projetos
+  OR 
+  (auth.uid() IS NULL AND is_public = true AND (share_token IS NOT NULL OR slug IS NOT NULL))  -- Públicos para anon
+);
+```
 
 ---
 
-## Ordem Final das Secoes
+## Mudanças Recomendadas
 
-1. Header
-2. Hero (nova copy)
-3. Features - "Por que usar o MetrikaPRO?" (novos icones)
-4. **Dashboard - "Acompanhe seus resultados minuto a minuto"** (NOVA)
-5. How AI Works - "Como Funciona a IA" (novos icones)
-6. Pricing
-7. Footer
+| Arquivo/Local | Alteração | Prioridade |
+|---------------|-----------|------------|
+| `src/pages/Dashboard.tsx` | Adicionar `.eq('user_id', user.id)` | CRÍTICA |
+| RLS `projects` | Restringir políticas públicas ao role `anon` | ALTA |
+| Tabelas relacionadas | Verificar `sales`, `ad_spend`, `integrations` | ALTA |
+
+---
+
+## Verificação de Outras Tabelas
+
+As tabelas `sales`, `ad_spend` e `integrations` também têm políticas "Public can view" que podem ter o mesmo problema:
+
+- `sales`: "Public can view sales of shared projects" 
+- `ad_spend`: "Public can view ad_spend of shared projects"
+
+Essas políticas também devem ser restritas ao role `anon` para evitar vazamento de dados entre usuários.
+
+---
+
+## Resultado Esperado
+
+Após a correção:
+
+| Usuário | O que vê |
+|---------|----------|
+| `vianavictor` | Apenas seus 2 projetos (Adri e Sexólogo) |
+| `contato@vianamidias` | Nenhum projeto (ainda não criou) |
+| Visitante (não logado) | Dashboard público via link se projeto for público |
 
