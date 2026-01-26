@@ -317,8 +317,9 @@ export default function PublicDashboard() {
 
   // Helper to get the correct amount based on project settings
   const getSaleValue = (sale: SalesPublic) => {
-    // If ticket price configured and useGrossForRoas, return ticket price for each sale
-    if (ticketPrice && useGrossForRoas) return ticketPrice;
+    // Priority 1: If ticket price is configured, use it for each sale
+    if (ticketPrice) return ticketPrice;
+    // Priority 2: Use gross_amount if useGrossForRoas, otherwise use amount
     return useGrossForRoas ? (sale.gross_amount || sale.amount) : sale.amount;
   };
 
