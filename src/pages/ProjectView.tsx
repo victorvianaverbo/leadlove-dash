@@ -380,11 +380,11 @@ const parseCurrencyInput = (value: string): number => {
     : null;
   
   const totalRevenue = (() => {
-    if (ticketPrice && useGrossForRoas) {
-      // Use fixed ticket: quantity × price
+    // Priority 1: If ticket price is configured, use it (quantity × price)
+    if (ticketPrice) {
       return (filteredSales?.length || 0) * ticketPrice;
     }
-    // Fallback: sum individual values
+    // Priority 2: Sum individual values (gross_amount if useGrossForRoas, otherwise amount)
     return filteredSales?.reduce((sum, s) => {
       const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
       return sum + Number(valueToUse);
