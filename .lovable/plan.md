@@ -1,52 +1,72 @@
 
+# Plano: Corrigir Cálculo de Receita na Edge Function generate-daily-report
 
-# Plano: Ajustes na Interface do Projeto
+## Problema Identificado
 
-## Resumo dos 3 Pedidos
+A edge function `generate-daily-report` não usa a lógica de prioridade do ticket price que foi implementada no frontend.
 
-1. **Ticket price no dashboard público**: ✅ Já corrigido na migração anterior
-2. **Remover seção "Benchmarks de Funil"**: Excluir o Card inteiro das linhas 219-284
-3. **Integrações sempre recolhidas**: Mudar lógica para iniciar todas fechadas
+**Código atual (linha 233-236):**
+```typescript
+const revenue = sales.reduce((sum, s) => {
+  const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
+  return sum + value;
+}, 0);
+```
+
+Este código **ignora** o `kiwify_ticket_price` configurado no projeto da Adri (R$27), resultando em receita incorreta de R$22,08 ao invés de R$27.
+
+---
+
+## Solução
+
+Alterar a função `calcDayMetrics` para seguir a mesma lógica de prioridade implementada nos dashboards:
+
+1. Se tem `ticketPrice` configurado → `vendas × ticketPrice`
+2. Se não tem ticket mas `useGrossForRevenue` → soma `gross_amount`
+3. Senão → soma `amount` (líquido individual)
 
 ---
 
 ## Mudanças Técnicas
 
-### 1. Remover Card de Benchmarks de Funil
-**Arquivo:** `src/pages/ProjectEdit.tsx`
+**Arquivo:** `supabase/functions/generate-daily-report/index.ts`
 
-Excluir o Card completo (linhas 219-284) que contém:
-- Engajamento (%)
-- CTR Link (%)
-- Taxa LP (%)
-- Checkout (%)
-- Venda/LP (%)
-
-O estado e a lógica de save dos benchmarks podem permanecer no código (usados pela IA nos relatórios), mas a interface de edição será removida.
-
-### 2. Integrações Sempre Recolhidas
-**Arquivo:** `src/pages/ProjectEdit.tsx`
-
-Alterar a lógica no `useEffect` (linhas 108-118):
+### 1. Ler o ticket price do projeto (após linha 215)
 
 ```typescript
-// ANTES: Abre apenas integrações desconectadas
-useEffect(() => {
-  if (integrations) {
-    const disconnected: string[] = [];
-    if (!kiwifyIntegration?.is_active) disconnected.push('kiwify');
-    // ...
-    setOpenIntegrations(disconnected);
-  }
-}, [...]);
-
-// DEPOIS: Todas fechadas por padrão
-useEffect(() => {
-  if (integrations) {
-    setOpenIntegrations([]); // Sempre vazio = tudo fechado
-  }
-}, [integrations]);
+const useGrossForRevenue = projectData.use_gross_for_roas || false;
+const ticketPrice = projectData.kiwify_ticket_price || null;  // NOVO
 ```
+
+### 2. Alterar cálculo de receita na função calcDayMetrics (linhas 233-236)
+
+```typescript
+// ANTES
+const revenue = sales.reduce((sum, s) => {
+  const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
+  return sum + value;
+}, 0);
+
+// DEPOIS: Ticket price tem prioridade
+const revenue = ticketPrice 
+  ? sales.length * ticketPrice
+  : sales.reduce((sum, s) => {
+      const value = useGrossForRevenue ? (Number(s.gross_amount) || Number(s.amount)) : Number(s.amount);
+      return sum + value;
+    }, 0);
+```
+
+---
+
+## Resultado Esperado
+
+Após a correção, o relatório da IA para a Adri vai calcular:
+
+| Dia | Vendas | Cálculo | Receita |
+|-----|--------|---------|---------|
+| Ontem | 1 | 1 × R$27 | **R$27,00** |
+
+Isso resolve a inconsistência entre os dashboards (frontend) e os relatórios da IA (edge function), garantindo que todos usem a mesma lógica de prioridade do ticket price.
 
 ---
 
@@ -54,16 +74,4 @@ useEffect(() => {
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/pages/ProjectEdit.tsx` | Remover Card de Benchmarks (linhas 219-284) |
-| `src/pages/ProjectEdit.tsx` | Alterar useEffect para fechar todas integrações |
-
----
-
-## Resultado Esperado
-
-1. ✅ Dashboard público usa ticket price (já implementado)
-2. ✅ Seção "Benchmarks de Funil" removida da tela de edição
-3. ✅ Todas as integrações (Kiwify, Hotmart, Guru, Meta) aparecem **fechadas** por padrão
-
-A configuração de benchmarks continua salva no banco de dados e disponível para os relatórios da IA, apenas a interface de edição é removida para simplificar a tela.
-
+| `supabase/functions/generate-daily-report/index.ts` | Adicionar leitura de `kiwify_ticket_price` e alterar cálculo de receita |
