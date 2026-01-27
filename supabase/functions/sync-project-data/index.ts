@@ -142,6 +142,13 @@ Deno.serve(async (req) => {
     const guruIntegration = integrations?.find(i => i.type === 'guru');
     const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
 
+    // === SYNC SUMMARY LOG (high priority - always visible) ===
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`=== SYNC START: Project ${project_id} ===`);
+    console.log(`=== Integrations: Kiwify=${!!kiwifyIntegration}, Hotmart=${!!hotmartIntegration}, Guru=${!!guruIntegration}, Meta=${!!metaIntegration} ===`);
+    console.log(`=== Products: Kiwify=${project.kiwify_product_ids?.length || 0}, Hotmart=${project.hotmart_product_ids?.length || 0}, Guru=${project.guru_product_ids?.length || 0}, Meta=${project.meta_campaign_ids?.length || 0} ===`);
+    console.log(`${'='.repeat(60)}\n`);
+
     let salesSynced = 0;
     let adSpendSynced = 0;
 
@@ -323,30 +330,37 @@ Deno.serve(async (req) => {
         basic_token: string;
       };
 
-      console.log('Starting Hotmart sync...');
+      console.log('\n>>> HOTMART SYNC STARTING <<<');
+      console.log(`Products to sync: ${project.hotmart_product_ids.join(', ')}`);
+      console.log(`Credentials: client_id=${client_id ? 'SET' : 'MISSING'}, basic_token=${basic_token ? 'SET' : 'MISSING'}`);
 
-      // Get access token from Hotmart
-      const tokenResponse = await fetch('https://api-sec-vlc.hotmart.com/security/oauth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${basic_token}`,
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id,
-          client_secret,
-        }).toString(),
-      });
+      try {
+        // Get access token from Hotmart
+        console.log('Requesting Hotmart OAuth token...');
+        const tokenResponse = await fetch('https://api-sec-vlc.hotmart.com/security/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Basic ${basic_token}`,
+          },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id,
+            client_secret,
+          }).toString(),
+        });
 
-      if (tokenResponse.ok) {
-        const tokenData = await tokenResponse.json();
-        const accessToken = tokenData.access_token;
+        console.log(`Hotmart token response status: ${tokenResponse.status}`);
 
-        const startTimestamp = syncStartDate.getTime();
-        const endTimestamp = nowBrasilia.getTime();
+        if (tokenResponse.ok) {
+          const tokenData = await tokenResponse.json();
+          const accessToken = tokenData.access_token;
+          console.log('Hotmart OAuth token obtained successfully');
 
-        console.log(`Syncing Hotmart sales from ${new Date(startTimestamp).toISOString()} to ${new Date(endTimestamp).toISOString()}`);
+          const startTimestamp = syncStartDate.getTime();
+          const endTimestamp = nowBrasilia.getTime();
+
+          console.log(`Syncing Hotmart sales from ${new Date(startTimestamp).toISOString()} to ${new Date(endTimestamp).toISOString()}`);
 
         // Fetch sales history from Hotmart
         for (const productId of project.hotmart_product_ids) {
@@ -413,35 +427,53 @@ Deno.serve(async (req) => {
             }
           }
         }
-      } else {
-        console.error('Failed to get Hotmart access token:', await tokenResponse.text());
+        } else {
+          const errorBody = await tokenResponse.text();
+          console.error(`HOTMART TOKEN ERROR: Status ${tokenResponse.status}`);
+          console.error(`HOTMART TOKEN ERROR Body: ${errorBody}`);
+        }
+      } catch (hotmartError) {
+        console.error('HOTMART SYNC EXCEPTION:', hotmartError);
       }
+      console.log(`>>> HOTMART SYNC COMPLETE: ${salesSynced} sales <<<\n`);
+    } else if (hotmartIntegration) {
+      console.log('HOTMART: Integration active but no products selected');
     }
 
     // ============ GURU DMG SYNC ============
+    const guruSalesStart = salesSynced; // Track Guru-specific sales
     if (guruIntegration && project.guru_product_ids?.length > 0) {
       const { api_token } = guruIntegration.credentials as { api_token: string };
 
-      console.log('Starting Guru DMG sync...');
+      console.log('\n>>> GURU DMG SYNC STARTING <<<');
+      console.log(`Products to sync: ${project.guru_product_ids.join(', ')}`);
+      console.log(`API Token: ${api_token ? 'SET (' + api_token.substring(0, 8) + '...)' : 'MISSING'}`);
 
       const startDate = syncStartDate.toISOString().split('T')[0];
       const endDate = new Date().toISOString().split('T')[0];
+      console.log(`Date range: ${startDate} to ${endDate}`);
 
-      for (const productId of project.guru_product_ids) {
-        let page = 1;
-        let hasMore = true;
+      try {
+        for (const productId of project.guru_product_ids) {
+          let page = 1;
+          let hasMore = true;
 
-        while (hasMore) {
-          // API v2 - Updated endpoint
-          const salesUrl = `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
-          
-          const salesResponse = await fetch(salesUrl, {
-            headers: {
-              'Authorization': `Bearer ${api_token}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-          });
+          console.log(`Fetching Guru sales for product: ${productId}`);
+
+          while (hasMore) {
+            // API v2 - Updated endpoint
+            const salesUrl = `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
+            console.log(`Guru API request: ${salesUrl.replace(api_token, 'TOKEN')}`);
+            
+            const salesResponse = await fetch(salesUrl, {
+              headers: {
+                'Authorization': `Bearer ${api_token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+            });
+
+            console.log(`Guru API response status: ${salesResponse.status}`);
 
           if (salesResponse.ok) {
             const salesData = await salesResponse.json();
@@ -487,13 +519,21 @@ Deno.serve(async (req) => {
             } else {
               page++;
             }
-          } else {
-            const errorText = await salesResponse.text();
-            console.error(`Error fetching Guru sales for product ${productId}:`, errorText);
-            hasMore = false;
+            } else {
+              const errorText = await salesResponse.text();
+              console.error(`GURU API ERROR for product ${productId}: Status ${salesResponse.status}`);
+              console.error(`GURU API ERROR Body: ${errorText}`);
+              hasMore = false;
+            }
           }
         }
+      } catch (guruError) {
+        console.error('GURU SYNC EXCEPTION:', guruError);
       }
+      const guruSalesTotal = salesSynced - guruSalesStart;
+      console.log(`>>> GURU SYNC COMPLETE: ${guruSalesTotal} sales <<<\n`);
+    } else if (guruIntegration) {
+      console.log('GURU: Integration active but no products selected');
     }
 
     // Sync Meta Ads spend
