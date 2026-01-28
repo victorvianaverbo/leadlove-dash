@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
+import { useMetricsCache } from '@/hooks/useMetricsCache';
+import { PaginatedTable } from '@/components/PaginatedTable';
 import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
@@ -379,51 +380,100 @@ const parseCurrencyInput = (value: string): number => {
     ? parseFloat((project as any).kiwify_ticket_price) 
     : null;
   
-  const totalRevenue = (() => {
-    // Priority 1: If ticket price is configured, use it (quantity × price)
-    if (ticketPrice) {
-      return (filteredSales?.length || 0) * ticketPrice;
+  // Memoize all metrics calculations for performance
+  const calculatedMetrics = useMemo(() => {
+    const totalRevenue = (() => {
+      // Priority 1: If ticket price is configured, use it (quantity × price)
+      if (ticketPrice) {
+        return (filteredSales?.length || 0) * ticketPrice;
+      }
+      // Priority 2: Sum individual values (gross_amount if useGrossForRoas, otherwise amount)
+      return filteredSales?.reduce((sum, s) => {
+        const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
+        return sum + Number(valueToUse);
+      }, 0) || 0;
+    })();
+    
+    const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
+    const totalSales = filteredSales?.length || 0;
+    const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+
+    // Funnel metrics from Meta
+    const totalImpressions = filteredAdSpend?.reduce((sum, a) => sum + a.impressions, 0) || 0;
+    const totalReach = filteredAdSpend?.reduce((sum, a) => sum + (a.reach || 0), 0) || 0;
+    const totalLandingPageViews = filteredAdSpend?.reduce((sum, a) => sum + (a.landing_page_views || 0), 0) || 0;
+    const totalLinkClicks = filteredAdSpend?.reduce((sum, a) => sum + (a.link_clicks || 0), 0) || 0;
+
+    // Get daily budget from most recent ad spend record
+    const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
+
+    // New metrics: checkouts, thruplays, video 3s views
+    const totalCheckoutsInitiated = filteredAdSpend?.reduce((sum, a) => sum + (a.checkouts_initiated || 0), 0) || 0;
+    const totalThruplays = filteredAdSpend?.reduce((sum, a) => sum + (a.thruplays || 0), 0) || 0;
+    const totalVideo3sViews = filteredAdSpend?.reduce((sum, a) => sum + (a.video_3s_views || 0), 0) || 0;
+
+    // Calculated funnel metrics
+    const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
+    const avgCPC = totalLinkClicks > 0 ? totalSpend / totalLinkClicks : 0;
+    const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+    const ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
+
+    // Hybrid metrics (Meta + Kiwify)
+    const lpViewRate = totalLinkClicks > 0 ? (totalLandingPageViews / totalLinkClicks) * 100 : 0;
+    const custoPerVenda = totalSales > 0 ? totalSpend / totalSales : 0;
+    const vendaPerLP = totalLandingPageViews > 0 ? (totalSales / totalLandingPageViews) * 100 : 0;
+
+    // New calculated rates
+    const checkoutConversionRate = totalCheckoutsInitiated > 0 ? (totalSales / totalCheckoutsInitiated) * 100 : 0;
+    const creativeEngagementRate = totalVideo3sViews > 0 ? (totalThruplays / totalVideo3sViews) * 100 : 0;
+    const custoPerCheckout = totalCheckoutsInitiated > 0 ? totalSpend / totalCheckoutsInitiated : 0;
+
+    return {
+      totalRevenue,
+      totalSpend,
+      totalSales,
+      roas,
+      totalImpressions,
+      totalReach,
+      totalLandingPageViews,
+      totalLinkClicks,
+      totalCheckoutsInitiated,
+      totalThruplays,
+      totalVideo3sViews,
+      avgFrequency,
+      avgCPC,
+      avgCPM,
+      ctr,
+      lpViewRate,
+      custoPerVenda,
+      vendaPerLP,
+      checkoutConversionRate,
+      creativeEngagementRate,
+      custoPerCheckout,
+      dailyBudget,
+    };
+  }, [filteredSales, filteredAdSpend, ticketPrice, useGrossForRoas]);
+
+  // Destructure for easier use in JSX
+  const {
+    totalRevenue, totalSpend, totalSales, roas,
+    totalImpressions, totalReach, totalLandingPageViews, totalLinkClicks,
+    totalCheckoutsInitiated, totalThruplays, totalVideo3sViews,
+    avgFrequency, avgCPC, avgCPM, ctr,
+    lpViewRate, custoPerVenda, vendaPerLP,
+    checkoutConversionRate, creativeEngagementRate, custoPerCheckout, dailyBudget,
+  } = calculatedMetrics;
+
+  // Use metrics cache hook
+  const { updateCache } = useMetricsCache(id, dateRange);
+
+  // Update cache when metrics change (debounced)
+  useEffect(() => {
+    if (id && totalRevenue !== undefined && !salesLoading && !adSpendLoading) {
+      // Update cache with calculated metrics
+      updateCache(calculatedMetrics);
     }
-    // Priority 2: Sum individual values (gross_amount if useGrossForRoas, otherwise amount)
-    return filteredSales?.reduce((sum, s) => {
-      const valueToUse = useGrossForRoas ? ((s as any).gross_amount || s.amount) : s.amount;
-      return sum + Number(valueToUse);
-    }, 0) || 0;
-  })();
-  const totalSpend = filteredAdSpend?.reduce((sum, a) => sum + Number(a.spend), 0) || 0;
-  // totalClicks removed - using totalLinkClicks instead for accurate metrics
-  const totalSales = filteredSales?.length || 0;
-  const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-
-  // Funnel metrics from Meta
-  const totalImpressions = filteredAdSpend?.reduce((sum, a) => sum + a.impressions, 0) || 0;
-  const totalReach = filteredAdSpend?.reduce((sum, a) => sum + (a.reach || 0), 0) || 0;
-  const totalLandingPageViews = filteredAdSpend?.reduce((sum, a) => sum + (a.landing_page_views || 0), 0) || 0;
-  const totalLinkClicks = filteredAdSpend?.reduce((sum, a) => sum + (a.link_clicks || 0), 0) || 0;
-
-  // Get daily budget from most recent ad spend record (it's the same for all records of a campaign)
-  const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
-
-  // New metrics: checkouts, thruplays, video 3s views
-  const totalCheckoutsInitiated = filteredAdSpend?.reduce((sum, a) => sum + (a.checkouts_initiated || 0), 0) || 0;
-  const totalThruplays = filteredAdSpend?.reduce((sum, a) => sum + (a.thruplays || 0), 0) || 0;
-  const totalVideo3sViews = filteredAdSpend?.reduce((sum, a) => sum + (a.video_3s_views || 0), 0) || 0;
-
-  // Calculated funnel metrics
-  const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
-  const avgCPC = totalLinkClicks > 0 ? totalSpend / totalLinkClicks : 0;
-  const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
-  const ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
-
-  // Hybrid metrics (Meta + Kiwify)
-  const lpViewRate = totalLinkClicks > 0 ? (totalLandingPageViews / totalLinkClicks) * 100 : 0;
-  const custoPerVenda = totalSales > 0 ? totalSpend / totalSales : 0;
-  const vendaPerLP = totalLandingPageViews > 0 ? (totalSales / totalLandingPageViews) * 100 : 0;
-
-  // New calculated rates
-  const checkoutConversionRate = totalCheckoutsInitiated > 0 ? (totalSales / totalCheckoutsInitiated) * 100 : 0;
-  const creativeEngagementRate = totalVideo3sViews > 0 ? (totalThruplays / totalVideo3sViews) * 100 : 0;
-  const custoPerCheckout = totalCheckoutsInitiated > 0 ? totalSpend / totalCheckoutsInitiated : 0;
+  }, [id, calculatedMetrics, salesLoading, adSpendLoading]);
 
   // Group sales by UTM
   const salesByUtm = filteredSales?.reduce((acc, sale) => {
@@ -1040,7 +1090,45 @@ const parseCurrencyInput = (value: string): number => {
           </div>
         </div>
 
-        {/* Delete Project Dialog */}
+        {/* UTM Attribution Table */}
+        {utmData.length > 0 && (
+          <Card className="mb-6 sm:mb-8">
+            <CardHeader>
+              <CardTitle className="text-base sm:text-lg">📊 Atribuição por UTM</CardTitle>
+              <CardDescription>Vendas e receita agrupadas por origem de tráfego</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PaginatedTable
+                data={utmData}
+                columns={[
+                  { key: 'source', header: 'Origem', className: 'font-medium' },
+                  { key: 'medium', header: 'Mídia' },
+                  { key: 'campaign', header: 'Campanha', className: 'max-w-[200px] truncate' },
+                  { 
+                    key: 'count', 
+                    header: 'Vendas', 
+                    className: 'text-right',
+                    render: (row) => <span className="font-semibold">{row.count}</span>
+                  },
+                  { 
+                    key: 'revenue', 
+                    header: 'Receita', 
+                    className: 'text-right',
+                    render: (row) => (
+                      <span className="font-semibold text-success">
+                        {formatCurrency(row.revenue)}
+                      </span>
+                    )
+                  },
+                ]}
+                defaultPageSize={10}
+                pageSizeOptions={[10, 25, 50]}
+                emptyMessage="Nenhuma venda com dados de UTM"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         <DeleteProjectDialog
           projectName={project?.name || ''}
           isOpen={deleteDialogOpen}
