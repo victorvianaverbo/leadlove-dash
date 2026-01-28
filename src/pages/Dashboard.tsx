@@ -1,59 +1,73 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, FolderOpen, LogOut, Loader2, TrendingUp, DollarSign, Target, BarChart3, HelpCircle, Crown, Settings, Trash2 } from "lucide-react";
+import { Plus, LogOut, Loader2, BarChart3, HelpCircle, Crown, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { STRIPE_PLANS } from "@/lib/stripe-plans";
 import { toast } from "@/hooks/use-toast";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import { 
+  ProjectCard, 
+  PlanCard, 
+  DashboardHeader, 
+  NewProjectCard, 
+  EmptyState 
+} from "@/components/dashboard";
 
 // Skeleton component for loading state
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
       {/* Plan Card Skeleton */}
-      <Card className="border-border">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <Skeleton className="w-10 h-10 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-3 w-48" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="h-24 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 animate-pulse" />
       
-      {/* Projects Section */}
+      {/* Header Skeleton */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="flex gap-3">
+          <Skeleton className="h-20 w-36 rounded-xl" />
+          <Skeleton className="h-20 w-32 rounded-xl" />
+        </div>
+      </div>
+      
+      {/* Projects Grid Skeleton */}
       <div>
         <Skeleton className="h-6 w-32 mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader className="pb-4">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-3 w-1/2 mt-2" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-border">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-24" />
+            <Card key={i} className="overflow-hidden">
+              <div className="h-1 bg-primary/30" />
+              <div className="p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
                 </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-24" />
+                <div className="grid grid-cols-3 gap-2">
+                  {[1, 2, 3].map((j) => (
+                    <Skeleton key={j} className="h-20 rounded-lg" />
+                  ))}
                 </div>
-                <div className="flex justify-between py-2">
-                  <Skeleton className="h-4 w-12" />
-                  <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <div className="flex items-center justify-between pt-3 border-t">
+                  <div className="flex gap-1.5">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-14 rounded-full" />
+                  </div>
+                  <Skeleton className="h-7 w-24" />
                 </div>
-              </CardContent>
+              </div>
             </Card>
           ))}
         </div>
@@ -61,13 +75,6 @@ function DashboardSkeleton() {
     </div>
   );
 }
-
-const formatCurrency = (value: number) => {
-  return value.toLocaleString('pt-BR', { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
-  });
-};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -83,10 +90,23 @@ export default function Dashboard() {
     }
   }, [user, loading, navigate]);
 
+  // Query for user profile
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user!.id)
+        .single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: projects, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: ['projects', user?.id],
     queryFn: async () => {
-      // Verificar se sessão ainda é válida
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Session expired');
@@ -95,20 +115,32 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
     enabled: !!user,
     retry: (failureCount, error) => {
-      // Não tentar novamente se sessão expirou
       if (error instanceof Error && error.message === 'Session expired') return false;
       return failureCount < 3;
     },
   });
 
-  // Se sessão expirou, redirecionar para login
+  // Query for project integrations
+  const { data: projectIntegrations } = useQuery({
+    queryKey: ['project-integrations', projects?.map(p => p.id)],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('integrations')
+        .select('project_id, type, is_active')
+        .in('project_id', projects?.map(p => p.id) || [])
+        .eq('is_active', true);
+      return data || [];
+    },
+    enabled: !!projects?.length,
+  });
+
   useEffect(() => {
     if (projectsError instanceof Error && projectsError.message === 'Session expired') {
       signOut();
@@ -121,7 +153,6 @@ export default function Dashboard() {
     queryFn: async () => {
       if (!projects?.length) return {};
       
-      // Limitar aos últimos 30 dias para carregamento mais rápido
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
@@ -133,7 +164,6 @@ export default function Dashboard() {
 
       const metrics: Record<string, { revenue: number; spend: number }> = {};
 
-      // Create a map of project settings for quick lookup (including ticket price)
       const projectSettings = new Map(projects.map(p => [
         p.id,
         {
@@ -142,13 +172,11 @@ export default function Dashboard() {
         }
       ]));
 
-      // First, count sales by project (for projects with ticket price)
       const salesCountByProject: Record<string, number> = {};
       salesResult.data?.forEach((sale: any) => {
         salesCountByProject[sale.project_id] = (salesCountByProject[sale.project_id] || 0) + 1;
       });
 
-      // Calculate revenue with priority logic: ticketPrice > gross > amount
       salesResult.data?.forEach((sale: any) => {
         if (!metrics[sale.project_id]) {
           metrics[sale.project_id] = { revenue: 0, spend: 0 };
@@ -157,12 +185,10 @@ export default function Dashboard() {
         const settings = projectSettings.get(sale.project_id);
         const ticketPrice = settings?.ticketPrice;
         
-        // If has ticket price, calculate only once per project
         if (ticketPrice && metrics[sale.project_id].revenue === 0) {
           const salesCount = salesCountByProject[sale.project_id] || 0;
           metrics[sale.project_id].revenue = salesCount * ticketPrice;
         } else if (!ticketPrice) {
-          // No ticket price: use gross or amount
           const useGross = settings?.useGross;
           const valueToUse = useGross ? (sale.gross_amount || sale.amount) : sale.amount;
           metrics[sale.project_id].revenue += Number(valueToUse) || 0;
@@ -179,8 +205,27 @@ export default function Dashboard() {
       return metrics;
     },
     enabled: !!user && !!projects?.length,
-    staleTime: 2 * 60 * 1000, // 2 minutos de cache
+    staleTime: 2 * 60 * 1000,
   });
+
+  // Calculate global metrics
+  const globalMetrics = useMemo(() => {
+    if (!projectMetrics || !projects?.length) {
+      return { totalRevenue: 0, totalSpend: 0, averageRoas: 0 };
+    }
+
+    let totalRevenue = 0;
+    let totalSpend = 0;
+
+    Object.values(projectMetrics).forEach((m) => {
+      totalRevenue += m.revenue;
+      totalSpend += m.spend;
+    });
+
+    const averageRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+
+    return { totalRevenue, totalSpend, averageRoas };
+  }, [projectMetrics, projects]);
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -204,18 +249,17 @@ export default function Dashboard() {
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
-      // Delete related data first
       await supabase.from('daily_reports').delete().eq('project_id', projectId);
       await supabase.from('integrations').delete().eq('project_id', projectId);
       await supabase.from('ad_spend').delete().eq('project_id', projectId);
       await supabase.from('sales').delete().eq('project_id', projectId);
-      // Delete project
       const { error } = await supabase.from('projects').delete().eq('id', projectId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['project-integrations'] });
       setDeleteDialogOpen(false);
       setProjectToDelete(null);
       toast({
@@ -252,26 +296,30 @@ export default function Dashboard() {
     return { ...metrics, roas };
   };
 
+  const getProjectIntegrations = (projectId: string) => {
+    return projectIntegrations?.filter(i => i.project_id === projectId) || [];
+  };
+
   const currentPlan = subscriptionTier ? STRIPE_PLANS[subscriptionTier] : null;
   const projectLimit = currentPlan?.projects ?? 0;
   const canCreateProject = projectLimit === -1 || (projects?.length ?? 0) < projectLimit;
+  const isMaxPlan = subscriptionTier === 'agencia';
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-40">
-          <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-          {/* Mobile: Stack layout */}
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Logo + Plan Badge */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-primary rounded-lg sm:rounded-xl">
-                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+              <div className="p-1.5 sm:p-2 gradient-primary rounded-lg sm:rounded-xl shadow-purple-sm">
+                <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <span className="font-bold text-lg sm:text-xl">MetrikaPRO</span>
+              <span className="font-bold text-lg sm:text-xl font-display">MetrikaPRO</span>
               {subscribed && currentPlan && (
                 <Badge variant="secondary" className="flex items-center gap-1 text-xs">
-                  <Crown className="h-3 w-3" />
+                  <Crown className="h-3 w-3 text-primary" />
                   <span className="hidden sm:inline">{currentPlan.name}</span>
                 </Badge>
               )}
@@ -310,7 +358,8 @@ export default function Dashboard() {
                   onClick={() => navigate('/projects/new')}
                   variant={canCreateProject ? 'default' : 'outline'}
                   size="sm"
-                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                  className={`h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm ${canCreateProject ? 'gradient-primary border-0' : ''}`}
+                  disabled={!canCreateProject}
                 >
                   <Plus className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">{canCreateProject ? 'Novo Projeto' : 'Limite'}</span>
@@ -327,165 +376,87 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-light">Gerencie seus projetos e métricas</p>
-        </div>
-
-        {/* Subscription Info */}
-        {!subscribed && !subscriptionLoading && (
-          <Card className="mb-6 sm:mb-8 border-border">
-            <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-base sm:text-lg">Você ainda não tem uma assinatura ativa</h3>
-                  <p className="text-muted-foreground text-xs sm:text-sm mt-1">
-                    Escolha um plano para começar a criar projetos.
-                  </p>
-                </div>
-                <Button asChild size="sm" className="w-full sm:w-auto">
-                  <Link to="/pricing">Ver Planos</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {subscribed && currentPlan && (
-          <Card className="mb-6 sm:mb-8 border-success/20 bg-success/5">
-            <CardContent className="py-3 sm:py-4 px-4 sm:px-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-success/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm sm:text-base">Plano {currentPlan.name}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                      {projectLimit === -1 
-                        ? 'Projetos ilimitados' 
-                        : `${projects?.length ?? 0}/${projectLimit} projetos`}
-                      {subscriptionEnd && (
-                        <span className="hidden sm:inline"> • Renova em {new Date(subscriptionEnd).toLocaleDateString('pt-BR')}</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Show skeleton while loading subscription or projects */}
+        {/* Show skeleton while loading */}
         {(subscriptionLoading || projectsLoading) ? (
           <DashboardSkeleton />
         ) : (
-        /* Projects */
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 tracking-tight">Seus Projetos</h2>
-          {!subscribed ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 sm:py-12 text-center px-4">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">Assine um plano para criar projetos</p>
-                <Button asChild size="sm">
-                  <Link to="/pricing">Ver Planos</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : projects?.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 sm:py-12 text-center px-4">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary-soft rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                </div>
-                <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">Você ainda não tem projetos</p>
-                <Button onClick={() => navigate('/projects/new')} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Criar Primeiro Projeto
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {projects?.map((project, index) => {
-                const { revenue, spend, roas } = getProjectMetrics(project.id);
-                const isPositiveRoas = roas >= 1;
-                
-                return (
-                  <Card
-                    key={project.id}
-                    className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all duration-200 overflow-hidden group relative"
-                    onClick={() => navigate(`/projects/${project.id}`)}
-                    style={{ animationDelay: `${index * 0.05}s` }}
-                  >
-                    {/* Header */}
-                    <CardHeader className="pb-4 p-5">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base font-semibold group-hover:text-primary transition-colors">
-                          {project.name}
-                        </CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      {project.last_sync_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Atualizado em {new Date(project.last_sync_at).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                    </CardHeader>
+          <>
+            {/* No Subscription Card */}
+            {!subscribed && (
+              <Card className="mb-6 sm:mb-8 border-primary/20 bg-primary/5">
+                <CardContent className="py-4 sm:py-6 px-4 sm:px-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-base sm:text-lg font-display">Você ainda não tem uma assinatura ativa</h3>
+                      <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+                        Escolha um plano para começar a criar projetos.
+                      </p>
+                    </div>
+                    <Button asChild size="sm" className="w-full sm:w-auto gradient-primary border-0">
+                      <Link to="/pricing">Ver Planos</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-                    <CardContent className="p-5 pt-0 space-y-3">
-                      {/* Faturamento */}
-                      <div className="flex items-center justify-between py-2 border-b border-border">
-                        <span className="text-sm text-muted-foreground">Faturamento</span>
-                        <span className="text-sm font-semibold text-success">
-                          R$ {formatCurrency(revenue)}
-                        </span>
-                      </div>
-                      
-                      {/* Investimento */}
-                      <div className="flex items-center justify-between py-2 border-b border-border">
-                        <span className="text-sm text-muted-foreground">Investimento</span>
-                        <span className="text-sm font-semibold text-destructive">
-                          R$ {formatCurrency(spend)}
-                        </span>
-                      </div>
-                      
-                      {/* ROAS */}
-                      <div className="flex items-center justify-between py-2">
-                        <span className="text-sm text-muted-foreground">ROAS</span>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-semibold ${isPositiveRoas ? 'text-success' : 'text-destructive'}`}>
-                            {roas.toFixed(2)}x
-                          </span>
-                          <Badge 
-                            variant="outline" 
-                            className={`text-[10px] px-1.5 py-0 h-5 ${
-                              isPositiveRoas 
-                                ? 'border-success/30 text-success bg-success/5' 
-                                : 'border-destructive/30 text-destructive bg-destructive/5'
-                            }`}
-                          >
-                            {isPositiveRoas ? 'Lucrativo' : 'Negativo'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            {/* Plan Card */}
+            {subscribed && currentPlan && (
+              <div className="mb-6 sm:mb-8">
+                <PlanCard
+                  planName={currentPlan.name}
+                  projectCount={projects?.length ?? 0}
+                  projectLimit={projectLimit}
+                  subscriptionEnd={subscriptionEnd}
+                  isMaxPlan={isMaxPlan}
+                />
+              </div>
+            )}
+
+            {/* Dashboard Header with Summary */}
+            <DashboardHeader
+              userName={profile?.full_name}
+              projectCount={projects?.length ?? 0}
+              totalRevenue={globalMetrics.totalRevenue}
+              averageRoas={globalMetrics.averageRoas}
+            />
+
+            {/* Projects Section */}
+            <div>
+              <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 tracking-tight font-display">
+                Seus Projetos
+              </h2>
+              
+              {!subscribed ? (
+                <EmptyState hasSubscription={false} />
+              ) : projects?.length === 0 ? (
+                <EmptyState 
+                  hasSubscription={true}
+                  onCreateProject={() => navigate('/projects/new')}
+                />
+              ) : (
+                <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects?.map((project, index) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      metrics={getProjectMetrics(project.id)}
+                      integrations={getProjectIntegrations(project.id)}
+                      onDelete={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
+                      onClick={() => navigate(`/projects/${project.id}`)}
+                      index={index}
+                    />
+                  ))}
+                  
+                  {/* New Project Card */}
+                  <NewProjectCard
+                    onClick={() => navigate('/projects/new')}
+                    disabled={!canCreateProject}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
         )}
 
         {/* Delete Project Dialog */}

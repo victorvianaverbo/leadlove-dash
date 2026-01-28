@@ -3,50 +3,50 @@
 @tailwind utilities;
 
 /* 
- * MetrikaPRO Design System
- * Clean, Professional, Minimal
- * Inspired by Stripe & Linear
+ * MetrikaPRO Design System v2.0
+ * Professional Purple Theme
+ * Typography: Poppins (display) + Inter (body)
  */
 
 @layer base {
   :root {
-    /* Cores Primárias - Azul Corporativo Discreto */
-    --primary: 220 14% 22%;           /* Cinza escuro corporativo */
+    /* Cores Primárias - Roxo Vibrante MetrikaPRO */
+    --primary: 263 70% 50%;           /* #8B5CF6 - Roxo vibrante */
     --primary-foreground: 0 0% 100%;  /* Branco */
     
     /* Variações de Primária */
-    --primary-dark: 220 20% 16%;      /* Mais escuro para hover */
-    --primary-light: 220 10% 40%;     /* Cinza médio */
-    --primary-muted: 220 10% 96%;     /* Cinza muito claro */
-    --primary-soft: 220 10% 97%;      /* Quase branco */
+    --primary-dark: 263 70% 42%;      /* #7C3AED - Hover */
+    --primary-light: 263 70% 60%;     /* #A78BFA - Light */
+    --primary-muted: 263 30% 96%;     /* Roxo muito claro */
+    --primary-soft: 263 30% 98%;      /* Quase branco */
     
     /* Cores Neutras */
-    --background: 0 0% 98%;           /* Branco suave */
-    --foreground: 220 43% 11%;        /* #111827 - Gray 900 */
+    --background: 0 0% 99%;           /* #FCFCFC */
+    --foreground: 240 10% 4%;         /* #0A0A0B */
     
     --card: 0 0% 100%;                /* Branco puro */
-    --card-foreground: 220 43% 11%;   /* #111827 */
+    --card-foreground: 240 10% 4%;    /* #0A0A0B */
     
     --popover: 0 0% 100%;
-    --popover-foreground: 220 43% 11%;
+    --popover-foreground: 240 10% 4%;
     
     /* Secundárias */
-    --secondary: 220 14% 96%;         /* #F3F4F6 - Gray 100 */
-    --secondary-foreground: 220 43% 11%;
+    --secondary: 240 5% 96%;          /* #F4F4F5 */
+    --secondary-foreground: 240 10% 4%;
     
     /* Muted */
-    --muted: 220 14% 96%;             /* #F3F4F6 */
-    --muted-foreground: 220 9% 46%;   /* #6B7280 - Gray 500 */
+    --muted: 240 5% 96%;              /* #F4F4F5 */
+    --muted-foreground: 240 4% 46%;   /* #71717A */
     
-    /* Accent - Azul discreto para ações */
-    --accent: 217 91% 60%;            /* #3B82F6 - Blue 500 */
+    /* Accent - Roxo */
+    --accent: 263 70% 50%;            /* #8B5CF6 */
     --accent-foreground: 0 0% 100%;   /* Branco */
     
     /* Semânticas */
     --destructive: 0 84% 60%;         /* #EF4444 - Error Red */
     --destructive-foreground: 0 0% 100%;
     
-    --success: 160 84% 39%;           /* #10B981 - Success Green */
+    --success: 142 76% 36%;           /* #22C55E - Success Green */
     --success-foreground: 0 0% 100%;
     
     --warning: 38 92% 50%;            /* #F59E0B - Warning Yellow */
@@ -56,61 +56,66 @@
     --info-foreground: 0 0% 100%;
     
     /* Bordas e Inputs */
-    --border: 220 13% 91%;            /* #E5E7EB - Gray 200 */
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;              /* Azul para focus ring */
+    --border: 240 6% 90%;             /* #E4E4E7 */
+    --input: 240 6% 90%;
+    --ring: 263 70% 50%;              /* Roxo para focus ring */
     
     --radius: 0.5rem;
     
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 220 14% 22%;
+    --sidebar-foreground: 240 4% 46%;
+    --sidebar-primary: 263 70% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
-    --sidebar-accent-foreground: 220 43% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 263 30% 96%;
+    --sidebar-accent-foreground: 240 10% 4%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-ring: 263 70% 50%;
   }
 
   .dark {
     /* Dark mode */
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
     
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 10% 8%;
+    --card-foreground: 0 0% 98%;
     
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 10% 8%;
+    --popover-foreground: 0 0% 98%;
     
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 263 70% 60%;           /* #A78BFA */
+    --primary-foreground: 240 10% 4%;
     
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --primary-dark: 263 70% 50%;
+    --primary-light: 263 70% 70%;
+    --primary-muted: 263 30% 15%;
+    --primary-soft: 263 30% 12%;
     
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
     
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    
+    --accent: 263 70% 60%;
+    --accent-foreground: 0 0% 98%;
     
     --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 98%;
     
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 263 70% 60%;
     
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 240 10% 8%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 263 70% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 240 4% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 4% 16%;
+    --sidebar-ring: 263 70% 60%;
   }
 }
 
@@ -121,6 +126,11 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Poppins for display elements */
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Poppins', system-ui, sans-serif;
   }
 }
 
@@ -141,8 +151,49 @@
   border-color: hsl(var(--primary));
 }
 
-/* Animações Simples */
+/* ============================================
+   MetrikaPRO Utility Classes
+   ============================================ */
+
 @layer utilities {
+  /* Card Elevation Effect */
+  .card-elevate {
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  .card-elevate:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -8px rgba(139, 92, 246, 0.15);
+  }
+  
+  /* Purple Shadow */
+  .shadow-purple {
+    box-shadow: 0 10px 40px -10px rgba(139, 92, 246, 0.3);
+  }
+  
+  .shadow-purple-sm {
+    box-shadow: 0 4px 12px -4px rgba(139, 92, 246, 0.2);
+  }
+  
+  /* Gradients */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(263 70% 50%) 0%, hsl(263 70% 42%) 100%);
+  }
+  
+  .gradient-success {
+    background: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 76% 30%) 100%);
+  }
+  
+  .gradient-purple-indigo {
+    background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #4F46E5 100%);
+  }
+  
+  /* Font utilities */
+  .font-poppins {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  /* Animation keyframes */
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -165,12 +216,27 @@
     }
   }
   
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
   .animate-fade-in {
     animation: fadeIn 0.4s ease-out forwards;
   }
   
   .animate-slide-up {
     animation: slideUp 0.5s ease-out forwards;
+  }
+  
+  .animate-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
   }
   
   /* Card hover sutil */
