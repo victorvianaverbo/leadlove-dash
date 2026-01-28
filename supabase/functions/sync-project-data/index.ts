@@ -657,10 +657,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use service key for both auth validation and database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -671,7 +672,7 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims(token);
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
     
     if (authError || !claimsData?.claims) {
       console.error('Auth error:', authError?.message || 'No claims found');
