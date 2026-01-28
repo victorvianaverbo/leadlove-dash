@@ -5,6 +5,54 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ============ PHASE 1 HELPERS ============
+
+/**
+ * Fetch with automatic retry and exponential backoff for rate limiting (429) and server errors (5xx)
+ * This prevents silent failures when APIs are overloaded
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+
+    // Rate limit or server error - retry with exponential backoff
+    if (response.status === 429 || response.status >= 500) {
+      if (attempt === maxRetries) {
+        console.warn(`fetchWithRetry: Max retries (${maxRetries}) reached for ${url}, returning last response`);
+        return response;
+      }
+
+      const retryAfter = response.headers.get('Retry-After');
+      const waitTime = retryAfter
+        ? parseInt(retryAfter) * 1000
+        : Math.pow(2, attempt) * 1000; // 2s, 4s, 8s exponential backoff
+
+      console.log(`fetchWithRetry: Attempt ${attempt} failed (${response.status}). Retrying in ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+
+    return response;
+  }
+  throw new Error(`fetchWithRetry: Max retries exceeded for ${url}`);
+}
+
+/**
+ * Parse and validate monetary amounts to prevent NaN/undefined in database
+ * Returns 0 for invalid values (null, undefined, negative, NaN)
+ */
+function parseAmount(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value));
+  return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+}
+
+// ============ END PHASE 1 HELPERS ============
+
 // Helper to get date in Brasília timezone (UTC-3)
 function getBrasiliaDate(daysAgo = 0): Date {
   const now = new Date();
@@ -181,7 +229,7 @@ Deno.serve(async (req) => {
       };
 
       // Get access token - Kiwify requires form-urlencoded format
-      const tokenResponse = await fetch('https://public-api.kiwify.com/v1/oauth/token', {
+      const tokenResponse = await fetchWithRetry('https://public-api.kiwify.com/v1/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -223,7 +271,7 @@ Deno.serve(async (req) => {
             });
 
             const salesUrl = `https://public-api.kiwify.com/v1/sales?${params.toString()}`;
-            const salesResponse = await fetch(salesUrl, {
+            const salesResponse = await fetchWithRetry(salesUrl, {
               headers: { 
                 'Authorization': `Bearer ${accessToken}`,
                 'x-kiwify-account-id': account_id
@@ -275,16 +323,16 @@ Deno.serve(async (req) => {
         for (const sale of allSales) {
           const tracking = sale.tracking || {};
           
-          // Valor líquido (parte do produtor após split de coprodução)
-          const netAmount = (sale.net_amount || sale.amount || 0) / 100;
+          // Valor líquido (parte do produtor após split de coprodução) - usando parseAmount para validação
+          const netAmount = parseAmount(sale.net_amount || sale.amount || 0) / 100;
           
           // Valor bruto: usar preço fixo se configurado, senão calcular
           let grossAmount: number;
           if (ticketPrice !== null) {
             grossAmount = ticketPrice;
           } else {
-            const chargeAmount = sale.payment?.charge_amount || 0;
-            const platformFee = sale.payment?.fee || 0;
+            const chargeAmount = parseAmount(sale.payment?.charge_amount || 0);
+            const platformFee = parseAmount(sale.payment?.fee || 0);
             grossAmount = chargeAmount > 0 
               ? (chargeAmount - platformFee) / 100 
               : netAmount;
@@ -337,7 +385,7 @@ Deno.serve(async (req) => {
       try {
         // Get access token from Hotmart
         console.log('Requesting Hotmart OAuth token...');
-        const tokenResponse = await fetch('https://api-sec-vlc.hotmart.com/security/oauth/token', {
+        const tokenResponse = await fetchWithRetry('https://api-sec-vlc.hotmart.com/security/oauth/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -370,7 +418,7 @@ Deno.serve(async (req) => {
           while (hasMore) {
             const salesUrl = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`;
             
-            const salesResponse = await fetch(salesUrl, {
+            const salesResponse = await fetchWithRetry(salesUrl, {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
@@ -386,8 +434,8 @@ Deno.serve(async (req) => {
               for (const sale of sales) {
                 const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
                 
-                // Hotmart: amount é o valor total, não há split visível na API
-                const saleAmount = (sale.purchase?.price?.value || sale.price || 0) / 100;
+                // Hotmart: amount é o valor total, não há split visível na API - usando parseAmount para validação
+                const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
                 
                 const { error: upsertError } = await supabase
                   .from('sales')
@@ -465,7 +513,7 @@ Deno.serve(async (req) => {
             const salesUrl = `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`;
             console.log(`Guru API request: ${salesUrl.replace(api_token, 'TOKEN')}`);
             
-            const salesResponse = await fetch(salesUrl, {
+            const salesResponse = await fetchWithRetry(salesUrl, {
               headers: {
                 'Authorization': `Bearer ${api_token}`,
                 'Content-Type': 'application/json',
@@ -484,8 +532,8 @@ Deno.serve(async (req) => {
             for (const sale of sales) {
               const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
               
-              // Guru: valor já vem em reais, não em centavos
-              const saleAmount = sale.amount || sale.value || sale.price || 0;
+              // Guru: valor já vem em reais, não em centavos - usando parseAmount para validação
+              const saleAmount = parseAmount(sale.amount || sale.value || sale.price || 0);
               
               const { error: upsertError } = await supabase
                 .from('sales')
@@ -649,13 +697,13 @@ Deno.serve(async (req) => {
               adset_name: insight.adset_name,
               ad_id: insight.ad_id,
               ad_name: insight.ad_name,
-              spend: parseFloat(insight.spend || '0'),
+              spend: parseAmount(insight.spend),
               impressions: parseInt(insight.impressions || '0'),
               clicks: parseInt(insight.clicks || '0'),
               reach: parseInt(insight.reach || '0'),
-              frequency: parseFloat(insight.frequency || '0'),
-              cpc: parseFloat(insight.cpc || '0'),
-              cpm: parseFloat(insight.cpm || '0'),
+              frequency: parseAmount(insight.frequency),
+              cpc: parseAmount(insight.cpc),
+              cpm: parseAmount(insight.cpm),
               link_clicks: parseInt(insight.inline_link_clicks || '0'),
               landing_page_views: landingPageViews,
               daily_budget: campaignBudgets[campaignId] || 0,
