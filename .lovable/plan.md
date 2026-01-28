@@ -1,260 +1,91 @@
 
-# Plano de Redesign Profissional - Dashboard de Projetos
+# Plano de Correção - Sincronização de Vendas Guru e Hotmart
 
-## Visão Geral
+## Problema Identificado
 
-Transformação completa da página de Dashboard para um design enterprise com paleta roxa, tipografia Poppins/Inter, cards profissionais com avatares, métricas com ícones coloridos, badges de status e micro-interações avançadas.
+O projeto **Medsimple** tem **0 vendas sincronizadas** apesar de ter integrações Hotmart (36 produtos) e Guru (18 produtos) configuradas corretamente. Os logs revelam dois erros críticos nas APIs:
+
+### Erro 1: Guru DMG - Parâmetros de Data Incorretos
+A API v2 do Guru **não aceita** `start_date` e `end_date`. Ela requer:
+- `confirmed_at_ini` / `confirmed_at_end` (formato: `YYYY-MM-DD`)
+- Ou `ordered_at_ini` / `ordered_at_end`
+
+### Erro 2: Hotmart - Parâmetro Inválido
+Alguns product_ids podem estar em formato incorreto ou referenciando produtos inativos/ofertas.
 
 ---
 
-## Fase 1: Fundação do Design System
+## Correções Propostas
 
-### 1.1 Tipografia (Poppins + Inter)
+### 1. Corrigir Endpoint da API Guru
 
-**Arquivo: `index.html`**
-- Adicionar Google Fonts Poppins + Inter
-- Remover Lato atual
+**Arquivo:** `supabase/functions/sync-project-data/index.ts`
 
-**Arquivo: `tailwind.config.ts`**
-- `font-sans: ['Inter', 'system-ui', 'sans-serif']` (corpo)
-- `font-display: ['Poppins', 'system-ui', 'sans-serif']` (títulos)
-
-### 1.2 Paleta Roxa MetrikaPRO
-
-**Arquivo: `src/index.css`**
-
-Novas variáveis CSS:
+Alterar de:
 ```text
-Light Mode:
---primary: 263 70% 50%           (#8B5CF6 - Roxo vibrante)
---primary-dark: 263 70% 42%      (#7C3AED - Hover)
---primary-light: 263 70% 60%     (#A78BFA - Light)
-
-Gradientes:
---gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9)
---gradient-success: linear-gradient(135deg, #22C55E, #16A34A)
+/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}
 ```
 
-### 1.3 Classes Utilitárias
-
-Adicionar em `src/index.css`:
-- `.shadow-purple` - sombra roxa para hover
-- `.card-elevate` - efeito de elevação (-4px)
-- `.animate-shimmer` - animação de loading
-- `.font-poppins` - classe para Poppins
-
----
-
-## Fase 2: Componentes Reutilizáveis
-
-### 2.1 Novo Componente: ProjectCard
-
-**Arquivo: `src/components/dashboard/ProjectCard.tsx`**
-
-Estrutura do card:
+Para:
 ```text
-┌─────────────────────────────────────────────┐
-│ ██████ (barra colorida 2px: roxo/verde/vermelho)
-├─────────────────────────────────────────────┤
-│ [RT] Roberley - TiozãodaIA      [⋮]        │
-│      ⏰ Atualizado há 2 horas               │
-├─────────────────────────────────────────────┤
-│ ┌───────┐ ┌───────┐ ┌───────┐               │
-│ │💰     │ │📉     │ │📊     │               │
-│ │Fatur. │ │Invest.│ │ROAS   │               │
-│ │R$450  │ │R$320  │ │1.41x  │               │
-│ │—      │ │—      │ │✓ Lucr │               │
-│ └───────┘ └───────┘ └───────┘               │
-├─────────────────────────────────────────────┤
-│ [Meta Ads] [Hotmart]    [Ver Dashboard →]   │
-└─────────────────────────────────────────────┘
+/api/v2/transactions?product_id=${productId}&confirmed_at_ini=${startDate}&confirmed_at_end=${endDate}
 ```
 
-Props:
-- `project` - dados do projeto
-- `metrics` - { revenue, spend, roas }
-- `integrations` - array de tipos conectados
-- `onDelete` - callback para deletar
-- `onClick` - callback para navegação
+### 2. Adicionar Tratamento de Erro Robusto para Hotmart
 
-Features:
-- Avatar com iniciais (gradiente roxo)
-- Barra colorida no topo baseada no ROAS
-- Grid 3 colunas para métricas com ícones em fundo pastel
-- Tags de integrações conectadas
-- Hover: `translateY(-4px)` + sombra roxa
+- Continuar processando outros produtos mesmo quando um falhar
+- Logar quais produtos específicos falharam para diagnóstico
+- Verificar se o product_id é numérico (Hotmart usa IDs numéricos)
 
-### 2.2 Componente: PlanCard Premium
+### 3. Adicionar Retry com Parâmetros Alternativos para Guru
 
-**Arquivo: `src/components/dashboard/PlanCard.tsx`**
-
-Design:
-- Gradiente roxo para indigo
-- Ícone Crown em fundo branco/20
-- Barra de progresso de projetos
-- Efeito de brilho (círculo blur)
-- Botão upgrade se não for plano máximo
-
-### 2.3 Componente: DashboardHeader
-
-**Arquivo: `src/components/dashboard/DashboardHeader.tsx`**
-
-Features:
-- Saudação personalizada: "Olá, {nome}! 👋"
-- Subtítulo: "Aqui está o resumo dos seus X projetos"
-- Cards de resumo: Faturamento Total + ROAS Médio
-- Gradientes roxo e verde nos cards de resumo
-
-### 2.4 Componente: NewProjectCard
-
-**Arquivo: `src/components/dashboard/NewProjectCard.tsx`**
-
-Design:
-- Borda tracejada
-- Ícone Plus em círculo
-- Hover: borda roxa, fundo roxo claro
+Se `confirmed_at_ini` falhar, tentar com `ordered_at_ini` como fallback.
 
 ---
 
-## Fase 3: Queries Adicionais
+## Arquivos a Modificar
 
-### 3.1 Buscar Integrações por Projeto
+| Arquivo | Modificação |
+|---------|-------------|
+| `supabase/functions/sync-project-data/index.ts` | Corrigir parâmetros da API Guru (linha ~455) |
+| `supabase/functions/sync-project-data/index.ts` | Melhorar tratamento de erros Hotmart (linha ~371) |
 
-Adicionar query em `Dashboard.tsx`:
+---
+
+## Detalhes Técnicos da Correção
+
+### Função syncGuru - Linha 454-455
+
+**Antes:**
 ```typescript
-const { data: projectIntegrations } = useQuery({
-  queryKey: ['project-integrations', projects?.map(p => p.id)],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('integrations')
-      .select('project_id, type, is_active')
-      .in('project_id', projects?.map(p => p.id) || [])
-      .eq('is_active', true);
-    return data;
-  },
-  enabled: !!projects?.length,
-});
+const salesResponse = await fetchWithRetry(
+  `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`,
 ```
 
-### 3.2 Buscar Nome do Usuário
-
-Adicionar query para perfil:
+**Depois:**
 ```typescript
-const { data: profile } = useQuery({
-  queryKey: ['user-profile', user?.id],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('user_id', user.id)
-      .single();
-    return data;
-  },
-  enabled: !!user,
-});
+const salesResponse = await fetchWithRetry(
+  `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&confirmed_at_ini=${startDate}&confirmed_at_end=${endDate}&page=${page}&per_page=100`,
 ```
 
----
+### Função syncHotmart - Melhorar Logs
 
-## Fase 4: Refatoração do Dashboard.tsx
-
-### 4.1 Estrutura do Layout
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ HEADER (logo + actions)                                 │
-├─────────────────────────────────────────────────────────┤
-│ DASHBOARD HEADER                                        │
-│ ┌────────────────────────────┬────────────────────────┐ │
-│ │ Olá, Victor! 👋            │ [Fatur.] [ROAS Médio]  │ │
-│ │ Resumo de 5 projetos       │ R$1.593  0.72x        │ │
-│ └────────────────────────────┴────────────────────────┘ │
-├─────────────────────────────────────────────────────────┤
-│ PLAN CARD (gradiente premium)                           │
-├─────────────────────────────────────────────────────────┤
-│ SEUS PROJETOS                                           │
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐         │
-│ │ ProjectCard │ │ ProjectCard │ │ ProjectCard │         │
-│ └─────────────┘ └─────────────┘ └─────────────┘         │
-│ ┌─────────────┐                                         │
-│ │NewProjectCard│                                        │
-│ └─────────────┘                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 4.2 Cálculos de Métricas Globais
-
-Adicionar `useMemo` para:
-- Faturamento Total: soma de todos os projetos
-- ROAS Médio: média ponderada
-- Contagem de projetos lucrativos/negativos
+Adicionar log mais detalhado para identificar quais produtos estão falhando e por quê, sem interromper a sincronização dos demais.
 
 ---
 
-## Fase 5: Atualização do Badge
+## Próximos Passos Após Correção
 
-### 5.1 Variantes de Badge
-
-**Arquivo: `src/components/ui/badge.tsx`**
-
-Adicionar variantes:
-- `trend-up` - verde com ícone ↑
-- `trend-down` - vermelho com ícone ↓
-- `integration` - estilo para tags (Meta Ads, Hotmart, etc.)
-
----
-
-## Fase 6: Empty State Aprimorado
-
-### 6.1 Design do Empty State
-
-Quando não há projetos:
-- Ilustração SVG ou ícone grande
-- Título: "Nenhum projeto ainda"
-- Descrição explicativa
-- Botão CTA com gradiente
-
----
-
-## Resumo de Arquivos
-
-| Arquivo | Ação |
-|---------|------|
-| `index.html` | Atualizar fonts |
-| `tailwind.config.ts` | Adicionar font-family |
-| `src/index.css` | Nova paleta roxa + utilitários |
-| `src/components/ui/badge.tsx` | Adicionar variantes |
-| `src/components/dashboard/ProjectCard.tsx` | Criar |
-| `src/components/dashboard/PlanCard.tsx` | Criar |
-| `src/components/dashboard/DashboardHeader.tsx` | Criar |
-| `src/components/dashboard/NewProjectCard.tsx` | Criar |
-| `src/pages/Dashboard.tsx` | Refatorar completo |
-
----
-
-## Dependências de Dados
-
-### Tabelas Utilizadas
-- `projects` - dados dos projetos
-- `profiles` - nome do usuário (full_name)
-- `integrations` - tipos conectados por projeto (type, is_active)
-- `sales` / `ad_spend` - métricas (já implementado)
-
-### Campos da Tabela Integrations
-```text
-- id: string
-- project_id: string
-- type: string (meta_ads, hotmart, kiwify, guru, eduzz)
-- is_active: boolean
-```
+1. Deploy da edge function atualizada
+2. Executar sincronização manual do projeto Medsimple
+3. Verificar logs para confirmar que vendas estão sendo capturadas
+4. Validar dados no banco
 
 ---
 
 ## Resultado Esperado
 
-1. **Visual Premium**: Gradientes roxos, sombras sutis, tipografia refinada
-2. **Hierarquia Clara**: Cards com avatares, métricas organizadas em grid
-3. **Feedback Visual**: Cores semânticas (verde=lucro, vermelho=negativo)
-4. **Contexto Rico**: Tags de integrações, timestamps relativos
-5. **Micro-interações**: Hover com elevação, transições suaves 300ms
-6. **Responsividade**: 1 coluna mobile, 2 tablet, 3 desktop
+Após a correção:
+- Vendas do Guru serão sincronizadas corretamente usando `confirmed_at_ini`
+- Erros de produtos individuais do Hotmart não bloquearão a sincronização dos demais
+- Logs mais claros para diagnóstico futuro
