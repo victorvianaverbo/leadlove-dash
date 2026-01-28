@@ -218,6 +218,51 @@ export type Database = {
           },
         ]
       }
+      metrics_cache: {
+        Row: {
+          cache_date: string
+          created_at: string
+          date_range: string
+          id: string
+          metrics: Json
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          cache_date: string
+          created_at?: string
+          date_range?: string
+          id?: string
+          metrics?: Json
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          cache_date?: string
+          created_at?: string
+          date_range?: string
+          id?: string
+          metrics?: Json
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrics_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metrics_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
