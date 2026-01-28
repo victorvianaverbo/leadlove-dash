@@ -1,147 +1,260 @@
 
+# Plano de Redesign Profissional - Dashboard de Projetos
 
-# Fase 1: Otimizações Seguras de Performance
+## Visão Geral
 
-## Objetivo
+Transformação completa da página de Dashboard para um design enterprise com paleta roxa, tipografia Poppins/Inter, cards profissionais com avatares, métricas com ícones coloridos, badges de status e micro-interações avançadas.
 
-Implementar apenas melhorias que garantidamente NÃO pioram a performance atual:
-- Criar índices de banco de dados (sempre melhora queries)
-- Adicionar `fetchWithRetry` para rate limiting (evita falhas silenciosas)
-- Implementar `parseAmount` para validação de dados (evita erros)
+---
 
-**O que NÃO faremos nesta fase:**
-- Paralelização (Promise.all) - pode causar rate limiting
-- Batch inserts - pode causar erros em transações grandes
-- Cache de métricas - requer nova tabela e lógica complexa
+## Fase 1: Fundação do Design System
 
-## Alterações
+### 1.1 Tipografia (Poppins + Inter)
 
-### 1. Criar Índices no Banco de Dados
+**Arquivo: `index.html`**
+- Adicionar Google Fonts Poppins + Inter
+- Remover Lato atual
 
-Adicionar índices compostos para acelerar queries em 10-100x:
+**Arquivo: `tailwind.config.ts`**
+- `font-sans: ['Inter', 'system-ui', 'sans-serif']` (corpo)
+- `font-display: ['Poppins', 'system-ui', 'sans-serif']` (títulos)
 
-```sql
--- Índice principal para vendas (usado no Dashboard)
-CREATE INDEX IF NOT EXISTS idx_sales_project_date_status 
-ON sales(project_id, sale_date DESC, status);
+### 1.2 Paleta Roxa MetrikaPRO
 
--- Índice para gastos com anúncios
-CREATE INDEX IF NOT EXISTS idx_ad_spend_project_date 
-ON ad_spend(project_id, date DESC);
+**Arquivo: `src/index.css`**
 
--- Índice para busca por fonte
-CREATE INDEX IF NOT EXISTS idx_sales_source_project 
-ON sales(source, project_id);
+Novas variáveis CSS:
+```text
+Light Mode:
+--primary: 263 70% 50%           (#8B5CF6 - Roxo vibrante)
+--primary-dark: 263 70% 42%      (#7C3AED - Hover)
+--primary-light: 263 70% 60%     (#A78BFA - Light)
+
+Gradientes:
+--gradient-primary: linear-gradient(135deg, #8B5CF6, #6D28D9)
+--gradient-success: linear-gradient(135deg, #22C55E, #16A34A)
 ```
 
-**Impacto:** Queries de 2-5s passam para 50-200ms. Zero risco de piorar performance.
+### 1.3 Classes Utilitárias
 
-### 2. Adicionar `fetchWithRetry` com Exponential Backoff
+Adicionar em `src/index.css`:
+- `.shadow-purple` - sombra roxa para hover
+- `.card-elevate` - efeito de elevação (-4px)
+- `.animate-shimmer` - animação de loading
+- `.font-poppins` - classe para Poppins
 
-Criar função helper para tratar rate limiting das APIs:
+---
 
+## Fase 2: Componentes Reutilizáveis
+
+### 2.1 Novo Componente: ProjectCard
+
+**Arquivo: `src/components/dashboard/ProjectCard.tsx`**
+
+Estrutura do card:
+```text
+┌─────────────────────────────────────────────┐
+│ ██████ (barra colorida 2px: roxo/verde/vermelho)
+├─────────────────────────────────────────────┤
+│ [RT] Roberley - TiozãodaIA      [⋮]        │
+│      ⏰ Atualizado há 2 horas               │
+├─────────────────────────────────────────────┤
+│ ┌───────┐ ┌───────┐ ┌───────┐               │
+│ │💰     │ │📉     │ │📊     │               │
+│ │Fatur. │ │Invest.│ │ROAS   │               │
+│ │R$450  │ │R$320  │ │1.41x  │               │
+│ │—      │ │—      │ │✓ Lucr │               │
+│ └───────┘ └───────┘ └───────┘               │
+├─────────────────────────────────────────────┤
+│ [Meta Ads] [Hotmart]    [Ver Dashboard →]   │
+└─────────────────────────────────────────────┘
+```
+
+Props:
+- `project` - dados do projeto
+- `metrics` - { revenue, spend, roas }
+- `integrations` - array de tipos conectados
+- `onDelete` - callback para deletar
+- `onClick` - callback para navegação
+
+Features:
+- Avatar com iniciais (gradiente roxo)
+- Barra colorida no topo baseada no ROAS
+- Grid 3 colunas para métricas com ícones em fundo pastel
+- Tags de integrações conectadas
+- Hover: `translateY(-4px)` + sombra roxa
+
+### 2.2 Componente: PlanCard Premium
+
+**Arquivo: `src/components/dashboard/PlanCard.tsx`**
+
+Design:
+- Gradiente roxo para indigo
+- Ícone Crown em fundo branco/20
+- Barra de progresso de projetos
+- Efeito de brilho (círculo blur)
+- Botão upgrade se não for plano máximo
+
+### 2.3 Componente: DashboardHeader
+
+**Arquivo: `src/components/dashboard/DashboardHeader.tsx`**
+
+Features:
+- Saudação personalizada: "Olá, {nome}! 👋"
+- Subtítulo: "Aqui está o resumo dos seus X projetos"
+- Cards de resumo: Faturamento Total + ROAS Médio
+- Gradientes roxo e verde nos cards de resumo
+
+### 2.4 Componente: NewProjectCard
+
+**Arquivo: `src/components/dashboard/NewProjectCard.tsx`**
+
+Design:
+- Borda tracejada
+- Ícone Plus em círculo
+- Hover: borda roxa, fundo roxo claro
+
+---
+
+## Fase 3: Queries Adicionais
+
+### 3.1 Buscar Integrações por Projeto
+
+Adicionar query em `Dashboard.tsx`:
 ```typescript
-async function fetchWithRetry(
-  url: string, 
-  options: RequestInit, 
-  maxRetries = 3
-): Promise<Response> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const response = await fetch(url, options);
-    
-    // Rate limit ou erro de servidor - tentar novamente
-    if (response.status === 429 || response.status >= 500) {
-      if (attempt === maxRetries) return response;
-      
-      const retryAfter = response.headers.get('Retry-After');
-      const waitTime = retryAfter 
-        ? parseInt(retryAfter) * 1000 
-        : Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-      
-      console.log(`Attempt ${attempt} failed (${response.status}). Retrying in ${waitTime}ms...`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      continue;
-    }
-    
-    return response;
-  }
-  throw new Error('Max retries exceeded');
-}
+const { data: projectIntegrations } = useQuery({
+  queryKey: ['project-integrations', projects?.map(p => p.id)],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from('integrations')
+      .select('project_id, type, is_active')
+      .in('project_id', projects?.map(p => p.id) || [])
+      .eq('is_active', true);
+    return data;
+  },
+  enabled: !!projects?.length,
+});
 ```
 
-**Impacto:** Evita falhas silenciosas por rate limiting. Zero impacto negativo.
+### 3.2 Buscar Nome do Usuário
 
-### 3. Adicionar `parseAmount` para Validação
-
-Criar função para sanitizar valores monetários:
-
+Adicionar query para perfil:
 ```typescript
-function parseAmount(value: any): number {
-  if (value === null || value === undefined) return 0;
-  const parsed = typeof value === 'number' ? value : parseFloat(String(value));
-  return isNaN(parsed) || parsed < 0 ? 0 : parsed;
-}
+const { data: profile } = useQuery({
+  queryKey: ['user-profile', user?.id],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+    return data;
+  },
+  enabled: !!user,
+});
 ```
 
-Aplicar em todos os cálculos de valores:
-- Kiwify: `netAmount`, `grossAmount`
-- Hotmart: `saleAmount`
-- Guru: `saleAmount`
-- Meta Ads: `spend`, `cpc`, `cpm`, `frequency`
+---
 
-**Impacto:** Evita inserção de NaN/undefined no banco. Zero impacto negativo.
+## Fase 4: Refatoração do Dashboard.tsx
 
-## Arquivo a Modificar
+### 4.1 Estrutura do Layout
 
-**`supabase/functions/sync-project-data/index.ts`**
-
-Adicionar no início do arquivo (após as funções existentes):
-1. Função `fetchWithRetry`
-2. Função `parseAmount`
-
-Substituir chamadas `fetch()` por `fetchWithRetry()` apenas em:
-- Token requests (OAuth) - linhas 184, 340, 468
-- Sales API requests - linhas 226, 373, 465
-
-Aplicar `parseAmount()` em:
-- Kiwify (linhas 279-291)
-- Hotmart (linha 390)
-- Guru (linha 488)
-- Meta Ads (linhas 652-658)
-
-## Migração de Banco de Dados
-
-Executar via ferramenta de migração:
-
-```sql
--- Índices para otimização de queries
-CREATE INDEX IF NOT EXISTS idx_sales_project_date_status 
-ON sales(project_id, sale_date DESC, status);
-
-CREATE INDEX IF NOT EXISTS idx_ad_spend_project_date 
-ON ad_spend(project_id, date DESC);
-
-CREATE INDEX IF NOT EXISTS idx_sales_source_project 
-ON sales(source, project_id);
+```text
+┌─────────────────────────────────────────────────────────┐
+│ HEADER (logo + actions)                                 │
+├─────────────────────────────────────────────────────────┤
+│ DASHBOARD HEADER                                        │
+│ ┌────────────────────────────┬────────────────────────┐ │
+│ │ Olá, Victor! 👋            │ [Fatur.] [ROAS Médio]  │ │
+│ │ Resumo de 5 projetos       │ R$1.593  0.72x        │ │
+│ └────────────────────────────┴────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│ PLAN CARD (gradiente premium)                           │
+├─────────────────────────────────────────────────────────┤
+│ SEUS PROJETOS                                           │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐         │
+│ │ ProjectCard │ │ ProjectCard │ │ ProjectCard │         │
+│ └─────────────┘ └─────────────┘ └─────────────┘         │
+│ ┌─────────────┐                                         │
+│ │NewProjectCard│                                        │
+│ └─────────────┘                                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Estimativa de Tempo
+### 4.2 Cálculos de Métricas Globais
 
-| Tarefa | Tempo |
-|--------|-------|
-| Criar índices (migração) | 5 min |
-| Implementar `fetchWithRetry` | 10 min |
-| Implementar `parseAmount` | 5 min |
-| Aplicar funções no código | 15 min |
-| Deploy e teste | 5 min |
-| **Total** | **~40 min** |
+Adicionar `useMemo` para:
+- Faturamento Total: soma de todos os projetos
+- ROAS Médio: média ponderada
+- Contagem de projetos lucrativos/negativos
 
-## Resultados Esperados
+---
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Query de vendas no Dashboard | 2-5s | 50-200ms |
-| Query de ad_spend | 1-3s | 30-100ms |
-| Falhas por rate limit | Erro silencioso | Retry automático |
-| Erros de dados inválidos | NaN no banco | 0 tratado |
+## Fase 5: Atualização do Badge
 
+### 5.1 Variantes de Badge
+
+**Arquivo: `src/components/ui/badge.tsx`**
+
+Adicionar variantes:
+- `trend-up` - verde com ícone ↑
+- `trend-down` - vermelho com ícone ↓
+- `integration` - estilo para tags (Meta Ads, Hotmart, etc.)
+
+---
+
+## Fase 6: Empty State Aprimorado
+
+### 6.1 Design do Empty State
+
+Quando não há projetos:
+- Ilustração SVG ou ícone grande
+- Título: "Nenhum projeto ainda"
+- Descrição explicativa
+- Botão CTA com gradiente
+
+---
+
+## Resumo de Arquivos
+
+| Arquivo | Ação |
+|---------|------|
+| `index.html` | Atualizar fonts |
+| `tailwind.config.ts` | Adicionar font-family |
+| `src/index.css` | Nova paleta roxa + utilitários |
+| `src/components/ui/badge.tsx` | Adicionar variantes |
+| `src/components/dashboard/ProjectCard.tsx` | Criar |
+| `src/components/dashboard/PlanCard.tsx` | Criar |
+| `src/components/dashboard/DashboardHeader.tsx` | Criar |
+| `src/components/dashboard/NewProjectCard.tsx` | Criar |
+| `src/pages/Dashboard.tsx` | Refatorar completo |
+
+---
+
+## Dependências de Dados
+
+### Tabelas Utilizadas
+- `projects` - dados dos projetos
+- `profiles` - nome do usuário (full_name)
+- `integrations` - tipos conectados por projeto (type, is_active)
+- `sales` / `ad_spend` - métricas (já implementado)
+
+### Campos da Tabela Integrations
+```text
+- id: string
+- project_id: string
+- type: string (meta_ads, hotmart, kiwify, guru, eduzz)
+- is_active: boolean
+```
+
+---
+
+## Resultado Esperado
+
+1. **Visual Premium**: Gradientes roxos, sombras sutis, tipografia refinada
+2. **Hierarquia Clara**: Cards com avatares, métricas organizadas em grid
+3. **Feedback Visual**: Cores semânticas (verde=lucro, vermelho=negativo)
+4. **Contexto Rico**: Tags de integrações, timestamps relativos
+5. **Micro-interações**: Hover com elevação, transições suaves 300ms
+6. **Responsividade**: 1 coluna mobile, 2 tablet, 3 desktop
