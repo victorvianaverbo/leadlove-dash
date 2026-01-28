@@ -1,54 +1,72 @@
 
-# Plano de Correção - Erro de Sincronização "signal is aborted without reason"
+# Correção do Erro 401 na Edge Function `sync-project-data`
 
 ## Diagnóstico
 
-O erro **"signal is aborted without reason"** exibido no dashboard Medsimple é causado por uma **falha de deploy da Edge Function**. A análise dos logs revela:
+O erro **"Failed to send a request to the Edge Function"** é causado por um problema de autenticação na Edge Function `sync-project-data`. Os logs mostram:
 
-```
-POST | 404 | https://ohwaygqxelyaytljbcsb.supabase.co/functions/v1/sync-project-data
-```
-
-A função `sync-project-data` está retornando **HTTP 404 (Not Found)**, indicando que a versão mais recente do código não foi corretamente implantada no Supabase após as últimas modificações (correções do Guru e Hotmart).
-
----
+| Função | Status | Resultado |
+|--------|--------|-----------|
+| `check-subscription` | 200 | Funciona corretamente |
+| `sync-project-data` | 401 | Falha na autenticação |
 
 ## Causa Raiz
 
-Quando uma Edge Function não está acessível (404), a chamada `supabase.functions.invoke()` no frontend falha com uma mensagem genérica "signal is aborted" porque a promise é rejeitada antes de receber uma resposta válida.
+A função `sync-project-data` está usando o **cliente errado** para validar o token de autenticação:
+
+```text
+PROBLEMA (sync-project-data linha 662):
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);  // <- ERRADO
+  const { data: claimsData } = await supabaseAuth.auth.getClaims(token);
+
+CORRETO (check-subscription linha 27-30):
+  const supabaseClient = createClient(supabaseUrl, SERVICE_ROLE_KEY); // <- CERTO
+  const { data: claimsData } = await supabaseClient.auth.getClaims(token);
+```
+
+O método `getClaims()` requer a **Service Role Key** para validar tokens JWT, não a Anon Key.
 
 ---
 
 ## Solução
 
-### Passo 1: Redeployar a Edge Function
+### Modificar `supabase/functions/sync-project-data/index.ts`
 
-Forçar o redeploy da função `sync-project-data` para garantir que a versão corrigida (com parâmetros Guru `confirmed_at_ini` e tratamento de erro Hotmart) seja implantada.
+Alterar a criação do cliente de autenticação para usar `SUPABASE_SERVICE_ROLE_KEY`:
 
-### Passo 2: Verificar o Deploy
+**Antes (linhas 658-663):**
+```typescript
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-Após o redeploy:
-- Confirmar que a função responde com status 200
-- Testar sincronização manual no projeto Medsimple
-- Verificar logs para confirmar busca de vendas Guru/Hotmart
+const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+```
 
-### Passo 3: Melhorar Tratamento de Erro no Frontend (Opcional)
+**Depois:**
+```typescript
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-Adicionar tratamento de erro mais específico no `ProjectView.tsx` para diferenciar entre:
-- Erro de rede/timeout (404, 500)
-- Erro de autenticação (401)
-- Erro de dados da API (resposta com `data.error`)
+// Use service key for both auth validation and database operations
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { persistSession: false }
+});
+```
+
+E ajustar a validação do token (linha 674):
+```typescript
+// Antes: await supabaseAuth.auth.getClaims(token);
+// Depois:
+const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+```
 
 ---
 
-## Arquivos a Modificar
+## Resultado Esperado
 
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/sync-project-data/index.ts` | Redeploy forçado (nenhuma mudança de código necessária) |
-
----
-
-## Ação Imediata
-
-Executar redeploy da Edge Function e testar sincronização do projeto Medsimple.
+Após a correção:
+- A função `sync-project-data` passará a retornar status 200
+- A sincronização do projeto Medsimple funcionará corretamente
+- As vendas do Guru e Hotmart serão importadas para o banco de dados
