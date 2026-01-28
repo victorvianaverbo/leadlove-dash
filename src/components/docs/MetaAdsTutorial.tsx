@@ -78,8 +78,8 @@ export function MetaAdsTutorial() {
             Ao criar seu app no Meta Developers, você precisará informar estas URLs:
           </p>
           <div className="space-y-3">
-            <CopyableUrl label="Privacy Policy URL" url="https://leadlove-dash.lovable.app/privacy" />
-            <CopyableUrl label="Terms of Service URL" url="https://leadlove-dash.lovable.app/terms" />
+            <CopyableUrl label="Privacy Policy URL" url="https://metrikapro.com.br/privacy" />
+            <CopyableUrl label="Terms of Service URL" url="https://metrikapro.com.br/terms" />
           </div>
         </div>
       </section>
