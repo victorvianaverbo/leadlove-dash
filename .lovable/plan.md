@@ -1,72 +1,88 @@
 
-# Correção do Erro 401 na Edge Function `sync-project-data`
+# Correção do Erro 409 Conflict na Tabela metrics_cache
 
 ## Diagnóstico
 
-O erro **"Failed to send a request to the Edge Function"** é causado por um problema de autenticação na Edge Function `sync-project-data`. Os logs mostram:
-
-| Função | Status | Resultado |
-|--------|--------|-----------|
-| `check-subscription` | 200 | Funciona corretamente |
-| `sync-project-data` | 401 | Falha na autenticação |
-
-## Causa Raiz
-
-A função `sync-project-data` está usando o **cliente errado** para validar o token de autenticação:
+O erro **"409 Conflict"** e **"signal is aborted without reason"** ocorrem devido a uma **race condition** no hook `useMetricsCache`:
 
 ```text
-PROBLEMA (sync-project-data linha 662):
-  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);  // <- ERRADO
-  const { data: claimsData } = await supabaseAuth.auth.getClaims(token);
-
-CORRETO (check-subscription linha 27-30):
-  const supabaseClient = createClient(supabaseUrl, SERVICE_ROLE_KEY); // <- CERTO
-  const { data: claimsData } = await supabaseClient.auth.getClaims(token);
+FLUXO PROBLEMÁTICO:
+Requisição A: Verifica se existe → Não existe
+Requisição B: Verifica se existe → Não existe  
+Requisição A: Tenta inserir → SUCESSO
+Requisição B: Tenta inserir → 409 CONFLICT (registro já existe)
 ```
 
-O método `getClaims()` requer a **Service Role Key** para validar tokens JWT, não a Anon Key.
+A tabela `metrics_cache` tem uma restrição `UNIQUE (project_id, cache_date, date_range)`, e o código atual faz "check then insert" que não é atômico.
 
 ---
 
 ## Solução
 
-### Modificar `supabase/functions/sync-project-data/index.ts`
+### Modificar `src/hooks/useMetricsCache.ts`
 
-Alterar a criação do cliente de autenticação para usar `SUPABASE_SERVICE_ROLE_KEY`:
+Substituir a lógica de "verificar e inserir" por um **UPSERT atômico** usando o método `.upsert()` do Supabase:
 
-**Antes (linhas 658-663):**
+**Antes (linhas 80-112):**
 ```typescript
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+// Check if cache entry exists
+const { data: existing } = await supabase
+  .from('metrics_cache')
+  .select('id')
+  .eq('project_id', projectId)
+  .eq('cache_date', today)
+  .eq('date_range', dateRange)
+  .maybeSingle();
 
-const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+if (existing) {
+  // Update existing
+  const { error } = await supabase
+    .from('metrics_cache')
+    .update({ metrics: metricsJson, updated_at: new Date().toISOString() })
+    .eq('id', existing.id);
+  if (error) throw error;
+} else {
+  // Insert new
+  const { error } = await supabase
+    .from('metrics_cache')
+    .insert([insertData]);
+  if (error) throw error;
+}
 ```
 
 **Depois:**
 ```typescript
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Use upsert to atomically insert or update
+const { error } = await supabase
+  .from('metrics_cache')
+  .upsert({
+    project_id: projectId,
+    cache_date: today,
+    date_range: dateRange,
+    metrics: metricsJson,
+    updated_at: new Date().toISOString(),
+  }, {
+    onConflict: 'project_id,cache_date,date_range'
+  });
 
-// Use service key for both auth validation and database operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false }
-});
+if (error) throw error;
 ```
 
-E ajustar a validação do token (linha 674):
-```typescript
-// Antes: await supabaseAuth.auth.getClaims(token);
-// Depois:
-const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
-```
+O método `.upsert()` com `onConflict` é atômico e evita race conditions completamente.
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| `src/hooks/useMetricsCache.ts` | Substituir lógica check-then-insert por upsert atômico |
 
 ---
 
 ## Resultado Esperado
 
 Após a correção:
-- A função `sync-project-data` passará a retornar status 200
-- A sincronização do projeto Medsimple funcionará corretamente
-- As vendas do Guru e Hotmart serão importadas para o banco de dados
+- Não haverá mais erros 409 Conflict na tabela `metrics_cache`
+- O erro "signal is aborted without reason" desaparecerá
+- A sincronização de métricas funcionará de forma estável
