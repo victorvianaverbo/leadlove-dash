@@ -77,39 +77,20 @@ export function useMetricsCache(projectId: string | undefined, dateRange: string
       // Convert metrics to Json type
       const metricsJson = metrics as unknown as Json;
 
-      // Check if cache entry exists
-      const { data: existing } = await supabase
+      // Use atomic upsert to avoid race conditions (409 Conflict)
+      const { error } = await supabase
         .from('metrics_cache')
-        .select('id')
-        .eq('project_id', projectId)
-        .eq('cache_date', today)
-        .eq('date_range', dateRange)
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from('metrics_cache')
-          .update({
-            metrics: metricsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        // Insert new - use raw SQL-like approach to avoid type issues
-        const insertData = {
+        .upsert({
           project_id: projectId,
           cache_date: today,
           date_range: dateRange,
           metrics: metricsJson,
-        };
-        
-        const { error } = await supabase
-          .from('metrics_cache')
-          .insert([insertData]);
-        if (error) throw error;
-      }
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'project_id,cache_date,date_range'
+        });
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
