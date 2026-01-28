@@ -401,24 +401,24 @@ function MetaAdsHelperBox() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground min-w-[50px]">Privacy:</span>
-            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">leadlove-dash.lovable.app/privacy</code>
+            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">metrikapro.com.br/privacy</code>
             <Button 
               variant="ghost" 
               size="sm" 
               className="h-6 w-6 p-0"
-              onClick={() => handleCopy('https://leadlove-dash.lovable.app/privacy', 'privacy')}
+              onClick={() => handleCopy('https://metrikapro.com.br/privacy', 'privacy')}
             >
               {copiedPrivacy ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
             </Button>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground min-w-[50px]">Terms:</span>
-            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">leadlove-dash.lovable.app/terms</code>
+            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">metrikapro.com.br/terms</code>
             <Button 
               variant="ghost" 
               size="sm" 
               className="h-6 w-6 p-0"
-              onClick={() => handleCopy('https://leadlove-dash.lovable.app/terms', 'terms')}
+              onClick={() => handleCopy('https://metrikapro.com.br/terms', 'terms')}
             >
               {copiedTerms ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
             </Button>
