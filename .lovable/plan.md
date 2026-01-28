@@ -1,118 +1,147 @@
 
-# Adicionar URLs de Privacy/Terms no Meta Ads + Botão "Ver Tutorial"
+
+# Fase 1: Otimizações Seguras de Performance
 
 ## Objetivo
 
-Inserir as URLs de **Privacy Policy** e **Terms of Service** em dois lugares:
-1. Na documentação do Meta Ads (tutorial)
-2. No card de integração Meta Ads (página de edição de projeto)
+Implementar apenas melhorias que garantidamente NÃO pioram a performance atual:
+- Criar índices de banco de dados (sempre melhora queries)
+- Adicionar `fetchWithRetry` para rate limiting (evita falhas silenciosas)
+- Implementar `parseAmount` para validação de dados (evita erros)
 
-Também adicionar um botão "Ver Tutorial" no card de integração que leva para a documentação.
-
-## URLs a serem usadas
-
-| Página | URL Publicada |
-|--------|---------------|
-| Privacy Policy | `https://leadlove-dash.lovable.app/privacy` |
-| Terms of Service | `https://leadlove-dash.lovable.app/terms` |
+**O que NÃO faremos nesta fase:**
+- Paralelização (Promise.all) - pode causar rate limiting
+- Batch inserts - pode causar erros em transações grandes
+- Cache de métricas - requer nova tabela e lógica complexa
 
 ## Alterações
 
-### 1. MetaAdsTutorial.tsx - Adicionar seção de URLs para App Meta
+### 1. Criar Índices no Banco de Dados
 
-Adicionar uma nova seção após o Step 2 (Criar ou Selecionar um App) com as URLs necessárias para configurar o app no Meta Developers:
+Adicionar índices compostos para acelerar queries em 10-100x:
 
-```text
-+-------------------------------------------+
-| 📋 URLs para Configuração do App Meta     |
-|                                           |
-| Ao criar seu app no Meta Developers,      |
-| você precisará informar estas URLs:       |
-|                                           |
-| Privacy Policy URL:                       |
-| [https://leadlove-dash.lovable.app/privacy] 📋
-|                                           |
-| Terms of Service URL:                     |
-| [https://leadlove-dash.lovable.app/terms] 📋
-|                                           |
-| (Botões para copiar cada URL)             |
-+-------------------------------------------+
+```sql
+-- Índice principal para vendas (usado no Dashboard)
+CREATE INDEX IF NOT EXISTS idx_sales_project_date_status 
+ON sales(project_id, sale_date DESC, status);
+
+-- Índice para gastos com anúncios
+CREATE INDEX IF NOT EXISTS idx_ad_spend_project_date 
+ON ad_spend(project_id, date DESC);
+
+-- Índice para busca por fonte
+CREATE INDEX IF NOT EXISTS idx_sales_source_project 
+ON sales(source, project_id);
 ```
 
-### 2. MetaAdsIntegrationCard.tsx - Adicionar helper box + botão tutorial
+**Impacto:** Queries de 2-5s passam para 50-200ms. Zero risco de piorar performance.
 
-Adicionar no topo do card (antes do formulário de credenciais):
+### 2. Adicionar `fetchWithRetry` com Exponential Backoff
 
-```text
-+-------------------------------------------+
-| 📖 Precisa de ajuda para conectar?        |
-|                                           |
-| [Ver Tutorial Completo] →                 |
-|                                           |
-| URLs para configurar seu App Meta:        |
-| Privacy: leadlove-dash.lovable.app/privacy|
-| Terms: leadlove-dash.lovable.app/terms    |
-+-------------------------------------------+
-```
+Criar função helper para tratar rate limiting das APIs:
 
-## Arquivos a Modificar
-
-### `src/components/docs/MetaAdsTutorial.tsx`
-- Adicionar nova seção "URLs para Configuração" entre Step 2 e Step 3
-- Criar componente de card com botões de copiar para cada URL
-- Importar ícone `Copy` do lucide-react
-
-### `src/components/integrations/MetaAdsIntegrationCard.tsx`
-- Importar `Link` do react-router-dom e ícone `BookOpen` do lucide-react
-- Adicionar box informativo no início do `CollapsibleContent`
-- Incluir botão "Ver Tutorial" que navega para `/documentacao` com hash `#meta-ads`
-- Mostrar URLs de Privacy/Terms com opção de copiar
-
-## Detalhes Técnicos
-
-### Componente de copiar URL (reutilizável)
-
-```tsx
-function CopyableUrl({ label, url }: { label: string; url: string }) {
-  const [copied, setCopied] = useState(false);
-  
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">{label}:</span>
-      <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">{url}</code>
-      <Button variant="ghost" size="sm" onClick={handleCopy}>
-        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-      </Button>
-    </div>
-  );
+```typescript
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    
+    // Rate limit ou erro de servidor - tentar novamente
+    if (response.status === 429 || response.status >= 500) {
+      if (attempt === maxRetries) return response;
+      
+      const retryAfter = response.headers.get('Retry-After');
+      const waitTime = retryAfter 
+        ? parseInt(retryAfter) * 1000 
+        : Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+      
+      console.log(`Attempt ${attempt} failed (${response.status}). Retrying in ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      continue;
+    }
+    
+    return response;
+  }
+  throw new Error('Max retries exceeded');
 }
 ```
 
-### Navegação para documentação
+**Impacto:** Evita falhas silenciosas por rate limiting. Zero impacto negativo.
 
-O botão "Ver Tutorial" usará o react-router-dom Link para navegar internamente:
+### 3. Adicionar `parseAmount` para Validação
 
-```tsx
-<Link to="/documentacao?tutorial=meta-ads">
-  <Button variant="outline" size="sm">
-    <BookOpen className="h-4 w-4 mr-1" />
-    Ver Tutorial
-  </Button>
-</Link>
+Criar função para sanitizar valores monetários:
+
+```typescript
+function parseAmount(value: any): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value));
+  return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+}
 ```
 
-## Estimativa
+Aplicar em todos os cálculos de valores:
+- Kiwify: `netAmount`, `grossAmount`
+- Hotmart: `saleAmount`
+- Guru: `saleAmount`
+- Meta Ads: `spend`, `cpc`, `cpm`, `frequency`
+
+**Impacto:** Evita inserção de NaN/undefined no banco. Zero impacto negativo.
+
+## Arquivo a Modificar
+
+**`supabase/functions/sync-project-data/index.ts`**
+
+Adicionar no início do arquivo (após as funções existentes):
+1. Função `fetchWithRetry`
+2. Função `parseAmount`
+
+Substituir chamadas `fetch()` por `fetchWithRetry()` apenas em:
+- Token requests (OAuth) - linhas 184, 340, 468
+- Sales API requests - linhas 226, 373, 465
+
+Aplicar `parseAmount()` em:
+- Kiwify (linhas 279-291)
+- Hotmart (linha 390)
+- Guru (linha 488)
+- Meta Ads (linhas 652-658)
+
+## Migração de Banco de Dados
+
+Executar via ferramenta de migração:
+
+```sql
+-- Índices para otimização de queries
+CREATE INDEX IF NOT EXISTS idx_sales_project_date_status 
+ON sales(project_id, sale_date DESC, status);
+
+CREATE INDEX IF NOT EXISTS idx_ad_spend_project_date 
+ON ad_spend(project_id, date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_source_project 
+ON sales(source, project_id);
+```
+
+## Estimativa de Tempo
 
 | Tarefa | Tempo |
 |--------|-------|
-| Seção de URLs no tutorial | 15 min |
-| Helper box no card | 15 min |
-| Botão copiar URL | 10 min |
-| Testes | 5 min |
-| **Total** | **~45 min** |
+| Criar índices (migração) | 5 min |
+| Implementar `fetchWithRetry` | 10 min |
+| Implementar `parseAmount` | 5 min |
+| Aplicar funções no código | 15 min |
+| Deploy e teste | 5 min |
+| **Total** | **~40 min** |
+
+## Resultados Esperados
+
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| Query de vendas no Dashboard | 2-5s | 50-200ms |
+| Query de ad_spend | 1-3s | 30-100ms |
+| Falhas por rate limit | Erro silencioso | Retry automático |
+| Erros de dados inválidos | NaN no banco | 0 tratado |
+
