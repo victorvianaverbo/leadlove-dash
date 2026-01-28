@@ -362,61 +362,75 @@ async function syncHotmart(
     const startTimestamp = syncStartDate.getTime();
     const endTimestamp = nowBrasilia.getTime();
 
-    // Fetch sales for each product
+    // Fetch sales for each product - continue even if individual products fail
+    let productsWithErrors = 0;
     for (const productId of productIds) {
       let page = 1;
       let hasMore = true;
 
-      while (hasMore) {
-        const salesResponse = await fetchWithRetry(
-          `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      try {
+        while (hasMore) {
+          const salesResponse = await fetchWithRetry(
+            `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
 
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json();
-          const sales = salesData.items || [];
-          
-          console.log(`[HOTMART] Product ${productId} - Page ${page}: ${sales.length} sales`);
-
-          for (const sale of sales) {
-            const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
-            const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
+          if (salesResponse.ok) {
+            const salesData = await salesResponse.json();
+            const sales = salesData.items || [];
             
-            result.sales.push({
-              kiwify_sale_id: saleId,
-              project_id: projectId,
-              user_id: userId,
-              product_id: productId,
-              product_name: sale.product?.name || sale.product_name || null,
-              amount: saleAmount,
-              gross_amount: saleAmount,
-              status: normalizeStatus(sale.purchase?.status || sale.status || 'approved', 'hotmart'),
-              payment_method: sale.purchase?.payment?.type || sale.payment_type || null,
-              customer_name: sale.buyer?.name || sale.buyer_name || null,
-              customer_email: sale.buyer?.email || sale.buyer_email || null,
-              sale_date: sale.purchase?.approved_date || sale.approved_date || sale.order_date,
-              utm_source: sale.purchase?.tracking?.source || sale.tracking?.source || null,
-              utm_medium: sale.purchase?.tracking?.medium || sale.tracking?.medium || null,
-              utm_campaign: sale.purchase?.tracking?.utm_campaign || null,
-              utm_content: sale.purchase?.tracking?.utm_content || null,
-              utm_term: sale.purchase?.tracking?.utm_term || null,
-              source: 'hotmart',
-            });
-          }
+            console.log(`[HOTMART] Product ${productId} - Page ${page}: ${sales.length} sales`);
 
-          hasMore = sales.length >= 100;
-          page++;
-        } else {
-          console.error(`[HOTMART] Error fetching product ${productId}:`, await salesResponse.text());
-          hasMore = false;
+            for (const sale of sales) {
+              const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
+              const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
+              
+              result.sales.push({
+                kiwify_sale_id: saleId,
+                project_id: projectId,
+                user_id: userId,
+                product_id: productId,
+                product_name: sale.product?.name || sale.product_name || null,
+                amount: saleAmount,
+                gross_amount: saleAmount,
+                status: normalizeStatus(sale.purchase?.status || sale.status || 'approved', 'hotmart'),
+                payment_method: sale.purchase?.payment?.type || sale.payment_type || null,
+                customer_name: sale.buyer?.name || sale.buyer_name || null,
+                customer_email: sale.buyer?.email || sale.buyer_email || null,
+                sale_date: sale.purchase?.approved_date || sale.approved_date || sale.order_date,
+                utm_source: sale.purchase?.tracking?.source || sale.tracking?.source || null,
+                utm_medium: sale.purchase?.tracking?.medium || sale.tracking?.medium || null,
+                utm_campaign: sale.purchase?.tracking?.utm_campaign || null,
+                utm_content: sale.purchase?.tracking?.utm_content || null,
+                utm_term: sale.purchase?.tracking?.utm_term || null,
+                source: 'hotmart',
+              });
+            }
+
+            hasMore = sales.length >= 100;
+            page++;
+          } else {
+            const errorText = await salesResponse.text();
+            console.error(`[HOTMART] Error fetching product ${productId} (status ${salesResponse.status}): ${errorText}`);
+            productsWithErrors++;
+            hasMore = false;
+            // Continue to next product instead of stopping
+          }
         }
+      } catch (productError) {
+        console.error(`[HOTMART] Exception for product ${productId}:`, productError);
+        productsWithErrors++;
+        // Continue to next product
       }
+    }
+    
+    if (productsWithErrors > 0) {
+      console.warn(`[HOTMART] ${productsWithErrors}/${productIds.length} products had errors, but sync continued`);
     }
 
     console.log(`[HOTMART] Completed: ${result.sales.length} sales fetched`);
@@ -451,8 +465,9 @@ async function syncGuru(
       let hasMore = true;
 
       while (hasMore) {
+        // Guru API v2 requires confirmed_at_ini/confirmed_at_end instead of start_date/end_date
         const salesResponse = await fetchWithRetry(
-          `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&start_date=${startDate}&end_date=${endDate}&page=${page}&per_page=100`,
+          `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&confirmed_at_ini=${startDate}&confirmed_at_end=${endDate}&page=${page}&per_page=100`,
           {
             headers: {
               'Authorization': `Bearer ${credentials.api_token}`,
