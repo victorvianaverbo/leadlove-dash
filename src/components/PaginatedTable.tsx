@@ -24,14 +24,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface Column<T> {
+export interface Column<T> {
   key: keyof T | string;
   header: string;
   render?: (row: T) => React.ReactNode;
   className?: string;
 }
 
-interface PaginatedTableProps<T> {
+export interface PaginatedTableProps<T> {
   data: T[];
   columns: Column<T>[];
   defaultPageSize?: number;
@@ -39,7 +39,7 @@ interface PaginatedTableProps<T> {
   emptyMessage?: string;
 }
 
-export function PaginatedTable<T extends Record<string, unknown>>({
+export function PaginatedTable<T extends object>({
   data,
   columns,
   defaultPageSize = 10,
