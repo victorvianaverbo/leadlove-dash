@@ -483,9 +483,19 @@ async function syncGuru(
           
           console.log(`[GURU] Product ${productId} - Page ${page}: ${sales.length} sales`);
 
+          // Log first sale structure to debug field names
+          if (sales.length > 0 && page === 1) {
+            console.log(`[GURU] Sample sale structure:`, JSON.stringify(Object.keys(sales[0])));
+            console.log(`[GURU] Sample sale data:`, JSON.stringify(sales[0]));
+          }
+
           for (const sale of sales) {
             const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
             const saleAmount = parseAmount(sale.amount || sale.value || sale.price || 0);
+            
+            // Guru v2 API uses 'confirmed_at' for the sale date
+            // Fallbacks: confirmed_at -> created_at -> date -> approved_at -> current timestamp
+            const saleDate = sale.confirmed_at || sale.created_at || sale.date || sale.approved_at || new Date().toISOString();
             
             result.sales.push({
               kiwify_sale_id: saleId,
@@ -497,14 +507,14 @@ async function syncGuru(
               gross_amount: saleAmount,
               status: normalizeStatus(sale.status || 'approved', 'guru'),
               payment_method: sale.payment_method || sale.payment_type || null,
-              customer_name: sale.customer?.name || sale.buyer?.name || sale.customer_name || null,
-              customer_email: sale.customer?.email || sale.buyer?.email || sale.customer_email || null,
-              sale_date: sale.created_at || sale.date || sale.approved_at,
-              utm_source: sale.utm_source || sale.tracking?.utm_source || null,
-              utm_medium: sale.utm_medium || sale.tracking?.utm_medium || null,
-              utm_campaign: sale.utm_campaign || sale.tracking?.utm_campaign || null,
-              utm_content: sale.utm_content || sale.tracking?.utm_content || null,
-              utm_term: sale.utm_term || sale.tracking?.utm_term || null,
+              customer_name: sale.customer?.name || sale.buyer?.name || sale.customer_name || sale.contact?.name || null,
+              customer_email: sale.customer?.email || sale.buyer?.email || sale.customer_email || sale.contact?.email || null,
+              sale_date: saleDate,
+              utm_source: sale.utm_source || sale.tracking?.utm_source || sale.origin?.utm_source || null,
+              utm_medium: sale.utm_medium || sale.tracking?.utm_medium || sale.origin?.utm_medium || null,
+              utm_campaign: sale.utm_campaign || sale.tracking?.utm_campaign || sale.origin?.utm_campaign || null,
+              utm_content: sale.utm_content || sale.tracking?.utm_content || sale.origin?.utm_content || null,
+              utm_term: sale.utm_term || sale.tracking?.utm_term || sale.origin?.utm_term || null,
               source: 'guru',
             });
           }
