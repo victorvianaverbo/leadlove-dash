@@ -12,7 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { useMetricsCache } from '@/hooks/useMetricsCache';
-import { PaginatedTable } from '@/components/PaginatedTable';
+import { LazyUtmTable } from '@/components/LazyUtmTable';
+import { KpiGridSkeleton, FunnelSectionSkeleton, SettingsCardSkeleton } from '@/components/skeletons';
 import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
@@ -794,8 +795,12 @@ const parseCurrencyInput = (value: string): number => {
           </CardContent>
         </Card>
 
-
         {/* Main KPI Cards */}
+        {(salesLoading || adSpendLoading) ? (
+          <div className="mb-6 sm:mb-8">
+            <KpiGridSkeleton count={5} columns={5} />
+          </div>
+        ) : (
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6 sm:mb-8">
           <Card className="border border-primary">
             <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
@@ -872,8 +877,12 @@ const parseCurrencyInput = (value: string): number => {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Funnel Section */}
+        {(salesLoading || adSpendLoading) ? (
+          <FunnelSectionSkeleton />
+        ) : (
         <div className="mb-6 sm:mb-8">
           <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
             🎯 Funil de Mídia
@@ -1089,45 +1098,16 @@ const parseCurrencyInput = (value: string): number => {
             </Card>
           </div>
         </div>
+        )}
 
         {/* UTM Attribution Table */}
-        {utmData.length > 0 && (
-          <Card className="mb-6 sm:mb-8">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">📊 Atribuição por UTM</CardTitle>
-              <CardDescription>Vendas e receita agrupadas por origem de tráfego</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PaginatedTable
-                data={utmData}
-                columns={[
-                  { key: 'source', header: 'Origem', className: 'font-medium' },
-                  { key: 'medium', header: 'Mídia' },
-                  { key: 'campaign', header: 'Campanha', className: 'max-w-[200px] truncate' },
-                  { 
-                    key: 'count', 
-                    header: 'Vendas', 
-                    className: 'text-right',
-                    render: (row) => <span className="font-semibold">{row.count}</span>
-                  },
-                  { 
-                    key: 'revenue', 
-                    header: 'Receita', 
-                    className: 'text-right',
-                    render: (row) => (
-                      <span className="font-semibold text-success">
-                        {formatCurrency(row.revenue)}
-                      </span>
-                    )
-                  },
-                ]}
-                defaultPageSize={10}
-                pageSizeOptions={[10, 25, 50]}
-                emptyMessage="Nenhuma venda com dados de UTM"
-              />
-            </CardContent>
-          </Card>
-        )}
+        <div className="mb-6 sm:mb-8">
+          <LazyUtmTable 
+            data={utmData} 
+            formatCurrency={formatCurrency}
+            isLoading={salesLoading}
+          />
+        </div>
 
         <DeleteProjectDialog
           projectName={project?.name || ''}
