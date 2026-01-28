@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, 
-  Search, ChevronDown, ChevronRight 
+  Search, ChevronDown, ChevronRight, BookOpen, Copy, Check 
 } from "lucide-react";
 
 interface Integration {
@@ -205,6 +206,8 @@ export function MetaAdsIntegrationCard({
 
         <CollapsibleContent>
           <div className="p-4 pt-0 space-y-4 border-t border-border">
+            {/* Helper Box */}
+            <MetaAdsHelperBox />
             {/* Connection Status */}
             {isConnected && (
               <div className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
@@ -363,5 +366,65 @@ export function MetaAdsIntegrationCard({
         </CollapsibleContent>
       </div>
     </Collapsible>
+  );
+}
+
+function MetaAdsHelperBox() {
+  const [copiedPrivacy, setCopiedPrivacy] = useState(false);
+  const [copiedTerms, setCopiedTerms] = useState(false);
+
+  const handleCopy = (url: string, type: 'privacy' | 'terms') => {
+    navigator.clipboard.writeText(url);
+    if (type === 'privacy') {
+      setCopiedPrivacy(true);
+      setTimeout(() => setCopiedPrivacy(false), 2000);
+    } else {
+      setCopiedTerms(true);
+      setTimeout(() => setCopiedTerms(false), 2000);
+    }
+  };
+
+  return (
+    <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Precisa de ajuda para conectar?</p>
+        <Link to="/documentacao?tutorial=meta-ads">
+          <Button variant="outline" size="sm">
+            <BookOpen className="h-4 w-4 mr-1" />
+            Ver Tutorial
+          </Button>
+        </Link>
+      </div>
+      
+      <div className="pt-2 border-t border-border">
+        <p className="text-xs text-muted-foreground mb-2">URLs para configurar seu App Meta:</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground min-w-[50px]">Privacy:</span>
+            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">leadlove-dash.lovable.app/privacy</code>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleCopy('https://leadlove-dash.lovable.app/privacy', 'privacy')}
+            >
+              {copiedPrivacy ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground min-w-[50px]">Terms:</span>
+            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">leadlove-dash.lovable.app/terms</code>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0"
+              onClick={() => handleCopy('https://leadlove-dash.lovable.app/terms', 'terms')}
+            >
+              {copiedTerms ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

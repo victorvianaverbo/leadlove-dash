@@ -1,4 +1,6 @@
-import { Clock, CheckCircle2, AlertTriangle, Info, ExternalLink, Key } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, CheckCircle2, AlertTriangle, Info, ExternalLink, Key, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -65,6 +67,21 @@ export function MetaAdsTutorial() {
             <li>Clique em <strong>"Criar App"</strong></li>
           </ol>
         </StepSection>
+
+        {/* URLs for Meta App Configuration */}
+        <div className="ml-12 mt-6 p-4 bg-muted/50 border border-border rounded-lg">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Copy className="h-4 w-4" />
+            URLs para Configuração do App Meta
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Ao criar seu app no Meta Developers, você precisará informar estas URLs:
+          </p>
+          <div className="space-y-3">
+            <CopyableUrl label="Privacy Policy URL" url="https://leadlove-dash.lovable.app/privacy" />
+            <CopyableUrl label="Terms of Service URL" url="https://leadlove-dash.lovable.app/terms" />
+          </div>
+        </div>
       </section>
 
       {/* Step 3 */}
@@ -357,6 +374,26 @@ function WarningCard({ children }: { children: React.ReactNode }) {
     <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg">
       <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
       <p className="text-sm text-amber-800 dark:text-amber-200">{children}</p>
+    </div>
+  );
+}
+
+function CopyableUrl({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium min-w-[140px]">{label}:</span>
+      <code className="text-xs bg-background px-2 py-1.5 rounded border flex-1 truncate">{url}</code>
+      <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 w-8 p-0">
+        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+      </Button>
     </div>
   );
 }
