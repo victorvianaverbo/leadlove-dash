@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { KpiCard, FunnelCard } from '@/components/ui/kpi-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -802,80 +803,46 @@ const parseCurrencyInput = (value: string): number => {
           </div>
         ) : (
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-6 sm:mb-8">
-          <Card className="border border-primary">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Orçamento Diário</CardTitle>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-soft rounded-lg flex items-center justify-center">
-                <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{formatCurrency(dailyBudget)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="Orçamento Diário"
+            value={formatCurrency(dailyBudget)}
+            subtitle="Meta Ads"
+            icon={Wallet}
+            variant="primary"
+          />
 
-          <Card className="border border-success">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Faturamento</CardTitle>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-lg sm:text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                {totalSales} vendas
-              </p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="Faturamento"
+            value={formatCurrency(totalRevenue)}
+            subtitle={`${totalSales} vendas`}
+            icon={DollarSign}
+            variant="success"
+          />
 
-          <Card className="border border-destructive">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Gasto em Ads</CardTitle>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                <Target className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-lg sm:text-2xl font-bold text-destructive">{formatCurrency(totalSpend)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                {totalLinkClicks.toLocaleString('pt-BR')} cliques no link
-              </p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="Gasto em Ads"
+            value={formatCurrency(totalSpend)}
+            subtitle={`${totalLinkClicks.toLocaleString('pt-BR')} cliques no link`}
+            icon={Target}
+            variant="destructive"
+          />
 
-          <Card className={`border ${roas >= 1 ? 'border-success' : 'border-destructive'}`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">ROAS</CardTitle>
-              <div className={`w-6 h-6 sm:w-8 sm:h-8 ${roas >= 1 ? 'bg-success/10' : 'bg-destructive/10'} rounded-lg flex items-center justify-center`}>
-                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${roas >= 1 ? 'text-success' : 'text-destructive'}`} />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className={`text-lg sm:text-2xl font-bold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>{roas.toFixed(2)}x</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                Retorno sobre gasto
-              </p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="ROAS"
+            value={`${roas.toFixed(2)}x`}
+            subtitle="Retorno sobre gasto"
+            icon={TrendingUp}
+            variant={roas >= 1 ? "success" : "destructive"}
+          />
 
-          <Card className="border border-info col-span-2 md:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">CPA</CardTitle>
-              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-info/10 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-info" />
-              </div>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-lg sm:text-2xl font-bold text-info">
-                {totalSales > 0 ? formatCurrency(totalSpend / totalSales) : 'R$ 0,00'}
-              </div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                Custo por aquisição
-              </p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="CPA"
+            value={totalSales > 0 ? formatCurrency(totalSpend / totalSales) : 'R$ 0,00'}
+            subtitle="Custo por aquisição"
+            icon={ShoppingCart}
+            variant="info"
+            className="col-span-2 md:col-span-1"
+          />
         </div>
         )}
 
@@ -890,212 +857,36 @@ const parseCurrencyInput = (value: string): number => {
           
           {/* Top of Funnel - Awareness */}
           <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Impressões</CardTitle>
-                <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalImpressions.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Alcance</CardTitle>
-                <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalReach.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Pessoas únicas</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Frequência</CardTitle>
-                <Repeat className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{avgFrequency.toFixed(2)}x</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Média por pessoa</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">CPM</CardTitle>
-                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(avgCPM)}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Custo por mil</p>
-              </CardContent>
-            </Card>
+            <FunnelCard title="Impressões" value={totalImpressions.toLocaleString('pt-BR')} subtitle="Meta Ads" icon={Eye} />
+            <FunnelCard title="Alcance" value={totalReach.toLocaleString('pt-BR')} subtitle="Pessoas únicas" icon={Users} />
+            <FunnelCard title="Frequência" value={`${avgFrequency.toFixed(2)}x`} subtitle="Média por pessoa" icon={Repeat} />
+            <FunnelCard title="CPM" value={formatCurrency(avgCPM)} subtitle="Custo por mil" icon={BarChart3} />
           </div>
 
           {/* Video/Creative Metrics */}
           <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Gancho (3s)</CardTitle>
-                <Play className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalVideo3sViews.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Visualizações 3s</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">ThruPlays</CardTitle>
-                <Video className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalThruplays.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Retenção completa</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Tx. Engajamento</CardTitle>
-                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{creativeEngagementRate.toFixed(1)}%</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">ThruPlays / Gancho</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">CTR</CardTitle>
-                <MousePointer className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{ctr.toFixed(2)}%</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Cliques / Impressões</p>
-              </CardContent>
-            </Card>
+            <FunnelCard title="Gancho (3s)" value={totalVideo3sViews.toLocaleString('pt-BR')} subtitle="Visualizações 3s" icon={Play} />
+            <FunnelCard title="ThruPlays" value={totalThruplays.toLocaleString('pt-BR')} subtitle="Retenção completa" icon={Video} />
+            <FunnelCard title="Tx. Engajamento" value={`${creativeEngagementRate.toFixed(1)}%`} subtitle="ThruPlays / Gancho" icon={Percent} />
+            <FunnelCard title="CTR" value={`${ctr.toFixed(2)}%`} subtitle="Cliques / Impressões" icon={MousePointer} />
           </div>
 
           {/* Middle of Funnel - Consideration */}
           <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Cliques Link</CardTitle>
-                <MousePointer className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalLinkClicks.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">CPC</CardTitle>
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(avgCPC)}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Custo por clique</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Views LP</CardTitle>
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalLandingPageViews.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Landing page</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Taxa LP/Clique</CardTitle>
-                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{lpViewRate.toFixed(1)}%</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Conversão clique</p>
-              </CardContent>
-            </Card>
+            <FunnelCard title="Cliques Link" value={totalLinkClicks.toLocaleString('pt-BR')} subtitle="Meta Ads" icon={MousePointer} />
+            <FunnelCard title="CPC" value={formatCurrency(avgCPC)} subtitle="Custo por clique" icon={DollarSign} />
+            <FunnelCard title="Views LP" value={totalLandingPageViews.toLocaleString('pt-BR')} subtitle="Landing page" icon={FileText} />
+            <FunnelCard title="Taxa LP/Clique" value={`${lpViewRate.toFixed(1)}%`} subtitle="Conversão clique" icon={Percent} />
           </div>
 
           {/* Bottom of Funnel - Conversion (Hybrid) */}
           <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Checkouts</CardTitle>
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{totalCheckoutsInitiated.toLocaleString('pt-BR')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta Ads</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Custo/Checkout</CardTitle>
-                <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(custoPerCheckout)}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Gasto ÷ Checkouts</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Conv. Checkout</CardTitle>
-                <Percent className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold">{checkoutConversionRate.toFixed(1)}%</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Vendas / Checkouts</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Vendas</CardTitle>
-                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold text-green-600">{totalSales}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Kiwify</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Custo/Venda</CardTitle>
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(custoPerVenda)}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Meta ÷ Kiwify</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-green-200 dark:border-green-800">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Taxa Venda/LP</CardTitle>
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-lg sm:text-2xl font-bold text-green-600">{vendaPerLP.toFixed(2)}%</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Conversão final</p>
-              </CardContent>
-            </Card>
+            <FunnelCard title="Checkouts" value={totalCheckoutsInitiated.toLocaleString('pt-BR')} subtitle="Meta Ads" icon={CheckCircle} />
+            <FunnelCard title="Custo/Checkout" value={formatCurrency(custoPerCheckout)} subtitle="Gasto ÷ Checkouts" icon={Wallet} />
+            <FunnelCard title="Conv. Checkout" value={`${checkoutConversionRate.toFixed(1)}%`} subtitle="Vendas / Checkouts" icon={Percent} />
+            <KpiCard title="Vendas" value={totalSales} subtitle="Kiwify" icon={ShoppingCart} variant="success" />
+            <KpiCard title="Custo/Venda" value={formatCurrency(custoPerVenda)} subtitle="Meta ÷ Kiwify" icon={DollarSign} variant="success" />
+            <KpiCard title="Taxa Venda/LP" value={`${vendaPerLP.toFixed(2)}%`} subtitle="Conversão final" icon={TrendingUp} variant="success" />
           </div>
         </div>
         )}
