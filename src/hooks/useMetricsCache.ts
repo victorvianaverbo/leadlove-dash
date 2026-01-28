@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -32,6 +33,16 @@ const CACHE_TTL_MINUTES = 5;
 export function useMetricsCache(projectId: string | undefined, dateRange: string) {
   const queryClient = useQueryClient();
   const today = new Date().toISOString().split('T')[0];
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   // Fetch cached metrics
   const { data: cachedMetrics, isLoading: cacheLoading } = useQuery({
@@ -45,9 +56,9 @@ export function useMetricsCache(projectId: string | undefined, dateRange: string
         .eq('project_id', projectId)
         .eq('date_range', dateRange)
         .eq('cache_date', today)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching metrics cache:', error);
         return null;
       }
@@ -70,7 +81,7 @@ export function useMetricsCache(projectId: string | undefined, dateRange: string
   });
 
   // Update cache mutation
-  const updateCache = useMutation({
+  const updateCacheMutation = useMutation({
     mutationFn: async (metrics: CachedMetrics) => {
       if (!projectId) throw new Error('Project ID required');
 
@@ -90,7 +101,10 @@ export function useMetricsCache(projectId: string | undefined, dateRange: string
           onConflict: 'project_id,cache_date,date_range'
         });
 
-      if (error) throw error;
+      // Treat duplicate key errors as success (another request succeeded)
+      if (error && error.code !== '23505' && !error.message.includes('duplicate')) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -99,10 +113,20 @@ export function useMetricsCache(projectId: string | undefined, dateRange: string
     },
   });
 
+  // Debounced update function to prevent rapid concurrent calls
+  const debouncedUpdateCache = useCallback((metrics: CachedMetrics) => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    debounceTimer.current = setTimeout(() => {
+      updateCacheMutation.mutate(metrics);
+    }, 500);
+  }, [updateCacheMutation]);
+
   return {
     cachedMetrics,
     cacheLoading,
-    updateCache: updateCache.mutate,
+    updateCache: debouncedUpdateCache,
     isCacheValid: !!cachedMetrics,
   };
 }
