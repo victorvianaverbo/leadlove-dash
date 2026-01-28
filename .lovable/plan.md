@@ -1,112 +1,118 @@
 
-# Diagnóstico: Dados não carregando para Medsimple
+# Adicionar URLs de Privacy/Terms no Meta Ads + Botão "Ver Tutorial"
 
-## Resumo da Investigação
+## Objetivo
 
-Investiguei o projeto **Medsimple** (ID: `4af70f92-4cdc-4a83-b08b-574e14ba97ce`) do cliente `contato@vianamidias.com.br`:
+Inserir as URLs de **Privacy Policy** e **Terms of Service** em dois lugares:
+1. Na documentação do Meta Ads (tutorial)
+2. No card de integração Meta Ads (página de edição de projeto)
 
-### O que está funcionando:
-- Meta Ads: **125 registros** de ad_spend salvos (R$3.778,91 total)
-- Produtos carregados: Hotmart (36), Guru (18), Meta Ads (95 campanhas)
-- Credenciais configuradas corretamente para todas as integrações
+Também adicionar um botão "Ver Tutorial" no card de integração que leva para a documentação.
 
-### O que NÃO está funcionando:
-- **0 vendas sincronizadas** de Hotmart e Guru
-- Logs de Hotmart/Guru não aparecem (cobertos pelos 95+ logs de campanhas Meta)
+## URLs a serem usadas
 
-## Causa Raiz Identificada
+| Página | URL Publicada |
+|--------|---------------|
+| Privacy Policy | `https://leadlove-dash.lovable.app/privacy` |
+| Terms of Service | `https://leadlove-dash.lovable.app/terms` |
 
-### Problema 1: Limite de logs oculta erros
-O sistema de logs tem limite de 100 entradas. Como o cliente selecionou **95 campanhas Meta Ads**, os logs dessas campanhas estão ocupando todo o espaço, ocultando possíveis erros de Hotmart/Guru.
+## Alterações
 
-### Problema 2: Possível erro silencioso nas APIs de vendas
-Os logs mostram que a sincronização rodou mas terminou com "0 sales". Não há registro de:
-- "Starting Hotmart sync..."
-- "Starting Guru DMG sync..."
-- Nenhum erro de autenticação
+### 1. MetaAdsTutorial.tsx - Adicionar seção de URLs para App Meta
 
-Isso sugere que ou:
-1. A obtenção do token OAuth falhou silenciosamente
-2. A API retornou 0 vendas no período
-3. Houve timeout na requisição
-
-## Plano de Correção
-
-### Fase 1: Melhorar Logging e Diagnóstico
-
-Adicionar logs mais robustos no início de cada sincronização para garantir visibilidade:
-
-**Arquivo:** `supabase/functions/sync-project-data/index.ts`
+Adicionar uma nova seção após o Step 2 (Criar ou Selecionar um App) com as URLs necessárias para configurar o app no Meta Developers:
 
 ```text
-Linha ~145: Adicionar log inicial
-  console.log(`=== SYNC START: Project ${project_id} ===`);
-  console.log(`Integrations found: Kiwify=${!!kiwifyIntegration}, Hotmart=${!!hotmartIntegration}, Guru=${!!guruIntegration}, Meta=${!!metaIntegration}`);
-  console.log(`Products configured: Hotmart=${project.hotmart_product_ids?.length || 0}, Guru=${project.guru_product_ids?.length || 0}`);
++-------------------------------------------+
+| 📋 URLs para Configuração do App Meta     |
+|                                           |
+| Ao criar seu app no Meta Developers,      |
+| você precisará informar estas URLs:       |
+|                                           |
+| Privacy Policy URL:                       |
+| [https://leadlove-dash.lovable.app/privacy] 📋
+|                                           |
+| Terms of Service URL:                     |
+| [https://leadlove-dash.lovable.app/terms] 📋
+|                                           |
+| (Botões para copiar cada URL)             |
++-------------------------------------------+
 ```
 
-### Fase 2: Tratar Erros de Autenticação OAuth
+### 2. MetaAdsIntegrationCard.tsx - Adicionar helper box + botão tutorial
 
-Melhorar tratamento de erros na obtenção de tokens:
+Adicionar no topo do card (antes do formulário de credenciais):
 
-**Hotmart (linhas 328-340):**
-- Adicionar try-catch ao redor da requisição de token
-- Logar status HTTP específico
-- Retornar erro detalhado caso falhe
+```text
++-------------------------------------------+
+| 📖 Precisa de ajuda para conectar?        |
+|                                           |
+| [Ver Tutorial Completo] →                 |
+|                                           |
+| URLs para configurar seu App Meta:        |
+| Privacy: leadlove-dash.lovable.app/privacy|
+| Terms: leadlove-dash.lovable.app/terms    |
++-------------------------------------------+
+```
 
-**Guru (linhas 434-444):**
-- Adicionar log de tentativa de requisição
-- Verificar se o endpoint v2 está respondendo corretamente
-- Tratar erro 401/403 especificamente
+## Arquivos a Modificar
 
-### Fase 3: Verificar Endpoints da API
+### `src/components/docs/MetaAdsTutorial.tsx`
+- Adicionar nova seção "URLs para Configuração" entre Step 2 e Step 3
+- Criar componente de card com botões de copiar para cada URL
+- Importar ícone `Copy` do lucide-react
 
-Pesquisei a documentação oficial:
+### `src/components/integrations/MetaAdsIntegrationCard.tsx`
+- Importar `Link` do react-router-dom e ícone `BookOpen` do lucide-react
+- Adicionar box informativo no início do `CollapsibleContent`
+- Incluir botão "Ver Tutorial" que navega para `/documentacao` com hash `#meta-ads`
+- Mostrar URLs de Privacy/Terms com opção de copiar
 
-1. **Hotmart API de Vendas:**
-   - Endpoint atual: `https://developers.hotmart.com/payments/api/v1/sales/history`
-   - Parâmetros: `product_id`, `start_date` (timestamp ms), `end_date` (timestamp ms)
-   - Este endpoint está correto conforme documentação
+## Detalhes Técnicos
 
-2. **Guru API v2:**
-   - Já corrigido de `api.digitalmanager.guru/api/v1` para `digitalmanager.guru/api/v2`
-   - Verificar se o endpoint de transações está correto: `/api/v2/transactions`
+### Componente de copiar URL (reutilizável)
 
-### Fase 4: Implementar Retry e Fallback
+```tsx
+function CopyableUrl({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm font-medium">{label}:</span>
+      <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">{url}</code>
+      <Button variant="ghost" size="sm" onClick={handleCopy}>
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </Button>
+    </div>
+  );
+}
+```
 
-Para evitar falhas silenciosas:
+### Navegação para documentação
 
-1. Adicionar retry em caso de timeout (3 tentativas)
-2. Logar resposta completa em caso de erro
-3. Continuar sincronização mesmo se uma integração falhar
+O botão "Ver Tutorial" usará o react-router-dom Link para navegar internamente:
 
-## Código a Modificar
+```tsx
+<Link to="/documentacao?tutorial=meta-ads">
+  <Button variant="outline" size="sm">
+    <BookOpen className="h-4 w-4 mr-1" />
+    Ver Tutorial
+  </Button>
+</Link>
+```
 
-### `supabase/functions/sync-project-data/index.ts`
-
-Adicionar os seguintes logs e tratamentos de erro nas seções:
-
-- **Linhas 140-147**: Log de início com resumo das integrações
-- **Linhas 326-340**: Melhorar log de autenticação Hotmart
-- **Linhas 342-350**: Log detalhado de erro de token
-- **Linhas 366-414**: Log de cada página de vendas e erros
-- **Linhas 421-450**: Mesmas melhorias para Guru
-
-## Ação Imediata para o Cliente
-
-Enquanto implementamos as correções:
-
-1. O cliente pode tentar **sincronizar novamente** clicando no botão "Atualizar"
-2. Se continuar sem dados, pode ser que realmente não haja vendas no período (últimos 90 dias) para os produtos selecionados
-3. Verificar se os produtos selecionados no Hotmart/Guru são os corretos (produtos ativos com vendas recentes)
-
-## Estimativa de Implementação
+## Estimativa
 
 | Tarefa | Tempo |
 |--------|-------|
-| Melhorar logging | 20 min |
-| Tratamento de erros OAuth | 25 min |
-| Verificar endpoints API | 15 min |
-| Implementar retry | 20 min |
-| Teste e deploy | 10 min |
-| **Total** | **~1h30** |
+| Seção de URLs no tutorial | 15 min |
+| Helper box no card | 15 min |
+| Botão copiar URL | 10 min |
+| Testes | 5 min |
+| **Total** | **~45 min** |
