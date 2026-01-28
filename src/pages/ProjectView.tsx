@@ -467,15 +467,15 @@ const parseCurrencyInput = (value: string): number => {
   } = calculatedMetrics;
 
   // Use metrics cache hook
-  const { updateCache } = useMetricsCache(id, dateRange);
+  const { updateCache, isCacheValid } = useMetricsCache(id, dateRange);
 
-  // Update cache when metrics change (debounced)
+  // Update cache when metrics change AND cache is invalid
   useEffect(() => {
-    if (id && totalRevenue !== undefined && !salesLoading && !adSpendLoading) {
-      // Update cache with calculated metrics
+    if (id && totalRevenue !== undefined && !salesLoading && !adSpendLoading && !isCacheValid) {
+      // Update cache with calculated metrics (debounced internally)
       updateCache(calculatedMetrics);
     }
-  }, [id, calculatedMetrics, salesLoading, adSpendLoading]);
+  }, [id, calculatedMetrics, salesLoading, adSpendLoading, isCacheValid]);
 
   // Group sales by UTM
   const salesByUtm = filteredSales?.reduce((acc, sale) => {
