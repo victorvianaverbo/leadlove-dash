@@ -129,6 +129,7 @@ export type Database = {
           created_at: string | null
           id: string
           metrics: Json | null
+          metrics_avg3days: Json | null
           project_id: string
           report_date: string
           summary: string
@@ -139,6 +140,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           metrics?: Json | null
+          metrics_avg3days?: Json | null
           project_id: string
           report_date: string
           summary: string
@@ -149,6 +151,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           metrics?: Json | null
+          metrics_avg3days?: Json | null
           project_id?: string
           report_date?: string
           summary?: string
