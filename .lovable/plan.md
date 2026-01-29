@@ -1,115 +1,89 @@
 
-# Correção da Inconsistência de Métricas Entre Dashboards
 
-## Diagnóstico
+# Correção: Divisão Dinâmica Baseada em Dias com Dados
 
-Após análise detalhada, identifiquei a causa raiz:
+## Problema Identificado
 
-### Como funciona hoje
-
-| Dado | Origem | Problema |
-|------|--------|----------|
-| **Resumo de Ontem** (métricas) | `funnelMetrics` = dados de D1 apenas | ❌ Mostra valores de ontem |
-| **Ações Recomendadas** (texto) | `avg3Days.*` = média 3 dias | ✅ Correto |
-| **Actions com metric_value** | Valor na resposta da IA (3 dias) | ✅ Correto |
-
-O Connect Rate **39.7%** é o valor de **ontem (D1)**, enquanto **56.3%** é a **média de 3 dias** que aparece no seu dashboard admin.
-
-### A solução
-
-Alterar o `generate-daily-report` para salvar **ambos** os conjuntos de métricas:
-1. `metrics` → dados de D1 (para comparação dia a dia)
-2. `metrics_avg3days` → média de 3 dias (para análises)
-
-E atualizar o `PublicDashboard.tsx` para:
-1. Renomear "Resumo de Ontem" → "Análise dos Últimos 3 Dias"
-2. Mostrar as métricas com base em `metrics_avg3days`
-
----
-
-## Alterações Necessárias
-
-### 1. Edge Function `generate-daily-report/index.ts`
-
-Adicionar campo `metrics_avg3days` ao salvar o relatório:
+O cálculo atual (linhas 274-291) **sempre divide por 3**, mesmo quando só há dados de 2 ou 1 dia:
 
 ```typescript
-// Save report to database (for yesterday's date)
-const { data: report, error: insertError } = await supabase
-  .from('daily_reports')
-  .upsert({
-    project_id: projectId,
-    report_date: day1,
-    summary: parsedAiResponse.summary,
-    comparison: funnelComparison,
-    actions: parsedAiResponse.actions || [],
-    metrics: funnelMetrics,
-    // NOVO: Adicionar métricas de média 3 dias
-    metrics_avg3days: {
-      revenue: avg3Days.revenue,
-      spend: avg3Days.spend,
-      roas: avg3Days.roas,
-      cpa: avg3Days.cpa,
-      salesCount: avg3Days.salesCount,
-      hookRate: avg3Days.hookRate,
-      holdRate: avg3Days.holdRate,
-      closeRate: avg3Days.closeRate,
-      connectRate: avg3Days.connectRate,
-      ctrRate: avg3Days.ctrRate,
-      cpmValue: avg3Days.cpmValue,
-      checkoutRate: avg3Days.checkoutRate,
-      saleRate: avg3Days.saleRate,
-    }
-  }, {
-    onConflict: 'project_id,report_date',
-  });
+// Atual - PROBLEMA
+const avg3Days = {
+  connectRate: (d1.connectRate + d2.connectRate + d3.connectRate) / 3,  // ← Divide por 3 sempre
+  // ...
+};
 ```
 
-### 2. Banco de Dados
+Se você iniciou o tráfego há 2 dias:
+- D1 (ontem): Connect = 68.9%
+- D2 (anteontem): Connect = 50.0%
+- D3 (3 dias atrás): Connect = 0% (sem dados)
+- **Média atual**: (68.9 + 50.0 + 0) / 3 = **39.6%** ❌
+- **Média correta**: (68.9 + 50.0) / 2 = **59.5%** ✅
 
-Adicionar coluna `metrics_avg3days` à tabela `daily_reports`:
+---
 
-```sql
-ALTER TABLE daily_reports 
-ADD COLUMN IF NOT EXISTS metrics_avg3days JSONB DEFAULT NULL;
-```
+## Solução
 
-### 3. Frontend `PublicDashboard.tsx`
+Detectar quantos dias têm dados significativos (impressions > 0 ou spend > 0) e dividir apenas por esse número.
 
-Atualizar a interface `DailyReport` e a seção de resumo:
+### Alteração em `supabase/functions/generate-daily-report/index.ts`
 
-**Mudanças:**
-- Linha 502: Renomear título para "Análise dos Últimos 3 Dias"
-- Linhas 514-543: Usar `latestReport.metrics_avg3days` para exibir métricas
-- Adicionar fallback para `metrics` quando `metrics_avg3days` não existir (compatibilidade)
+**Após linha 271 (depois do `d3 = calcDayMetrics(...)`)**, adicionar lógica para contar dias com dados:
 
-```tsx
-// Section 2: Yesterday's Report → 3-Day Analysis
-<CardTitle className="text-lg">Análise dos Últimos 3 Dias</CardTitle>
+```typescript
+const d1 = calcDayMetrics(day1Sales, day1AdSpend);
+const d2 = calcDayMetrics(day2Sales, day2AdSpend);
+const d3 = calcDayMetrics(day3Sales, day3AdSpend);
 
-// Usar métricas de 3 dias com fallback para D1
-const displayMetrics = latestReport.metrics_avg3days || latestReport.metrics;
-<p className="font-semibold text-success">
-  {formatCurrency(displayMetrics?.revenue || 0)}
-</p>
+// Detectar quantos dias têm dados significativos
+const hasD1Data = d1.impressions > 0 || d1.spend > 0 || d1.salesCount > 0;
+const hasD2Data = d2.impressions > 0 || d2.spend > 0 || d2.salesCount > 0;
+const hasD3Data = d3.impressions > 0 || d3.spend > 0 || d3.salesCount > 0;
+
+// Contar dias com dados (mínimo 1 para evitar divisão por zero)
+const daysWithData = Math.max(1, (hasD1Data ? 1 : 0) + (hasD2Data ? 1 : 0) + (hasD3Data ? 1 : 0));
+
+console.log(`Days with data: ${daysWithData} (D1: ${hasD1Data}, D2: ${hasD2Data}, D3: ${hasD3Data})`);
+
+// Calculate averages using only days with data
+const avg3Days = {
+  engagementRate: (d1.engagementRate + d2.engagementRate + d3.engagementRate) / daysWithData,
+  ctrRate: (d1.ctrRate + d2.ctrRate + d3.ctrRate) / daysWithData,
+  lpRate: (d1.lpRate + d2.lpRate + d3.lpRate) / daysWithData,
+  checkoutRate: (d1.checkoutRate + d2.checkoutRate + d3.checkoutRate) / daysWithData,
+  saleRate: (d1.saleRate + d2.saleRate + d3.saleRate) / daysWithData,
+  revenue: (d1.revenue + d2.revenue + d3.revenue) / daysWithData,
+  spend: (d1.spend + d2.spend + d3.spend) / daysWithData,
+  roas: (d1.roas + d2.roas + d3.roas) / daysWithData,
+  cpa: (d1.cpa + d2.cpa + d3.cpa) / daysWithData,
+  salesCount: (d1.salesCount + d2.salesCount + d3.salesCount) / daysWithData,
+  hookRate: (d1.hookRate + d2.hookRate + d3.hookRate) / daysWithData,
+  holdRate: (d1.holdRate + d2.holdRate + d3.holdRate) / daysWithData,
+  closeRate: (d1.closeRate + d2.closeRate + d3.closeRate) / daysWithData,
+  connectRate: (d1.connectRate + d2.connectRate + d3.connectRate) / daysWithData,
+  cpmValue: (d1.cpmValue + d2.cpmValue + d3.cpmValue) / daysWithData,
+};
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/generate-daily-report/index.ts` | Salvar `metrics_avg3days` no relatório |
-| **Migração SQL** | Adicionar coluna `metrics_avg3days` |
-| `src/pages/PublicDashboard.tsx` | Usar métricas de 3 dias, renomear seção |
+| `supabase/functions/generate-daily-report/index.ts` | Adicionar detecção de dias com dados e usar `daysWithData` como divisor |
 
 ---
 
 ## Resultado Esperado
 
-Após a correção:
-- O dashboard público mostrará **métricas de 3 dias** consistentes com as recomendações
-- O título "Análise dos Últimos 3 Dias" deixa claro que são dados consolidados
-- Métricas e recomendações estarão sincronizadas (ambos usando avg3Days)
-- Compatibilidade mantida com relatórios antigos (fallback para `metrics`)
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| 3 dias de tráfego | (D1+D2+D3)/3 | (D1+D2+D3)/3 ✅ |
+| 2 dias de tráfego | (D1+D2+0)/3 ❌ | (D1+D2)/2 ✅ |
+| 1 dia de tráfego | (D1+0+0)/3 ❌ | (D1)/1 ✅ |
+
+Para o projeto Roberley (2 dias de dados):
+- Connect Rate: passará de **39.7%** para **~59%** (consistente com admin)
+
