@@ -89,6 +89,23 @@ interface FunnelMetrics {
   };
 }
 
+// 3-day average metrics (for consistent display with recommendations)
+interface Metrics3DayAvg {
+  revenue: number;
+  spend: number;
+  roas: number;
+  cpa: number;
+  salesCount: number;
+  hookRate?: number;
+  holdRate?: number;
+  closeRate?: number;
+  connectRate?: number;
+  ctrRate?: number;
+  cpmValue?: number;
+  checkoutRate?: number;
+  saleRate?: number;
+}
+
 interface DailyReport {
   id: string;
   project_id: string;
@@ -116,6 +133,8 @@ interface DailyReport {
     reason?: string;
   }>;
   metrics: FunnelMetrics;
+  // 3-day average metrics for consistent display
+  metrics_avg3days?: Metrics3DayAvg;
   created_at: string;
 }
 
@@ -490,7 +509,7 @@ export default function PublicDashboard() {
           </CardContent>
         </Card>
 
-        {/* Section 2: Yesterday's Report (AI Generated) */}
+        {/* Section 2: 3-Day Analysis (AI Generated) */}
         {latestReport && (
           <Card className="border border-border">
             <CardHeader className="pb-3">
@@ -499,10 +518,10 @@ export default function PublicDashboard() {
                   <div className="p-1.5 bg-muted rounded-lg">
                     <Sparkles className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <CardTitle className="text-lg">Resumo de Ontem</CardTitle>
+                  <CardTitle className="text-lg">Análise dos Últimos 3 Dias</CardTitle>
                 </div>
                 <span className="text-sm text-muted-foreground capitalize">
-                  {formatReportDate(latestReport.report_date)}
+                  Atualizado em {formatReportDate(latestReport.report_date)}
                 </span>
               </div>
             </CardHeader>
@@ -510,38 +529,48 @@ export default function PublicDashboard() {
               {/* Summary */}
               <p className="text-sm leading-relaxed">{latestReport.summary}</p>
 
-              {/* Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Receita</p>
-                  <p className="font-semibold text-success">
-                    {formatCurrency(latestReport.metrics?.revenue || 0)}
-                  </p>
-                  <ChangeIndicator value={latestReport.comparison.revenue?.change || 0} />
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Gasto</p>
-                  <p className="font-semibold text-destructive">
-                    {formatCurrency(latestReport.metrics?.spend || 0)}
-                  </p>
-                  <ChangeIndicator value={-(latestReport.comparison.spend?.change || 0)} />
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                  <p className={`font-semibold ${(latestReport.metrics?.roas || 0) >= 1 ? 'text-success' : 'text-destructive'}`}>
-                    {(latestReport.metrics?.roas || 0).toFixed(2)}x
-                  </p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                  <p className="font-semibold">{formatCurrency(latestReport.metrics?.cpa || 0)}</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground mb-1">Vendas</p>
-                  <p className="font-semibold">{latestReport.metrics?.sales || 0}</p>
-                  <ChangeIndicator value={latestReport.comparison.sales?.change || 0} />
-                </div>
-              </div>
+              {/* Metrics - Use 3-day averages with fallback to D1 for older reports */}
+              {(() => {
+                const displayMetrics = latestReport.metrics_avg3days || latestReport.metrics;
+                const revenue = displayMetrics?.revenue || 0;
+                const spend = displayMetrics?.spend || 0;
+                const roas = displayMetrics?.roas || 0;
+                const cpa = displayMetrics?.cpa || 0;
+                const salesCount = 'salesCount' in displayMetrics 
+                  ? (displayMetrics as Metrics3DayAvg).salesCount 
+                  : (displayMetrics as FunnelMetrics)?.sales || 0;
+                
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Receita (média)</p>
+                      <p className="font-semibold text-success">
+                        {formatCurrency(revenue)}
+                      </p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Gasto (média)</p>
+                      <p className="font-semibold text-destructive">
+                        {formatCurrency(spend)}
+                      </p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                      <p className={`font-semibold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                        {roas.toFixed(2)}x
+                      </p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                      <p className="font-semibold">{formatCurrency(cpa)}</p>
+                    </div>
+                    <div className="bg-card rounded-lg p-3 border">
+                      <p className="text-xs text-muted-foreground mb-1">Vendas (média)</p>
+                      <p className="font-semibold">{salesCount.toFixed(1)}</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}

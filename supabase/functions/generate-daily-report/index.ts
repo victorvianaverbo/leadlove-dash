@@ -567,6 +567,7 @@ IMPORTANTE para actions:
   }
 
   // Save report to database (for yesterday's date)
+  // Save both D1 metrics and 3-day averages for consistency
   const { data: report, error: insertError } = await supabase
     .from('daily_reports')
     .upsert({
@@ -576,6 +577,22 @@ IMPORTANTE para actions:
       comparison: funnelComparison,
       actions: parsedAiResponse.actions || [],
       metrics: funnelMetrics,
+      // 3-day average metrics for consistent display with recommendations
+      metrics_avg3days: {
+        revenue: avg3Days.revenue,
+        spend: avg3Days.spend,
+        roas: avg3Days.roas,
+        cpa: avg3Days.cpa,
+        salesCount: avg3Days.salesCount,
+        hookRate: avg3Days.hookRate,
+        holdRate: avg3Days.holdRate,
+        closeRate: avg3Days.closeRate,
+        connectRate: avg3Days.connectRate,
+        ctrRate: avg3Days.ctrRate,
+        cpmValue: avg3Days.cpmValue,
+        checkoutRate: avg3Days.checkoutRate,
+        saleRate: avg3Days.saleRate,
+      },
     }, {
       onConflict: 'project_id,report_date',
     })
