@@ -270,24 +270,34 @@ async function generateReportForProject(
   const d2 = calcDayMetrics(day2Sales, day2AdSpend);
   const d3 = calcDayMetrics(day3Sales, day3AdSpend);
 
-  // Calculate 3-day averages for trend analysis
+  // Detectar quantos dias têm dados significativos
+  const hasD1Data = d1.impressions > 0 || d1.spend > 0 || d1.salesCount > 0;
+  const hasD2Data = d2.impressions > 0 || d2.spend > 0 || d2.salesCount > 0;
+  const hasD3Data = d3.impressions > 0 || d3.spend > 0 || d3.salesCount > 0;
+
+  // Contar dias com dados (mínimo 1 para evitar divisão por zero)
+  const daysWithData = Math.max(1, (hasD1Data ? 1 : 0) + (hasD2Data ? 1 : 0) + (hasD3Data ? 1 : 0));
+
+  console.log(`Days with data: ${daysWithData} (D1: ${hasD1Data}, D2: ${hasD2Data}, D3: ${hasD3Data})`);
+
+  // Calculate averages using only days with data
   const avg3Days = {
-    engagementRate: (d1.engagementRate + d2.engagementRate + d3.engagementRate) / 3,
-    ctrRate: (d1.ctrRate + d2.ctrRate + d3.ctrRate) / 3,
-    lpRate: (d1.lpRate + d2.lpRate + d3.lpRate) / 3,
-    checkoutRate: (d1.checkoutRate + d2.checkoutRate + d3.checkoutRate) / 3,
-    saleRate: (d1.saleRate + d2.saleRate + d3.saleRate) / 3,
-    revenue: (d1.revenue + d2.revenue + d3.revenue) / 3,
-    spend: (d1.spend + d2.spend + d3.spend) / 3,
-    roas: (d1.roas + d2.roas + d3.roas) / 3,
-    cpa: (d1.cpa + d2.cpa + d3.cpa) / 3,
-    salesCount: (d1.salesCount + d2.salesCount + d3.salesCount) / 3,
+    engagementRate: (d1.engagementRate + d2.engagementRate + d3.engagementRate) / daysWithData,
+    ctrRate: (d1.ctrRate + d2.ctrRate + d3.ctrRate) / daysWithData,
+    lpRate: (d1.lpRate + d2.lpRate + d3.lpRate) / daysWithData,
+    checkoutRate: (d1.checkoutRate + d2.checkoutRate + d3.checkoutRate) / daysWithData,
+    saleRate: (d1.saleRate + d2.saleRate + d3.saleRate) / daysWithData,
+    revenue: (d1.revenue + d2.revenue + d3.revenue) / daysWithData,
+    spend: (d1.spend + d2.spend + d3.spend) / daysWithData,
+    roas: (d1.roas + d2.roas + d3.roas) / daysWithData,
+    cpa: (d1.cpa + d2.cpa + d3.cpa) / daysWithData,
+    salesCount: (d1.salesCount + d2.salesCount + d3.salesCount) / daysWithData,
     // Novas métricas de vídeo
-    hookRate: (d1.hookRate + d2.hookRate + d3.hookRate) / 3,
-    holdRate: (d1.holdRate + d2.holdRate + d3.holdRate) / 3,
-    closeRate: (d1.closeRate + d2.closeRate + d3.closeRate) / 3,
-    connectRate: (d1.connectRate + d2.connectRate + d3.connectRate) / 3,
-    cpmValue: (d1.cpmValue + d2.cpmValue + d3.cpmValue) / 3,
+    hookRate: (d1.hookRate + d2.hookRate + d3.hookRate) / daysWithData,
+    holdRate: (d1.holdRate + d2.holdRate + d3.holdRate) / daysWithData,
+    closeRate: (d1.closeRate + d2.closeRate + d3.closeRate) / daysWithData,
+    connectRate: (d1.connectRate + d2.connectRate + d3.connectRate) / daysWithData,
+    cpmValue: (d1.cpmValue + d2.cpmValue + d3.cpmValue) / daysWithData,
   };
 
   // Determine trends (comparing day1 to day3)
