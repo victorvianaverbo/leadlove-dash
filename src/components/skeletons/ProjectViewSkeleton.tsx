@@ -72,39 +72,6 @@ export function ProjectViewSkeleton() {
           ))}
         </section>
 
-        {/* UTM Table Skeleton */}
-        <section className="mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-64 mt-1" />
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md overflow-hidden">
-                <div className="bg-muted/50 p-3 flex gap-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={`header-${i}`} className="h-4 flex-1" />
-                  ))}
-                </div>
-                {Array.from({ length: 5 }).map((_, rowIndex) => (
-                  <div key={`row-${rowIndex}`} className="p-3 flex gap-4 border-t border-border">
-                    {Array.from({ length: 5 }).map((_, colIndex) => (
-                      <Skeleton key={`cell-${rowIndex}-${colIndex}`} className="h-4 flex-1" />
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 flex items-center justify-between">
-                <Skeleton className="h-4 w-32" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
       </main>
     </div>
   );
