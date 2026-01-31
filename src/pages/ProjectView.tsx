@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { useMetricsCache } from '@/hooks/useMetricsCache';
-import { LazyUtmTable } from '@/components/LazyUtmTable';
+
 import { KpiGridSkeleton, FunnelSectionSkeleton, SettingsCardSkeleton } from '@/components/skeletons';
 import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
@@ -477,22 +477,6 @@ const parseCurrencyInput = (value: string): number => {
     }
   }, [id, calculatedMetrics, salesLoading, adSpendLoading, isCacheValid]);
 
-  // Group sales by UTM
-  const salesByUtm = filteredSales?.reduce((acc, sale) => {
-    const key = `${sale.utm_source || 'direto'}|${sale.utm_medium || '-'}|${sale.utm_campaign || '-'}`;
-    if (!acc[key]) {
-      acc[key] = { source: sale.utm_source || 'direto', medium: sale.utm_medium || '-', campaign: sale.utm_campaign || '-', count: 0, revenue: 0 };
-    }
-    acc[key].count++;
-    // Use ticket price when configured, otherwise use gross_amount/amount
-    const saleValue = (ticketPrice && useGrossForRoas) 
-      ? ticketPrice 
-      : (useGrossForRoas ? ((sale as any).gross_amount || sale.amount) : sale.amount);
-    acc[key].revenue += Number(saleValue);
-    return acc;
-  }, {} as Record<string, { source: string; medium: string; campaign: string; count: number; revenue: number }>);
-
-  const utmData = Object.values(salesByUtm || {}).sort((a, b) => b.revenue - a.revenue);
 
   if (loading || !user || projectLoading) {
     return (
@@ -891,14 +875,6 @@ const parseCurrencyInput = (value: string): number => {
         </div>
         )}
 
-        {/* UTM Attribution Table */}
-        <div className="mb-6 sm:mb-8">
-          <LazyUtmTable 
-            data={utmData} 
-            formatCurrency={formatCurrency}
-            isLoading={salesLoading}
-          />
-        </div>
 
         <DeleteProjectDialog
           projectName={project?.name || ''}
