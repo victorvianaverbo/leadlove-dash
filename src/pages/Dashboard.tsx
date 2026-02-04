@@ -455,7 +455,7 @@ export default function Dashboard() {
                       metrics={getProjectMetrics(project.id)}
                       integrations={getProjectIntegrations(project.id)}
                       onDelete={(e) => handleDeleteClick(e, { id: project.id, name: project.name })}
-                      onClick={() => navigate(`/projects/${project.id}`)}
+                      onClick={() => navigate(`/projects/${(project as any).slug || project.id}`)}
                       index={index}
                     />
                   ))}

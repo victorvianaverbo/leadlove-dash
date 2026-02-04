@@ -19,7 +19,7 @@ import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, Shoppi
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, generateSlug, isUUID } from '@/lib/utils';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all' | 'custom';
 
@@ -49,15 +49,6 @@ export default function ProjectView() {
   // Custom domain - use your published domain
   const PUBLIC_DOMAIN = 'https://metrikapro.com.br';
 
-  // Generate slug from project name
-  const generateSlug = (name: string): string => {
-    return name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/[^a-z0-9]+/g, '-')     // Replace special chars with dash
-      .replace(/^-+|-+$/g, '');        // Remove leading/trailing dashes
-  };
 
   // Currency formatting helpers
   const formatCurrencyInput = (value: number): string => {
@@ -94,11 +85,16 @@ const parseCurrencyInput = (value: string): number => {
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Hybrid lookup: support both UUID and slug
+      let query = supabase.from('projects').select('*');
+      
+      if (isUUID(id!)) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id).eq('user_id', user!.id);
+      }
+      
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
@@ -179,13 +175,16 @@ const parseCurrencyInput = (value: string): number => {
     return null;
   };
 
+  // Use the actual project ID for queries that need it
+  const projectId = project?.id;
+
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales', id, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: ['sales', projectId, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from('sales')
         .select('*')
-        .eq('project_id', id)
+        .eq('project_id', projectId!)
         .eq('status', 'paid')
         .order('sale_date', { ascending: false });
       
@@ -202,16 +201,16 @@ const parseCurrencyInput = (value: string): number => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !!id,
+    enabled: !!user && !!projectId,
   });
 
   const { data: adSpend, isLoading: adSpendLoading } = useQuery({
-    queryKey: ['ad_spend', id, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
+    queryKey: ['ad_spend', projectId, dateRange, customStartDate?.toISOString(), customEndDate?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from('ad_spend')
         .select('*')
-        .eq('project_id', id)
+        .eq('project_id', projectId!)
         .order('date', { ascending: false });
       
       const dateFilter = getDateFilter();
@@ -227,7 +226,7 @@ const parseCurrencyInput = (value: string): number => {
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !!id,
+    enabled: !!user && !!projectId,
   });
 
   // Sync progress state
@@ -249,7 +248,7 @@ const parseCurrencyInput = (value: string): number => {
       
       // Step 1: Sync data from Kiwify + Meta Ads
       const { error, data } = await supabase.functions.invoke('sync-project-data', {
-        body: { project_id: id },
+        body: { project_id: projectId },
       });
       
       if (error) throw error;
@@ -263,7 +262,7 @@ const parseCurrencyInput = (value: string): number => {
 
       // Step 2: Generate updated AI report
       const { error: reportError } = await supabase.functions.invoke('generate-daily-report', {
-        body: { project_id: id },
+        body: { project_id: projectId },
       });
 
       if (reportError) {
@@ -277,8 +276,8 @@ const parseCurrencyInput = (value: string): number => {
       setSyncProgress({ stage: 'connecting', message: 'Iniciando sincronização...' });
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sales', id] });
-      queryClient.invalidateQueries({ queryKey: ['ad_spend', id] });
+      queryClient.invalidateQueries({ queryKey: ['sales', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['ad_spend', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       
       const salesCount = data?.salesSynced || 0;
@@ -319,7 +318,7 @@ const parseCurrencyInput = (value: string): number => {
           account_status: accountStatus,
           ad_type: adType
         })
-        .eq('id', id);
+        .eq('id', projectId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -339,7 +338,7 @@ const parseCurrencyInput = (value: string): number => {
       const { error } = await supabase
         .from('projects')
         .update({ is_public: newIsPublic, slug } as any)
-        .eq('id', id);
+        .eq('id', projectId);
       if (error) throw error;
       return slug;
     },
@@ -361,12 +360,12 @@ const parseCurrencyInput = (value: string): number => {
   const deleteProject = useMutation({
     mutationFn: async () => {
       // Delete related data first
-      await supabase.from('daily_reports').delete().eq('project_id', id);
-      await supabase.from('integrations').delete().eq('project_id', id);
-      await supabase.from('ad_spend').delete().eq('project_id', id);
-      await supabase.from('sales').delete().eq('project_id', id);
+      await supabase.from('daily_reports').delete().eq('project_id', projectId);
+      await supabase.from('integrations').delete().eq('project_id', projectId);
+      await supabase.from('ad_spend').delete().eq('project_id', projectId);
+      await supabase.from('sales').delete().eq('project_id', projectId);
       // Delete project
-      const { error } = await supabase.from('projects').delete().eq('id', id);
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
       if (error) throw error;
     },
     onSuccess: () => {
