@@ -109,15 +109,19 @@ export default function Settings() {
 
     setIsUpdatingEmail(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        email: newEmail.trim(),
+      const { error } = await supabase.functions.invoke('send-email-change', {
+        body: {
+          currentEmail: user!.email,
+          newEmail: newEmail.trim(),
+          redirectUrl: window.location.origin + '/settings',
+        },
       });
 
       if (error) throw error;
 
       toast({
         title: 'Email de confirmação enviado!',
-        description: 'Verifique sua caixa de entrada para confirmar a alteração.',
+        description: 'Verifique a caixa de entrada do novo email para confirmar a alteração.',
       });
       setNewEmail('');
     } catch (error: any) {
