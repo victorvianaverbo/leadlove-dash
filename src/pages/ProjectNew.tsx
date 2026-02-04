@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft, AlertTriangle, Crown } from 'lucide-react';
 import { STRIPE_PLANS, PlanKey } from '@/lib/stripe-plans';
 import { CheckoutModal } from '@/components/CheckoutModal';
 import { validateProjectName, validateProjectDescription } from '@/lib/validation';
+import { generateSlug } from '@/lib/utils';
 
 // List of upgrade options for the modal
 const upgradeOptions: { key: PlanKey; label: string }[] = [
@@ -68,17 +69,45 @@ export default function ProjectNew() {
     return optionPlan.projects > currentPlan.projects;
   });
 
+  // Generate unique slug for the user
+  const generateUniqueSlug = async (name: string, userId: string): Promise<string> => {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let counter = 1;
+    
+    while (true) {
+      const { data } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('slug', slug)
+        .maybeSingle();
+      
+      if (!data) break; // Slug available
+      
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+    
+    return slug;
+  };
+
   const createProject = useMutation({
     mutationFn: async () => {
       if (!canCreateProject) {
         throw new Error('Limite de projetos atingido');
       }
+      
+      // Generate unique slug for URL
+      const slug = await generateUniqueSlug(name, user!.id);
+      
       const { data, error } = await supabase
         .from('projects')
         .insert({
           user_id: user!.id,
           name,
           description: description || null,
+          slug,
         })
         .select()
         .single();
@@ -89,7 +118,8 @@ export default function ProjectNew() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project-count'] });
       toast({ title: 'Projeto criado!', description: 'Agora selecione os produtos e campanhas.' });
-      navigate(`/projects/${data.id}/edit`);
+      // Navigate using slug for friendly URL
+      navigate(`/projects/${data.slug}/edit`);
     },
     onError: (error) => {
       toast({ title: 'Erro ao criar projeto', description: error.message, variant: 'destructive' });
