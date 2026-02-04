@@ -230,6 +230,12 @@ const parseCurrencyInput = (value: string): number => {
     enabled: !!user && !!id,
   });
 
+  // Sync progress state
+  const [syncProgress, setSyncProgress] = useState<{
+    stage: 'idle' | 'connecting' | 'importing' | 'processing' | 'done';
+    message: string;
+  }>({ stage: 'idle', message: '' });
+
   const syncData = useMutation({
     mutationFn: async () => {
       // Ensure we have a valid session before calling the edge function
@@ -237,6 +243,9 @@ const parseCurrencyInput = (value: string): number => {
       if (!session) {
         throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
+      
+      // Stage 1: Connecting
+      setSyncProgress({ stage: 'connecting', message: 'Conectando às APIs...' });
       
       // Step 1: Sync data from Kiwify + Meta Ads
       const { error, data } = await supabase.functions.invoke('sync-project-data', {
@@ -249,6 +258,9 @@ const parseCurrencyInput = (value: string): number => {
         throw new Error(data.error);
       }
 
+      // Stage 2: Processing report
+      setSyncProgress({ stage: 'processing', message: 'Gerando relatório...' });
+
       // Step 2: Generate updated AI report
       const { error: reportError } = await supabase.functions.invoke('generate-daily-report', {
         body: { project_id: id },
@@ -258,18 +270,40 @@ const parseCurrencyInput = (value: string): number => {
         console.error('Error generating report after sync:', reportError);
         // Don't throw - sync was successful, report generation is secondary
       }
+
+      return data;
     },
-    onSuccess: () => {
+    onMutate: () => {
+      setSyncProgress({ stage: 'connecting', message: 'Iniciando sincronização...' });
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales', id] });
       queryClient.invalidateQueries({ queryKey: ['ad_spend', id] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
-      toast({ title: 'Dados atualizados!', description: 'Vendas, gastos e relatório foram sincronizados.' });
+      
+      const salesCount = data?.salesSynced || 0;
+      const adSpendCount = data?.adSpendSynced || 0;
+      const totalTime = data?.timing?.total ? `${(data.timing.total / 1000).toFixed(1)}s` : '';
+      const backgroundNote = data?.backgroundSyncScheduled ? ' Dados históricos serão importados em segundo plano.' : '';
+      
+      setSyncProgress({ stage: 'done', message: '' });
+      toast({ 
+        title: 'Dados atualizados!', 
+        description: `${salesCount} vendas e ${adSpendCount} registros de anúncios importados${totalTime ? ` em ${totalTime}` : ''}.${backgroundNote}`
+      });
     },
     onError: (error) => {
+      setSyncProgress({ stage: 'idle', message: '' });
       const message = error.message.includes('Invalid token') 
         ? 'Sessão expirada. Recarregue a página e tente novamente.'
         : error.message;
       toast({ title: 'Erro ao sincronizar', description: message, variant: 'destructive' });
+    },
+    onSettled: () => {
+      // Reset progress after a short delay to allow the user to see the final state
+      setTimeout(() => {
+        setSyncProgress({ stage: 'idle', message: '' });
+      }, 2000);
     },
   });
 
@@ -614,13 +648,28 @@ const parseCurrencyInput = (value: string): number => {
                 </>
               )}
               
-              <Button onClick={() => syncData.mutate()} disabled={syncData.isPending} size="sm" className="px-2 sm:px-3">
+              <Button 
+                onClick={() => syncData.mutate()} 
+                disabled={syncData.isPending} 
+                size="sm" 
+                className="px-2 sm:px-3 min-w-[100px] sm:min-w-[120px]"
+              >
                 {syncData.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="ml-1.5 text-xs sm:text-sm truncate">
+                      {syncProgress.stage === 'connecting' && 'Conectando...'}
+                      {syncProgress.stage === 'importing' && 'Importando...'}
+                      {syncProgress.stage === 'processing' && 'Processando...'}
+                      {syncProgress.stage === 'idle' && 'Sincronizando...'}
+                    </span>
+                  </>
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="ml-1.5 hidden sm:inline">Atualizar</span>
+                  </>
                 )}
-                <span className="ml-1.5 hidden sm:inline">Atualizar</span>
               </Button>
               <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" asChild>
                 <Link to={`/projects/${id}/edit`}>
