@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { validateProjectName, validateProjectDescription } from "@/lib/validation";
 import { SalesIntegrationCard } from "@/components/integrations/SalesIntegrationCard";
 import { MetaAdsIntegrationCard } from "@/components/integrations/MetaAdsIntegrationCard";
+import { isUUID } from "@/lib/utils";
 
 export default function ProjectEdit() {
   const { id } = useParams<{ id: string }>();
@@ -49,33 +50,40 @@ export default function ProjectEdit() {
   // Collapsible states - connected integrations start collapsed
   const [openIntegrations, setOpenIntegrations] = useState<string[]>([]);
 
-  // Fetch project data
+  // Fetch project data - supports both UUID and slug lookup
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
+      let query = supabase.from('projects').select('*');
+      
+      if (isUUID(id!)) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id).eq('user_id', user!.id);
+      }
+      
+      const { data, error } = await query.single();
       if (error) throw error;
       return data;
     },
     enabled: !!id && !!user,
   });
 
+  // Use real project ID for queries that need it
+  const projectId = project?.id;
+
   // Fetch project integrations
   const { data: integrations, isLoading: integrationsLoading } = useQuery({
-    queryKey: ['project-integrations', id],
+    queryKey: ['project-integrations', projectId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('integrations')
         .select('*')
-        .eq('project_id', id);
+        .eq('project_id', projectId!);
       if (error) throw error;
       return data;
     },
-    enabled: !!id && !!user,
+    enabled: !!projectId && !!user,
   });
 
   const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
@@ -150,7 +158,7 @@ export default function ProjectEdit() {
           use_gross_for_roas: useGrossForRoas,
           kiwify_ticket_price: kiwifyTicketPrice ? parseFloat(kiwifyTicketPrice) : null,
         } as any)
-        .eq('id', id);
+        .eq('id', projectId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -179,7 +187,7 @@ export default function ProjectEdit() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(`/projects/${id}`)}>
+          <Button variant="ghost" onClick={() => navigate(`/projects/${project?.slug || id}`)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </Button>
@@ -291,7 +299,7 @@ export default function ProjectEdit() {
           <CardContent className="space-y-3">
             <SalesIntegrationCard
               type="kiwify"
-              projectId={id!}
+              projectId={projectId!}
               integration={kiwifyIntegration}
               selectedProducts={kiwifyProducts}
               onProductsChange={setKiwifyProducts}
@@ -300,7 +308,7 @@ export default function ProjectEdit() {
             />
             <SalesIntegrationCard
               type="hotmart"
-              projectId={id!}
+              projectId={projectId!}
               integration={hotmartIntegration}
               selectedProducts={hotmartProducts}
               onProductsChange={setHotmartProducts}
@@ -309,7 +317,7 @@ export default function ProjectEdit() {
             />
             <SalesIntegrationCard
               type="guru"
-              projectId={id!}
+              projectId={projectId!}
               integration={guruIntegration}
               selectedProducts={guruProducts}
               onProductsChange={setGuruProducts}
@@ -332,7 +340,7 @@ export default function ProjectEdit() {
           </CardHeader>
           <CardContent>
             <MetaAdsIntegrationCard
-              projectId={id!}
+              projectId={projectId!}
               integration={metaIntegration}
               selectedCampaigns={selectedCampaigns}
               onCampaignsChange={setSelectedCampaigns}
