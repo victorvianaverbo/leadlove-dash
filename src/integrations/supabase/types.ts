@@ -672,6 +672,7 @@ export type Database = {
       }
     }
     Functions: {
+      generate_slug_from_name: { Args: { name: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
