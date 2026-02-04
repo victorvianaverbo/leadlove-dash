@@ -365,13 +365,20 @@ async function syncHotmart(
     // Fetch sales for each product - continue even if individual products fail
     let productsWithErrors = 0;
     for (const productId of productIds) {
-      let page = 1;
+      let pageToken: string | null = null;
       let hasMore = true;
+      let pageCount = 0;
 
       try {
         while (hasMore) {
+          // Build URL with page_token only if we have one (cursor-based pagination)
+          let url = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100`;
+          if (pageToken) {
+            url += `&page_token=${encodeURIComponent(pageToken)}`;
+          }
+
           const salesResponse = await fetchWithRetry(
-            `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`,
+            url,
             {
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
@@ -383,8 +390,9 @@ async function syncHotmart(
           if (salesResponse.ok) {
             const salesData = await salesResponse.json();
             const sales = salesData.items || [];
+            pageCount++;
             
-            console.log(`[HOTMART] Product ${productId} - Page ${page}: ${sales.length} sales`);
+            console.log(`[HOTMART] Product ${productId} - Page ${pageCount}: ${sales.length} sales`);
 
             for (const sale of sales) {
               const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
@@ -412,8 +420,9 @@ async function syncHotmart(
               });
             }
 
-            hasMore = sales.length >= 100;
-            page++;
+            // Get next page token for cursor-based pagination
+            pageToken = salesData.page_info?.next_page_token || null;
+            hasMore = !!pageToken;
           } else {
             const errorText = await salesResponse.text();
             console.error(`[HOTMART] Error fetching product ${productId} (status ${salesResponse.status}): ${errorText}`);
