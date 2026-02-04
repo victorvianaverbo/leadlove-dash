@@ -1,209 +1,226 @@
 
 
-# URLs Amigáveis para Projetos
+# Sistema de Recuperacao de Senha e Gerenciamento de Conta
 
-## Objetivo
+## Visao Geral
 
-Substituir as URLs com UUIDs (`/projects/25eb6e21-0760-4e30-b177-29e20346a8a7`) por URLs amigáveis com o nome do projeto (`/projects/meu-projeto`).
+Implementar um sistema completo de:
+1. **Recuperacao de senha** - Envio de email com link de reset via Resend
+2. **Redefinicao de senha** - Pagina para definir nova senha
+3. **Pagina de configuracoes do usuario** - Alterar email, nome e senha
 
 ---
 
-## Estrutura Atual
+## Arquitetura do Fluxo
 
 ```text
-URLs atuais:
-├── /projects/25eb6e21-0760-4e30-b177-29e20346a8a7        (ProjectView)
-├── /projects/25eb6e21-0760-4e30-b177-29e20346a8a7/edit  (ProjectEdit)
-└── /meu-projeto                                          (PublicDashboard - já usa slug!)
-```
+RECUPERAR SENHA:
+┌─────────────────────────────────────────────────────────────────────┐
+│  /auth (link "Esqueci minha senha")                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  /forgot-password (formulario com email)                           │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Edge Function: send-password-reset                                │
+│  - Gera token via Supabase Auth                                    │
+│  - Envia email via Resend com link de reset                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  /reset-password?token=xxx (formulario nova senha)                 │
+│  - Valida token                                                    │
+│  - Atualiza senha via Supabase Auth                                │
+└─────────────────────────────────────────────────────────────────────┘
 
-O sistema já possui:
-- Coluna `slug` na tabela `projects`
-- Função `generateSlug()` que converte nome em slug
-- Rota pública `/:slug` funcionando com slugs
+
+ALTERAR DADOS DA CONTA:
+┌─────────────────────────────────────────────────────────────────────┐
+│  /settings (nova pagina)                                           │
+│  - Alterar nome                                                    │
+│  - Alterar email (requer confirmacao)                              │
+│  - Alterar senha (requer senha atual)                              │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Solução Proposta
+## Componentes a Criar
 
-Usar o **slug** como identificador principal nas URLs do usuário logado, mantendo compatibilidade com UUIDs existentes.
+### 1. Edge Function: send-password-reset
 
-```text
-URLs novas:
-├── /projects/meu-projeto         (ProjectView)
-├── /projects/meu-projeto/edit    (ProjectEdit)
-└── /meu-projeto                  (PublicDashboard - sem mudança)
-```
+| Campo | Valor |
+|-------|-------|
+| Caminho | `supabase/functions/send-password-reset/index.ts` |
+| Metodo | POST |
+| Body | `{ email: string }` |
+| Acao | Gera link de reset e envia via Resend |
+
+### 2. Novas Paginas
+
+| Pagina | Rota | Descricao |
+|--------|------|-----------|
+| ForgotPassword | `/forgot-password` | Formulario para solicitar reset |
+| ResetPassword | `/reset-password` | Formulario para definir nova senha |
+| Settings | `/settings` | Configuracoes da conta do usuario |
 
 ---
 
-## Alterações Necessárias
+## Alteracoes Necessarias
 
-### 1. Garantir Slug em Todos os Projetos
+### Backend (Edge Functions)
 
-| Ação | Descrição |
-|------|-----------|
-| SQL Migration | Gerar slugs para projetos existentes que não têm |
-| ProjectNew | Gerar e salvar slug ao criar novo projeto |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `supabase/functions/send-password-reset/index.ts` | **Novo** - Envia email de recuperacao via Resend |
+| `supabase/config.toml` | Adicionar configuracao da nova funcao |
 
-### 2. Buscar Projeto por Slug ou UUID
+### Frontend (Paginas)
 
-As páginas ProjectView e ProjectEdit precisam aceitar tanto slug quanto UUID para manter retrocompatibilidade com links antigos.
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/ForgotPassword.tsx` | **Novo** - Formulario para solicitar reset de senha |
+| `src/pages/ResetPassword.tsx` | **Novo** - Formulario para definir nova senha |
+| `src/pages/Settings.tsx` | **Novo** - Pagina de configuracoes da conta |
+| `src/pages/Auth.tsx` | Adicionar link "Esqueci minha senha" |
+| `src/App.tsx` | Adicionar novas rotas |
+
+---
+
+## Pre-requisito: API Key do Resend
+
+Antes de implementar, sera necessario configurar o secret `RESEND_API_KEY`:
+
+- Criar conta em https://resend.com (se ainda nao tiver)
+- Validar dominio em https://resend.com/domains
+- Criar API key em https://resend.com/api-keys
+- Adicionar o secret no projeto
+
+---
+
+## Secao Tecnica
+
+### Edge Function: send-password-reset
 
 ```typescript
-// Lógica de busca híbrida
-const isUUID = /^[0-9a-f-]{36}$/i.test(id);
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
 
-if (isUUID) {
-  // Busca por ID (compatibilidade com links antigos)
-  query.eq('id', id);
-} else {
-  // Busca por slug (nova forma)
-  query.eq('slug', id);
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { email } = await req.json();
+    
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Gerar link de reset via Supabase
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: {
+        redirectTo: `${req.headers.get("origin")}/reset-password`,
+      },
+    });
+
+    if (error) throw error;
+
+    // Enviar email via Resend
+    await resend.emails.send({
+      from: "MetrikaPRO <noreply@SEU-DOMINIO.com>",
+      to: [email],
+      subject: "Recupere sua senha - MetrikaPRO",
+      html: `
+        <h1>Recuperacao de Senha</h1>
+        <p>Clique no link abaixo para redefinir sua senha:</p>
+        <a href="${data.properties.action_link}">Redefinir Senha</a>
+        <p>Este link expira em 1 hora.</p>
+      `,
+    });
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+```
+
+### Pagina Settings - Funcionalidades
+
+```typescript
+// Alterar nome
+await supabase.from('profiles').update({ full_name: newName }).eq('user_id', user.id);
+
+// Alterar email
+await supabase.auth.updateUser({ email: newEmail });
+// Usuario recebe email de confirmacao
+
+// Alterar senha
+await supabase.auth.updateUser({ password: newPassword });
+```
+
+### Pagina Reset Password
+
+```typescript
+// Quando o usuario clica no link do email, Supabase seta a sessao automaticamente
+// Basta verificar se ha sessao e permitir alterar a senha
+
+const { data: { session } } = await supabase.auth.getSession();
+if (session) {
+  await supabase.auth.updateUser({ password: newPassword });
 }
 ```
 
-### 3. Atualizar Navegações para Usar Slug
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `Dashboard.tsx` | Navegar para `/projects/${project.slug}` |
-| `ProjectCard.tsx` | Receber e usar slug no onClick |
-| `ProjectEdit.tsx` | Navegar de volta usando slug |
-| `ProjectNew.tsx` | Após criar, redirecionar usando slug |
-
-### 4. Garantir Unicidade do Slug
-
-Adicionar constraint no banco e lógica para resolver conflitos:
-- Se "meu-projeto" já existe, usar "meu-projeto-2"
-- Constraint UNIQUE na coluna slug
-
 ---
 
-## Fluxo de Resolução de Conflitos
+## Arquivos a Criar/Modificar
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│  Usuário cria projeto "Meu Projeto"                                │
-└─────────────────────────────────────────────────────────────────────┘
-                                  ↓
-┌─────────────────────────────────────────────────────────────────────┐
-│  Sistema gera slug: "meu-projeto"                                  │
-└─────────────────────────────────────────────────────────────────────┘
-                                  ↓
-┌─────────────────────────────────────────────────────────────────────┐
-│  Verifica se slug existe para o mesmo user_id                      │
-│  (mesmo usuário pode ter projetos com nomes similares)             │
-└─────────────────────────────────────────────────────────────────────┘
-                     ↓                              ↓
-              Não existe                        Já existe
-                     ↓                              ↓
-         Usa "meu-projeto"              Tenta "meu-projeto-2"
-                                                    ↓
-                                        Continua até encontrar único
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Tipo | Alteração |
+| Arquivo | Tipo | Descricao |
 |---------|------|-----------|
-| `supabase/migrations/` | Novo | Migration para gerar slugs e adicionar constraint |
-| `src/pages/ProjectView.tsx` | Editar | Busca híbrida por slug ou UUID |
-| `src/pages/ProjectEdit.tsx` | Editar | Busca híbrida e navegação por slug |
-| `src/pages/ProjectNew.tsx` | Editar | Gerar slug único na criação |
-| `src/pages/Dashboard.tsx` | Editar | Usar slug na navegação |
-| `src/components/dashboard/ProjectCard.tsx` | Editar | Receber slug na prop |
-| `src/lib/utils.ts` | Editar | Adicionar `generateSlug()` como utilitário |
+| `supabase/functions/send-password-reset/index.ts` | Novo | Edge function para envio de email |
+| `supabase/config.toml` | Editar | Adicionar config da nova funcao |
+| `src/pages/ForgotPassword.tsx` | Novo | Solicitar reset de senha |
+| `src/pages/ResetPassword.tsx` | Novo | Definir nova senha |
+| `src/pages/Settings.tsx` | Novo | Configuracoes da conta |
+| `src/pages/Auth.tsx` | Editar | Adicionar link "Esqueci senha" |
+| `src/App.tsx` | Editar | Adicionar novas rotas |
+| `src/pages/Dashboard.tsx` | Editar | Adicionar link para Settings no header |
 
 ---
 
 ## Resultado Esperado
 
-| Antes | Depois |
-|-------|--------|
-| `/projects/25eb6e21-0760-4e30-b177-29e20346a8a7` | `/projects/funil-com-ia` |
-| URL feia e sem significado | URL legível e compartilhável |
-| Difícil lembrar/digitar | Fácil identificar o projeto |
-
----
-
-## Seção Técnica
-
-### Migration SQL
-
-```sql
--- Gerar slugs para projetos existentes
-UPDATE projects
-SET slug = lower(
-  regexp_replace(
-    regexp_replace(
-      regexp_replace(name, '[^a-zA-Z0-9\s-]', '', 'g'),
-      '\s+', '-', 'g'
-    ),
-    '-+', '-', 'g'
-  )
-)
-WHERE slug IS NULL;
-
--- Resolver conflitos adicionando sufixo numérico
--- (função PL/pgSQL para lidar com duplicatas)
-
--- Adicionar constraint de unicidade por usuário
-ALTER TABLE projects 
-ADD CONSTRAINT projects_user_slug_unique 
-UNIQUE (user_id, slug);
-```
-
-### Função de Geração de Slug Único
-
-```typescript
-const generateUniqueSlug = async (name: string, userId: string): Promise<string> => {
-  const baseSlug = generateSlug(name);
-  let slug = baseSlug;
-  let counter = 1;
-  
-  while (true) {
-    const { data } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('slug', slug)
-      .maybeSingle();
-    
-    if (!data) break; // Slug disponível
-    
-    counter++;
-    slug = `${baseSlug}-${counter}`;
-  }
-  
-  return slug;
-};
-```
-
-### Busca Híbrida (UUID ou Slug)
-
-```typescript
-const { data: project } = useQuery({
-  queryKey: ['project', identifier],
-  queryFn: async () => {
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
-    
-    let query = supabase
-      .from('projects')
-      .select('*');
-    
-    if (isUUID) {
-      query = query.eq('id', identifier);
-    } else {
-      query = query.eq('slug', identifier).eq('user_id', user!.id);
-    }
-    
-    const { data, error } = await query.single();
-    if (error) throw error;
-    return data;
-  },
-});
-```
+| Funcionalidade | Status |
+|----------------|--------|
+| Link "Esqueci minha senha" na pagina de login | Novo |
+| Formulario para solicitar reset de senha | Novo |
+| Email enviado via Resend com link de recuperacao | Novo |
+| Pagina para definir nova senha | Novo |
+| Pagina de configuracoes da conta | Novo |
+| Alterar nome do usuario | Novo |
+| Alterar email (com confirmacao) | Novo |
+| Alterar senha (requer senha atual) | Novo |
 
