@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -364,6 +364,11 @@ export default function Auth() {
                     required
                     className="h-11"
                   />
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="link" asChild className="px-0 h-auto text-sm text-muted-foreground hover:text-primary">
+                    <Link to="/forgot-password">Esqueci minha senha</Link>
+                  </Button>
                 </div>
                 <Button type="submit" className="w-full h-11" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
