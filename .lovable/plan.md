@@ -1,118 +1,209 @@
 
 
-# Otimização da Primeira Sincronização de Projetos
+# URLs Amigáveis para Projetos
 
-## Problema Identificado
+## Objetivo
 
-A primeira sincronização de um projeto novo demora muito porque:
+Substituir as URLs com UUIDs (`/projects/25eb6e21-0760-4e30-b177-29e20346a8a7`) por URLs amigáveis com o nome do projeto (`/projects/meu-projeto`).
 
-1. **90 dias de dados** - A primeira sincronização busca 90 dias de histórico (`FIRST_SYNC_DAYS = 90`)
-2. **Muitos produtos/campanhas** - Projetos podem ter dezenas de produtos e campanhas (ex: Medsimple tem 36 Hotmart + 18 Guru + 95 Meta campaigns)
-3. **Paginação sequencial** - Cada produto é processado página por página dentro de cada API
-4. **Timeout do Edge Function** - Supabase Edge Functions têm limite de 60 segundos, causando erro quando há muito volume
-5. **Feedback pobre** - O usuário não vê progresso, apenas espera
+---
 
-## Soluções Propostas
+## Estrutura Atual
 
-### 1. Sincronização em Fases (Chunked Sync)
+```text
+URLs atuais:
+├── /projects/25eb6e21-0760-4e30-b177-29e20346a8a7        (ProjectView)
+├── /projects/25eb6e21-0760-4e30-b177-29e20346a8a7/edit  (ProjectEdit)
+└── /meu-projeto                                          (PublicDashboard - já usa slug!)
+```
 
-Dividir a primeira sincronização em chamadas menores que não ultrapassem o timeout:
+O sistema já possui:
+- Coluna `slug` na tabela `projects`
+- Função `generateSlug()` que converte nome em slug
+- Rota pública `/:slug` funcionando com slugs
+
+---
+
+## Solução Proposta
+
+Usar o **slug** como identificador principal nas URLs do usuário logado, mantendo compatibilidade com UUIDs existentes.
+
+```text
+URLs novas:
+├── /projects/meu-projeto         (ProjectView)
+├── /projects/meu-projeto/edit    (ProjectEdit)
+└── /meu-projeto                  (PublicDashboard - sem mudança)
+```
+
+---
+
+## Alterações Necessárias
+
+### 1. Garantir Slug em Todos os Projetos
+
+| Ação | Descrição |
+|------|-----------|
+| SQL Migration | Gerar slugs para projetos existentes que não têm |
+| ProjectNew | Gerar e salvar slug ao criar novo projeto |
+
+### 2. Buscar Projeto por Slug ou UUID
+
+As páginas ProjectView e ProjectEdit precisam aceitar tanto slug quanto UUID para manter retrocompatibilidade com links antigos.
+
+```typescript
+// Lógica de busca híbrida
+const isUUID = /^[0-9a-f-]{36}$/i.test(id);
+
+if (isUUID) {
+  // Busca por ID (compatibilidade com links antigos)
+  query.eq('id', id);
+} else {
+  // Busca por slug (nova forma)
+  query.eq('slug', id);
+}
+```
+
+### 3. Atualizar Navegações para Usar Slug
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `Dashboard.tsx` | Navegar para `/projects/${project.slug}` |
+| `ProjectCard.tsx` | Receber e usar slug no onClick |
+| `ProjectEdit.tsx` | Navegar de volta usando slug |
+| `ProjectNew.tsx` | Após criar, redirecionar usando slug |
+
+### 4. Garantir Unicidade do Slug
+
+Adicionar constraint no banco e lógica para resolver conflitos:
+- Se "meu-projeto" já existe, usar "meu-projeto-2"
+- Constraint UNIQUE na coluna slug
+
+---
+
+## Fluxo de Resolução de Conflitos
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  FASE 1: Sincronizar primeiro (requisição inicial)                 │
-│  - Processar todos os produtos/campanhas                            │
-│  - Limitar a 30 dias em vez de 90 na primeira sync                 │
-│  - Retornar status parcial para o frontend                         │
+│  Usuário cria projeto "Meu Projeto"                                │
 └─────────────────────────────────────────────────────────────────────┘
                                   ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│  FASE 2: Background sync para dados históricos                     │
-│  - Usar waitUntil para continuar após resposta                     │
-│  - Processar os 60 dias restantes em background                    │
+│  Sistema gera slug: "meu-projeto"                                  │
 └─────────────────────────────────────────────────────────────────────┘
+                                  ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│  Verifica se slug existe para o mesmo user_id                      │
+│  (mesmo usuário pode ter projetos com nomes similares)             │
+└─────────────────────────────────────────────────────────────────────┘
+                     ↓                              ↓
+              Não existe                        Já existe
+                     ↓                              ↓
+         Usa "meu-projeto"              Tenta "meu-projeto-2"
+                                                    ↓
+                                        Continua até encontrar único
 ```
-
-### 2. Feedback de Progresso no Frontend
-
-Adicionar indicadores visuais durante a sincronização:
-
-- Spinner com mensagem "Sincronizando vendas..."
-- Mostrar etapas: "Conectando APIs" → "Importando vendas" → "Processando métricas"
-- Toast de sucesso com contagem de registros importados
-
-### 3. Reduzir Janela de Primeira Sincronização
-
-Alterar de 90 dias para 30 dias na primeira sincronização:
-- Dados recentes são mais relevantes
-- Reduz tempo de 90+ segundos para ~30 segundos
-- Sincronizações incrementais mantêm dados atualizados
-
-### 4. Paralelizar Produtos Dentro de Cada Plataforma
-
-Atualmente os produtos são processados sequencialmente. Paralelizar em chunks:
-
-```typescript
-// Antes: sequencial
-for (const productId of productIds) {
-  await fetchProduct(productId);
-}
-
-// Depois: paralelo em chunks de 3
-const chunks = chunkArray(productIds, 3);
-for (const chunk of chunks) {
-  await Promise.all(chunk.map(id => fetchProduct(id)));
-}
-```
-
----
-
-## Alterações Técnicas
-
-### 1. Edge Function: sync-project-data/index.ts
-
-| Alteração | Descrição |
-|-----------|-----------|
-| Reduzir `FIRST_SYNC_DAYS` | De 90 para 30 dias |
-| Paralelizar produtos | Processar 3-5 produtos simultaneamente por plataforma |
-| Usar `waitUntil` | Continuar processamento em background após resposta |
-| Retornar timing detalhado | Informar tempo de cada etapa para diagnóstico |
-
-### 2. Frontend: ProjectView.tsx
-
-| Alteração | Descrição |
-|-----------|-----------|
-| Estado de progresso | Mostrar etapas durante sincronização |
-| Mensagem melhorada | Toast com contagem de registros importados |
-| Tratamento de timeout | Retry automático ou mensagem explicativa |
-
-### 3. Nova Feature: Sincronização Resumível
-
-Para projetos muito grandes, implementar cursor de sincronização:
-
-| Coluna | Tabela | Descrição |
-|--------|--------|-----------|
-| `sync_cursor` | projects | JSON com estado da última sync parcial |
-| `sync_status` | projects | 'idle', 'running', 'completed', 'failed' |
-
----
-
-## Resultado Esperado
-
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Tempo primeira sync (projeto pequeno) | 30-60s | 10-15s |
-| Tempo primeira sync (projeto grande) | 90s+ (timeout) | 30s + background |
-| Feedback visual | Nenhum | Progresso em etapas |
-| Risco de timeout | Alto | Baixo |
-| Dados importados | 90 dias | 30 dias inicial + histórico em background |
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/sync-project-data/index.ts` | Otimizações de paralelização, redução de janela, waitUntil |
-| `src/pages/ProjectView.tsx` | UI de progresso, mensagens melhoradas |
+| Arquivo | Tipo | Alteração |
+|---------|------|-----------|
+| `supabase/migrations/` | Novo | Migration para gerar slugs e adicionar constraint |
+| `src/pages/ProjectView.tsx` | Editar | Busca híbrida por slug ou UUID |
+| `src/pages/ProjectEdit.tsx` | Editar | Busca híbrida e navegação por slug |
+| `src/pages/ProjectNew.tsx` | Editar | Gerar slug único na criação |
+| `src/pages/Dashboard.tsx` | Editar | Usar slug na navegação |
+| `src/components/dashboard/ProjectCard.tsx` | Editar | Receber slug na prop |
+| `src/lib/utils.ts` | Editar | Adicionar `generateSlug()` como utilitário |
+
+---
+
+## Resultado Esperado
+
+| Antes | Depois |
+|-------|--------|
+| `/projects/25eb6e21-0760-4e30-b177-29e20346a8a7` | `/projects/funil-com-ia` |
+| URL feia e sem significado | URL legível e compartilhável |
+| Difícil lembrar/digitar | Fácil identificar o projeto |
+
+---
+
+## Seção Técnica
+
+### Migration SQL
+
+```sql
+-- Gerar slugs para projetos existentes
+UPDATE projects
+SET slug = lower(
+  regexp_replace(
+    regexp_replace(
+      regexp_replace(name, '[^a-zA-Z0-9\s-]', '', 'g'),
+      '\s+', '-', 'g'
+    ),
+    '-+', '-', 'g'
+  )
+)
+WHERE slug IS NULL;
+
+-- Resolver conflitos adicionando sufixo numérico
+-- (função PL/pgSQL para lidar com duplicatas)
+
+-- Adicionar constraint de unicidade por usuário
+ALTER TABLE projects 
+ADD CONSTRAINT projects_user_slug_unique 
+UNIQUE (user_id, slug);
+```
+
+### Função de Geração de Slug Único
+
+```typescript
+const generateUniqueSlug = async (name: string, userId: string): Promise<string> => {
+  const baseSlug = generateSlug(name);
+  let slug = baseSlug;
+  let counter = 1;
+  
+  while (true) {
+    const { data } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('slug', slug)
+      .maybeSingle();
+    
+    if (!data) break; // Slug disponível
+    
+    counter++;
+    slug = `${baseSlug}-${counter}`;
+  }
+  
+  return slug;
+};
+```
+
+### Busca Híbrida (UUID ou Slug)
+
+```typescript
+const { data: project } = useQuery({
+  queryKey: ['project', identifier],
+  queryFn: async () => {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    
+    let query = supabase
+      .from('projects')
+      .select('*');
+    
+    if (isUUID) {
+      query = query.eq('id', identifier);
+    } else {
+      query = query.eq('slug', identifier).eq('user_id', user!.id);
+    }
+    
+    const { data, error } = await query.single();
+    if (error) throw error;
+    return data;
+  },
+});
+```
 
