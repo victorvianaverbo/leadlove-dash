@@ -51,6 +51,17 @@ function parseAmount(value: unknown): number {
   return isNaN(parsed) || parsed < 0 ? 0 : parsed;
 }
 
+/**
+ * Split array into chunks for parallel processing
+ */
+function chunkArray<T>(array: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 // ============ PHASE 2 HELPERS ============
 
 /**
@@ -218,6 +229,7 @@ interface SyncResult {
 
 /**
  * Sync Kiwify sales - returns array of sale records for batch insert
+ * Now processes products in parallel chunks for faster execution
  */
 async function syncKiwify(
   credentials: { client_id: string; client_secret: string; account_id: string },
@@ -256,8 +268,9 @@ async function syncKiwify(
     const endDateObj = getBrasiliaDate(-1);
     const formattedEndDate = endDateObj.toISOString().split('T')[0];
 
-    // Fetch all sales from all products
-    for (const productId of productIds) {
+    // Helper function to fetch all sales for a single product
+    const fetchProductSales = async (productId: string): Promise<SaleRecord[]> => {
+      const productSales: SaleRecord[] = [];
       let pageNumber = 1;
       let hasMorePages = true;
       
@@ -301,7 +314,7 @@ async function syncKiwify(
               grossAmount = chargeAmount > 0 ? (chargeAmount - platformFee) / 100 : netAmount;
             }
             
-            result.sales.push({
+            productSales.push({
               kiwify_sale_id: sale.id,
               project_id: projectId,
               user_id: userId,
@@ -330,6 +343,18 @@ async function syncKiwify(
           hasMorePages = false;
         }
       }
+      return productSales;
+    };
+
+    // Process products in parallel chunks of 3
+    const PRODUCT_CHUNK_SIZE = 3;
+    const productChunks = chunkArray(productIds, PRODUCT_CHUNK_SIZE);
+    
+    for (const chunk of productChunks) {
+      const chunkResults = await Promise.all(chunk.map(fetchProductSales));
+      for (const productSales of chunkResults) {
+        result.sales.push(...productSales);
+      }
     }
 
     console.log(`[KIWIFY] Completed: ${result.sales.length} sales fetched`);
@@ -343,6 +368,7 @@ async function syncKiwify(
 
 /**
  * Sync Hotmart sales - returns array of sale records for batch insert
+ * Now processes products in parallel chunks for faster execution
  */
 async function syncHotmart(
   credentials: { client_id: string; client_secret: string; basic_token: string },
@@ -383,30 +409,26 @@ async function syncHotmart(
     const startTimestamp = syncStartDate.getTime();
     const endTimestamp = nowBrasilia.getTime();
 
-    // Fetch sales for each product - continue even if individual products fail
-    let productsWithErrors = 0;
-    for (const productId of productIds) {
+    // Helper function to fetch all sales for a single product
+    const fetchProductSales = async (productId: string): Promise<SaleRecord[]> => {
+      const productSales: SaleRecord[] = [];
       let pageToken: string | null = null;
       let hasMore = true;
       let pageCount = 0;
 
       try {
         while (hasMore) {
-          // Build URL with page_token only if we have one (cursor-based pagination)
           let url = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100`;
           if (pageToken) {
             url += `&page_token=${encodeURIComponent(pageToken)}`;
           }
 
-          const salesResponse = await fetchWithRetry(
-            url,
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-            }
-          );
+          const salesResponse = await fetchWithRetry(url, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
           if (salesResponse.ok) {
             const salesData = await salesResponse.json();
@@ -417,10 +439,9 @@ async function syncHotmart(
 
             for (const sale of sales) {
               const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
-              // Hotmart returns price in decimal format (e.g., 235.76), NOT in cents like Kiwify
               const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0);
               
-              result.sales.push({
+              productSales.push({
                 kiwify_sale_id: saleId,
                 project_id: projectId,
                 user_id: userId,
@@ -442,26 +463,30 @@ async function syncHotmart(
               });
             }
 
-            // Get next page token for cursor-based pagination
             pageToken = salesData.page_info?.next_page_token || null;
             hasMore = !!pageToken;
           } else {
             const errorText = await salesResponse.text();
             console.error(`[HOTMART] Error fetching product ${productId} (status ${salesResponse.status}): ${errorText}`);
-            productsWithErrors++;
             hasMore = false;
-            // Continue to next product instead of stopping
           }
         }
       } catch (productError) {
         console.error(`[HOTMART] Exception for product ${productId}:`, productError);
-        productsWithErrors++;
-        // Continue to next product
       }
-    }
+      
+      return productSales;
+    };
+
+    // Process products in parallel chunks of 3
+    const PRODUCT_CHUNK_SIZE = 3;
+    const productChunks = chunkArray(productIds, PRODUCT_CHUNK_SIZE);
     
-    if (productsWithErrors > 0) {
-      console.warn(`[HOTMART] ${productsWithErrors}/${productIds.length} products had errors, but sync continued`);
+    for (const chunk of productChunks) {
+      const chunkResults = await Promise.all(chunk.map(fetchProductSales));
+      for (const productSales of chunkResults) {
+        result.sales.push(...productSales);
+      }
     }
 
     console.log(`[HOTMART] Completed: ${result.sales.length} sales fetched`);
@@ -475,6 +500,7 @@ async function syncHotmart(
 
 /**
  * Sync Guru sales - returns array of sale records for batch insert
+ * Now processes products in parallel chunks for faster execution
  */
 async function syncGuru(
   credentials: { api_token: string },
@@ -491,12 +517,13 @@ async function syncGuru(
     const startDate = syncStartDate.toISOString().split('T')[0];
     const endDate = new Date().toISOString().split('T')[0];
 
-    for (const productId of productIds) {
+    // Helper function to fetch all sales for a single product
+    const fetchProductSales = async (productId: string): Promise<SaleRecord[]> => {
+      const productSales: SaleRecord[] = [];
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
-        // Guru API v2 requires confirmed_at_ini/confirmed_at_end instead of start_date/end_date
         const salesResponse = await fetchWithRetry(
           `https://digitalmanager.guru/api/v2/transactions?product_id=${productId}&confirmed_at_ini=${startDate}&confirmed_at_end=${endDate}&page=${page}&per_page=100`,
           {
@@ -514,21 +541,16 @@ async function syncGuru(
           
           console.log(`[GURU] Product ${productId} - Page ${page}: ${sales.length} sales`);
 
-          // Log first sale structure to debug field names
           if (sales.length > 0 && page === 1) {
             console.log(`[GURU] Sample sale structure:`, JSON.stringify(Object.keys(sales[0])));
-            console.log(`[GURU] Sample sale data:`, JSON.stringify(sales[0]));
           }
 
           for (const sale of sales) {
             const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
             const saleAmount = parseAmount(sale.amount || sale.value || sale.price || 0);
-            
-            // Guru v2 API uses 'confirmed_at' for the sale date
-            // Fallbacks: confirmed_at -> created_at -> date -> approved_at -> current timestamp
             const saleDate = sale.confirmed_at || sale.created_at || sale.date || sale.approved_at || new Date().toISOString();
             
-            result.sales.push({
+            productSales.push({
               kiwify_sale_id: saleId,
               project_id: projectId,
               user_id: userId,
@@ -558,6 +580,19 @@ async function syncGuru(
           hasMore = false;
         }
       }
+      
+      return productSales;
+    };
+
+    // Process products in parallel chunks of 3
+    const PRODUCT_CHUNK_SIZE = 3;
+    const productChunks = chunkArray(productIds, PRODUCT_CHUNK_SIZE);
+    
+    for (const chunk of productChunks) {
+      const chunkResults = await Promise.all(chunk.map(fetchProductSales));
+      for (const productSales of chunkResults) {
+        result.sales.push(...productSales);
+      }
     }
 
     console.log(`[GURU] Completed: ${result.sales.length} sales fetched`);
@@ -571,6 +606,7 @@ async function syncGuru(
 
 /**
  * Sync Meta Ads - returns array of ad_spend records for batch insert
+ * Campaigns are already parallelized via Promise.all for budget fetch
  */
 async function syncMetaAds(
   credentials: { access_token: string; ad_account_id: string },
@@ -588,7 +624,6 @@ async function syncMetaAds(
     const until = formatBrasiliaDateString(0);
 
     // Fetch daily_budget AND effective_status for each campaign in parallel
-    // Only ACTIVE campaigns will have their budget counted
     const budgetPromises = campaignIds.map(async (campaignId) => {
       try {
         const campaignResponse = await fetch(
@@ -597,7 +632,6 @@ async function syncMetaAds(
         if (campaignResponse.ok) {
           const campaignData = await campaignResponse.json();
           
-          // Only count budget for ACTIVE campaigns
           const isActive = campaignData.effective_status === 'ACTIVE';
           const budget = isActive && campaignData.daily_budget 
             ? parseFloat(campaignData.daily_budget) / 100 
@@ -617,8 +651,8 @@ async function syncMetaAds(
     const campaignBudgets: Record<string, number> = {};
     budgetResults.forEach(r => { campaignBudgets[r.campaignId] = r.budget; });
 
-    // Fetch insights for each campaign
-    for (const campaignId of campaignIds) {
+    // Helper to fetch insights for a single campaign
+    const fetchCampaignInsights = async (campaignId: string): Promise<any[]> => {
       const insightsUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,impressions,clicks,reach,frequency,cpc,cpm,inline_link_clicks,actions,video_thruplay_watched_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions&time_range={"since":"${since}","until":"${until}"}&level=ad&time_increment=1&access_token=${credentials.access_token}`;
       
       const insightsResponse = await fetch(insightsUrl);
@@ -626,7 +660,7 @@ async function syncMetaAds(
 
       if (!insightsResponse.ok) {
         console.error(`[META] API error for campaign ${campaignId}:`, responseText);
-        continue;
+        return [];
       }
 
       let insightsData;
@@ -634,13 +668,13 @@ async function syncMetaAds(
         insightsData = JSON.parse(responseText);
       } catch (e) {
         console.error(`[META] Failed to parse response for campaign ${campaignId}`);
-        continue;
+        return [];
       }
 
       const insights = insightsData.data || [];
       console.log(`[META] Campaign ${campaignId}: ${insights.length} insights`);
-
-      for (const insight of insights) {
+      
+      return insights.map((insight: any) => {
         const actions = insight.actions || [];
         const landingPageViewAction = actions.find((a: { action_type: string }) => a.action_type === 'landing_page_view');
         const landingPageViews = landingPageViewAction ? parseInt(landingPageViewAction.value || '0') : 0;
@@ -658,7 +692,7 @@ async function syncMetaAds(
           return action ? parseInt(action.value || '0') : 0;
         };
 
-        result.records.push({
+        return {
           project_id: projectId,
           user_id: userId,
           campaign_id: insight.campaign_id,
@@ -685,7 +719,18 @@ async function syncMetaAds(
           video_p75_views: extractVideoViews(insight.video_p75_watched_actions),
           video_p100_views: extractVideoViews(insight.video_p100_watched_actions),
           date: insight.date_start,
-        });
+        };
+      });
+    };
+
+    // Process campaigns in parallel chunks of 5 (Meta API is more tolerant)
+    const CAMPAIGN_CHUNK_SIZE = 5;
+    const campaignChunks = chunkArray(campaignIds, CAMPAIGN_CHUNK_SIZE);
+    
+    for (const chunk of campaignChunks) {
+      const chunkResults = await Promise.all(chunk.map(fetchCampaignInsights));
+      for (const insightsRecords of chunkResults) {
+        result.records.push(...insightsRecords);
       }
     }
 
@@ -696,6 +741,125 @@ async function syncMetaAds(
   }
   
   return result;
+}
+
+// ============ BACKGROUND SYNC FUNCTION ============
+
+/**
+ * Performs historical data sync (days 31-90) in background after initial response
+ */
+async function backgroundHistoricalSync(
+  supabase: any,
+  project: any,
+  userId: string,
+  integrations: any[],
+  initialSyncEndDate: Date // Day 30 - where initial sync stopped
+): Promise<void> {
+  try {
+    console.log('\n>>> BACKGROUND HISTORICAL SYNC STARTED <<<\n');
+    
+    const HISTORICAL_DAYS = 90;
+    const historicalStartDate = getBrasiliaDate(HISTORICAL_DAYS); // 90 days ago
+    const historicalEndDate = new Date(initialSyncEndDate.getTime() - 24 * 60 * 60 * 1000); // Day before initial sync start
+    
+    console.log(`[BACKGROUND] Fetching historical data from ${historicalStartDate.toISOString()} to ${historicalEndDate.toISOString()}`);
+    
+    const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
+    const hotmartIntegration = integrations?.find(i => i.type === 'hotmart');
+    const guruIntegration = integrations?.find(i => i.type === 'guru');
+    const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
+    
+    const ticketPrice = project.kiwify_ticket_price ? parseFloat(project.kiwify_ticket_price) : null;
+    const nowBrasilia = getBrasiliaDate(0);
+    
+    const syncPromises: Promise<SyncResult | { records: any[]; source: string; error?: string }>[] = [];
+
+    if (kiwifyIntegration && project.kiwify_product_ids?.length > 0) {
+      syncPromises.push(
+        syncKiwify(
+          kiwifyIntegration.credentials as any,
+          project.kiwify_product_ids,
+          project.id,
+          userId,
+          historicalStartDate,
+          ticketPrice
+        )
+      );
+    }
+
+    if (hotmartIntegration && project.hotmart_product_ids?.length > 0) {
+      syncPromises.push(
+        syncHotmart(
+          hotmartIntegration.credentials as any,
+          project.hotmart_product_ids,
+          project.id,
+          userId,
+          historicalStartDate,
+          nowBrasilia
+        )
+      );
+    }
+
+    if (guruIntegration && project.guru_product_ids?.length > 0) {
+      syncPromises.push(
+        syncGuru(
+          guruIntegration.credentials as any,
+          project.guru_product_ids,
+          project.id,
+          userId,
+          historicalStartDate
+        )
+      );
+    }
+
+    if (metaIntegration && project.meta_campaign_ids?.length > 0) {
+      syncPromises.push(
+        syncMetaAds(
+          metaIntegration.credentials as any,
+          project.meta_campaign_ids,
+          project.id,
+          userId,
+          historicalStartDate
+        )
+      );
+    }
+
+    if (syncPromises.length === 0) {
+      console.log('[BACKGROUND] No integrations to sync');
+      return;
+    }
+
+    const syncResults = await Promise.all(syncPromises);
+    
+    // Collect and insert records
+    const allSales: SaleRecord[] = [];
+    let adSpendRecords: any[] = [];
+
+    for (const result of syncResults) {
+      if ('sales' in result) {
+        allSales.push(...result.sales);
+      } else if ('records' in result) {
+        adSpendRecords.push(...result.records);
+      }
+    }
+
+    let salesSynced = 0;
+    let adSpendSynced = 0;
+
+    if (allSales.length > 0) {
+      const salesResult = await batchUpsertSales(supabase, allSales);
+      salesSynced = salesResult.success;
+    }
+
+    if (adSpendRecords.length > 0) {
+      const adSpendResult = await batchUpsertAdSpend(supabase, adSpendRecords);
+      adSpendSynced = adSpendResult.success;
+    }
+
+    console.log(`\n>>> BACKGROUND SYNC COMPLETE: ${salesSynced} sales, ${adSpendSynced} ad_spend <<<\n`);
+  } catch (error) {
+    console.error('[BACKGROUND] Historical sync error:', error);
+  }
 }
 
 // ============ MAIN HANDLER ============
@@ -780,13 +944,15 @@ Deno.serve(async (req) => {
 
     // === SYNC SUMMARY LOG ===
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`=== SYNC START (PHASE 2 - PARALLEL): Project ${project_id} ===`);
+    console.log(`=== SYNC START (OPTIMIZED - 30 DAYS INITIAL): Project ${project_id} ===`);
     console.log(`=== Integrations: Kiwify=${!!kiwifyIntegration}, Hotmart=${!!hotmartIntegration}, Guru=${!!guruIntegration}, Meta=${!!metaIntegration} ===`);
     console.log(`=== Products: Kiwify=${project.kiwify_product_ids?.length || 0}, Hotmart=${project.hotmart_product_ids?.length || 0}, Guru=${project.guru_product_ids?.length || 0}, Meta=${project.meta_campaign_ids?.length || 0} ===`);
     console.log(`${'='.repeat(60)}\n`);
 
-    // Sync configuration
-    const FIRST_SYNC_DAYS = 90;
+    // ============ OPTIMIZED SYNC CONFIGURATION ============
+    // First sync: 30 days (fast response) + background sync for 60 more days
+    // Incremental sync: 7-day margin as before
+    const FIRST_SYNC_DAYS = 30; // Reduced from 90 to 30
     const INCREMENTAL_MARGIN_DAYS = 7;
 
     const isFirstSync = !project.last_sync_at;
@@ -795,7 +961,7 @@ Deno.serve(async (req) => {
     let syncStartDate: Date;
     if (isFirstSync) {
       syncStartDate = getBrasiliaDate(FIRST_SYNC_DAYS);
-      console.log(`First sync detected - fetching ${FIRST_SYNC_DAYS} days of data`);
+      console.log(`First sync detected - fetching ${FIRST_SYNC_DAYS} days of data (historical 60 days in background)`);
     } else {
       const lastSync = new Date(project.last_sync_at);
       syncStartDate = new Date(lastSync.getTime() - INCREMENTAL_MARGIN_DAYS * 24 * 60 * 60 * 1000);
@@ -805,8 +971,8 @@ Deno.serve(async (req) => {
     // Get fixed ticket price if configured
     const ticketPrice = project.kiwify_ticket_price ? parseFloat(project.kiwify_ticket_price) : null;
 
-    // ============ PHASE 2: PARALLEL SYNC WITH Promise.all ============
-    console.log('\n>>> STARTING PARALLEL SYNC <<<\n');
+    // ============ PARALLEL SYNC WITH CHUNKED PRODUCTS ============
+    console.log('\n>>> STARTING OPTIMIZED PARALLEL SYNC <<<\n');
     const startTime = Date.now();
 
     // Build array of sync promises (only for active integrations with products)
@@ -921,11 +1087,26 @@ Deno.serve(async (req) => {
     console.log(`=== Fetch: ${fetchTime}ms, Insert: ${insertTime}ms, Total: ${totalTime}ms ===`);
     console.log(`${'='.repeat(60)}\n`);
 
+    // ============ BACKGROUND HISTORICAL SYNC (First sync only) ============
+    // Use EdgeRuntime.waitUntil to continue processing after response is sent
+    if (isFirstSync && integrations && integrations.length > 0) {
+      console.log('>>> Scheduling background historical sync (days 31-90) <<<');
+      // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(
+          backgroundHistoricalSync(supabase, project, userId, integrations, syncStartDate)
+        );
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         salesSynced, 
         adSpendSynced,
+        isFirstSync,
+        backgroundSyncScheduled: isFirstSync,
         timing: { fetch: fetchTime, insert: insertTime, total: totalTime }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
