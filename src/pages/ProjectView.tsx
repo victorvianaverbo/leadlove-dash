@@ -417,11 +417,16 @@ const parseCurrencyInput = (value: string): number => {
     const totalLandingPageViews = filteredAdSpend?.reduce((sum, a) => sum + (a.landing_page_views || 0), 0) || 0;
     const totalLinkClicks = filteredAdSpend?.reduce((sum, a) => sum + (a.link_clicks || 0), 0) || 0;
 
-    // Sum daily budgets from all unique campaigns (avoid duplicates from multiple days)
+    // Get daily budget from the most recent date only (reflects current campaign status)
+    const mostRecentDate = filteredAdSpend?.length 
+      ? filteredAdSpend.reduce((max, a) => (a.date > max ? a.date : max), filteredAdSpend[0].date)
+      : null;
+
     const uniqueCampaignBudgets = new Map<string, number>();
     filteredAdSpend?.forEach(a => {
-      if (a.campaign_id && a.daily_budget && !uniqueCampaignBudgets.has(a.campaign_id)) {
-        uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget);
+      // Only use budget from the most recent date to reflect current active campaigns
+      if (a.date === mostRecentDate && a.campaign_id && !uniqueCampaignBudgets.has(a.campaign_id)) {
+        uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget || 0);
       }
     });
     const dailyBudget = Array.from(uniqueCampaignBudgets.values()).reduce((sum, b) => sum + b, 0);
