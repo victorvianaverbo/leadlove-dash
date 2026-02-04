@@ -1,90 +1,71 @@
 
 
-# Correção: API Hotmart Retorna Erro "invalid_parameter"
+# Correção: Conversão de Timestamp Hotmart para Data ISO
 
 ## Problema Identificado
 
-Os logs mostram que **todos os 4 produtos Hotmart** estão retornando erro 400:
+Os logs revelam o erro real:
+
 ```
-ERROR [HOTMART] Error fetching product 7101386 (status 400): {"error":"invalid_parameter"}
-WARNING [HOTMART] 4/4 products had errors
-```
-
-### Causa Raiz
-
-Na linha 374 do `sync-project-data/index.ts`, a URL está usando o parâmetro `page` que **não existe** na API da Hotmart:
-
-```typescript
-// ATUAL - INCORRETO
-`...&max_results=100&page=${page}`
+ERROR Batch upsert error (batch 1): {
+  code: "22008",
+  message: 'date/time field value out of range: "1770154401000"'
+}
+INFO Sales batch complete: 0 success, 3 errors
 ```
 
-A documentação da Hotmart especifica:
-- **page_token** (string): Cursor para paginação, obtido do campo `next_page_token` na resposta anterior
-- O parâmetro `page` (numérico) **não existe** e causa erro "invalid_parameter"
+A API Hotmart retorna `approved_date` como **timestamp em milissegundos** (ex: `1770154401000`), mas o código passa esse valor numérico diretamente para o banco, que espera uma string ISO ou timestamp em segundos.
 
 ---
 
 ## Solução
 
-Refatorar a lógica de paginação para usar `page_token` (cursor-based) ao invés de `page` (offset-based).
+Converter o timestamp de milissegundos para ISO string antes de inserir no banco.
 
 ### Alteração em `supabase/functions/sync-project-data/index.ts`
 
-**De (linhas 367-424):**
+**De (linha 413):**
 ```typescript
-for (const productId of productIds) {
-  let page = 1;
-  let hasMore = true;
-
-  while (hasMore) {
-    const salesResponse = await fetchWithRetry(
-      `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`,
-      ...
-    );
-    // ...
-    hasMore = sales.length >= 100;
-    page++;
-  }
-}
+sale_date: sale.purchase?.approved_date || sale.approved_date || sale.order_date,
 ```
 
 **Para:**
 ```typescript
-for (const productId of productIds) {
-  let pageToken: string | null = null;
-  let hasMore = true;
+sale_date: convertTimestampToISO(sale.purchase?.approved_date || sale.approved_date || sale.order_date),
+```
 
-  while (hasMore) {
-    // Build URL with page_token only if we have one (not first page)
-    let url = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100`;
-    if (pageToken) {
-      url += `&page_token=${encodeURIComponent(pageToken)}`;
-    }
-
-    const salesResponse = await fetchWithRetry(url, ...);
-
-    if (salesResponse.ok) {
-      const salesData = await salesResponse.json();
-      const sales = salesData.items || [];
-      
-      // Get next page token for cursor-based pagination
-      pageToken = salesData.page_info?.next_page_token || null;
-      hasMore = !!pageToken;
-      
-      // ... process sales ...
-    }
+**Nova função helper (adicionar após linha ~167):**
+```typescript
+// Convert timestamp (ms or seconds) to ISO string
+function convertTimestampToISO(value: any): string {
+  if (!value) return new Date().toISOString();
+  
+  // If already a string in ISO format, return as-is
+  if (typeof value === 'string' && value.includes('-')) {
+    return value;
   }
+  
+  // If numeric timestamp
+  const numValue = Number(value);
+  if (!isNaN(numValue)) {
+    // Hotmart uses milliseconds - values > year 2100 in seconds = definitely ms
+    const isMilliseconds = numValue > 4102444800000 / 1000; // ~2100 in seconds
+    const timestamp = isMilliseconds ? numValue : numValue * 1000;
+    return new Date(timestamp).toISOString();
+  }
+  
+  return new Date().toISOString();
 }
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/sync-project-data/index.ts` | Linhas 367-424: Refatorar paginação de `page` para `page_token` |
+| `supabase/functions/sync-project-data/index.ts` | Linha ~167: Adicionar função `convertTimestampToISO()` |
+| `supabase/functions/sync-project-data/index.ts` | Linha 413: Usar função para converter timestamp |
 
 ---
 
@@ -92,32 +73,21 @@ for (const productId of productIds) {
 
 | Antes | Depois |
 |-------|--------|
-| Erro 400 "invalid_parameter" | Vendas Hotmart sincronizadas corretamente |
-| 0 vendas Hotmart no dashboard | Vendas aparecem no projeto "Funil com IA" |
+| `sale_date: 1770154401000` ❌ | `sale_date: "2026-02-04T13:13:21.000Z"` ✅ |
+| Erro 22008: "date/time field value out of range" | 3 vendas Hotmart inseridas com sucesso |
 
 ---
 
 ## Seção Técnica
 
-### Cursor-based vs Offset-based Pagination
+### Detecção de Milissegundos vs Segundos
 
-A API da Hotmart usa **cursor-based pagination**:
+A função usa uma heurística simples: se o valor numérico representa uma data depois do ano 2100 quando interpretado como segundos, então é certamente milissegundos:
 
 ```text
-Offset: ?page=1 → ?page=2 → ?page=3  ❌ Não suportado
-Cursor: ?page_token=abc123 → ?page_token=xyz789  ✅ Correto
+1770154401000 (ms) → 2026-02-04 ✅
+1770154401000 (s)  → ~58,073 AD ❌ (impossível)
 ```
 
-Na primeira requisição, não enviamos `page_token`. A resposta contém:
-```json
-{
-  "items": [...],
-  "page_info": {
-    "next_page_token": "abc123",
-    "prev_page_token": null
-  }
-}
-```
-
-Para a próxima página, usamos o `next_page_token` retornado. Quando ele for `null` ou não existir, acabaram as páginas.
+Isso garante compatibilidade caso a Hotmart mude o formato no futuro.
 
