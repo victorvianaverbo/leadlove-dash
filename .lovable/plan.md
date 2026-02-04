@@ -1,112 +1,123 @@
 
 
-# Correções: Orçamento Diário e Filtro de Vendas Multi-Plataforma
+# Correção: API Hotmart Retorna Erro "invalid_parameter"
 
-## Problemas Identificados
+## Problema Identificado
 
-### 1. Orçamento Diário não soma múltiplas campanhas
-
-**Código atual (linha 410)**:
-```typescript
-const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
+Os logs mostram que **todos os 4 produtos Hotmart** estão retornando erro 400:
+```
+ERROR [HOTMART] Error fetching product 7101386 (status 400): {"error":"invalid_parameter"}
+WARNING [HOTMART] 4/4 products had errors
 ```
 
-Isso pega apenas o orçamento da primeira campanha, ignorando as demais quando várias estão selecionadas.
+### Causa Raiz
 
-### 2. Vendas Hotmart/Guru não aparecem no dashboard
+Na linha 374 do `sync-project-data/index.ts`, a URL está usando o parâmetro `page` que **não existe** na API da Hotmart:
 
-**Código atual (linha 367-369)**:
 ```typescript
-const filteredSales = sales?.filter(s => 
-  !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
-);
+// ATUAL - INCORRETO
+`...&max_results=100&page=${page}`
 ```
 
-Este filtro verifica **apenas** `kiwify_product_ids`, excluindo vendas de Hotmart e Guru do dashboard.
+A documentação da Hotmart especifica:
+- **page_token** (string): Cursor para paginação, obtido do campo `next_page_token` na resposta anterior
+- O parâmetro `page` (numérico) **não existe** e causa erro "invalid_parameter"
 
 ---
 
 ## Solução
 
-### Alteração 1: Somar orçamentos de todas as campanhas selecionadas
+Refatorar a lógica de paginação para usar `page_token` (cursor-based) ao invés de `page` (offset-based).
 
-**De:**
-```typescript
-const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
-```
+### Alteração em `supabase/functions/sync-project-data/index.ts`
 
-**Para:**
+**De (linhas 367-424):**
 ```typescript
-// Sum daily budgets from all unique campaigns (avoid duplicates from multiple days)
-const uniqueCampaignBudgets = new Map<string, number>();
-filteredAdSpend?.forEach(a => {
-  if (a.campaign_id && a.daily_budget && !uniqueCampaignBudgets.has(a.campaign_id)) {
-    uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget);
+for (const productId of productIds) {
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const salesResponse = await fetchWithRetry(
+      `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100&page=${page}`,
+      ...
+    );
+    // ...
+    hasMore = sales.length >= 100;
+    page++;
   }
-});
-const dailyBudget = Array.from(uniqueCampaignBudgets.values()).reduce((sum, b) => sum + b, 0);
-```
-
-### Alteração 2: Filtrar vendas de todas as plataformas
-
-**De:**
-```typescript
-const filteredSales = sales?.filter(s => 
-  !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
-);
+}
 ```
 
 **Para:**
 ```typescript
-const filteredSales = sales?.filter(s => {
-  // Combine all product IDs from all platforms
-  const kiwifyIds = project?.kiwify_product_ids || [];
-  const hotmartIds = (project as any)?.hotmart_product_ids || [];
-  const guruIds = (project as any)?.guru_product_ids || [];
-  
-  const allProductIds = [...kiwifyIds, ...hotmartIds, ...guruIds];
-  
-  // If no products selected in any platform, show all sales
-  if (allProductIds.length === 0) return true;
-  
-  // Include sales that match any selected product from any platform
-  return allProductIds.includes(s.product_id);
-});
+for (const productId of productIds) {
+  let pageToken: string | null = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    // Build URL with page_token only if we have one (not first page)
+    let url = `https://developers.hotmart.com/payments/api/v1/sales/history?product_id=${productId}&start_date=${startTimestamp}&end_date=${endTimestamp}&max_results=100`;
+    if (pageToken) {
+      url += `&page_token=${encodeURIComponent(pageToken)}`;
+    }
+
+    const salesResponse = await fetchWithRetry(url, ...);
+
+    if (salesResponse.ok) {
+      const salesData = await salesResponse.json();
+      const sales = salesData.items || [];
+      
+      // Get next page token for cursor-based pagination
+      pageToken = salesData.page_info?.next_page_token || null;
+      hasMore = !!pageToken;
+      
+      // ... process sales ...
+    }
+  }
+}
 ```
 
 ---
 
-## Arquivo a Modificar
+## Arquivos a Modificar
 
-| Arquivo | Alterações |
-|---------|------------|
-| `src/pages/ProjectView.tsx` | Linha 367-369: Atualizar filtro de vendas multi-plataforma |
-| `src/pages/ProjectView.tsx` | Linha 409-410: Somar orçamentos de campanhas únicas |
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/sync-project-data/index.ts` | Linhas 367-424: Refatorar paginação de `page` para `page_token` |
 
 ---
 
 ## Resultado Esperado
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| **3 campanhas selecionadas** (R$50 + R$100 + R$150) | R$ 50 | **R$ 300** |
-| **Vendas Hotmart/Guru** | Não aparecem | **Aparecem no dashboard** |
-| **Projeto multi-checkout** (Kiwify + Hotmart) | Apenas Kiwify | **Todas as vendas** |
+| Antes | Depois |
+|-------|--------|
+| Erro 400 "invalid_parameter" | Vendas Hotmart sincronizadas corretamente |
+| 0 vendas Hotmart no dashboard | Vendas aparecem no projeto "Funil com IA" |
 
 ---
 
 ## Seção Técnica
 
-### Por que usar Map para orçamentos?
+### Cursor-based vs Offset-based Pagination
 
-Cada campanha gera múltiplos registros `ad_spend` (um por dia). Sem usar um Map para deduplicar por `campaign_id`, o orçamento seria somado incorretamente múltiplas vezes:
+A API da Hotmart usa **cursor-based pagination**:
 
 ```text
-Campanha A: 30 registros (30 dias) × R$100 = R$3000 ❌
-Campanha A: 1 valor único × R$100 = R$100 ✅
+Offset: ?page=1 → ?page=2 → ?page=3  ❌ Não suportado
+Cursor: ?page_token=abc123 → ?page_token=xyz789  ✅ Correto
 ```
 
-### Compatibilidade com tipos
+Na primeira requisição, não enviamos `page_token`. A resposta contém:
+```json
+{
+  "items": [...],
+  "page_info": {
+    "next_page_token": "abc123",
+    "prev_page_token": null
+  }
+}
+```
 
-Os campos `hotmart_product_ids` e `guru_product_ids` existem no banco mas podem não estar tipados. Usamos `(project as any)` para acessá-los de forma segura.
+Para a próxima página, usamos o `next_page_token` retornado. Quando ele for `null` ou não existir, acabaram as páginas.
 
