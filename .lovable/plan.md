@@ -1,101 +1,86 @@
 
 
-# Orçamento Diário: Considerar Apenas Campanhas Ativas
+# Correção: Orçamento Diário Usando Dados do Dia Mais Recente
 
-## Problema Atual
+## Problema Identificado
 
-O orçamento diário exibido no dashboard soma o `daily_budget` de **todas** as campanhas configuradas, incluindo campanhas pausadas, arquivadas ou desativadas. Isso gera um valor incorreto que não reflete o gasto real projetado.
+A Edge Function está correta e salvando `daily_budget: 0` para campanhas pausadas.
+O **banco de dados hoje** mostra corretamente:
+- Campanha 120240099092300751 (ACTIVE): R$ 60,00
+- Campanha 120240098944500751 (ACTIVE): R$ 105,00
+- **Total correto: R$ 165,00**
 
-## Solução
+Mas o **frontend** soma budgets de todos os dias no período, incluindo dados históricos de quando campanhas pausadas ainda tinham budget > 0.
 
-Modificar a sincronização Meta Ads para verificar o `effective_status` da campanha antes de atribuir o `daily_budget`. Apenas campanhas com status `ACTIVE` terão seu orçamento computado.
+Código atual (linhas 420-427 de `ProjectView.tsx`):
+```typescript
+const uniqueCampaignBudgets = new Map<string, number>();
+filteredAdSpend?.forEach(a => {
+  if (a.campaign_id && a.daily_budget && !uniqueCampaignBudgets.has(a.campaign_id)) {
+    uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget);
+  }
+});
+```
+
+Problema: Pega o primeiro `daily_budget` encontrado para cada campanha, mas se os dados vierem ordenados de forma inconsistente ou o filtro de período incluir dados antigos, valores errados são usados.
 
 ---
 
-## Alterações Necessárias
+## Solução
 
-### Arquivo: `supabase/functions/sync-project-data/index.ts`
+Modificar o cálculo para usar **apenas os registros do dia mais recente** disponível nos dados filtrados.
 
-**Linha 590-608** - Modificar busca de budgets para incluir `effective_status`:
+### Alteração em `src/pages/ProjectView.tsx`
 
-```text
-De:
-┌─────────────────────────────────────────────────────────────────────┐
-│ campaignId?fields=daily_budget                                     │
-│ return { campaignId, budget: ... }                                 │
-└─────────────────────────────────────────────────────────────────────┘
-
-Para:
-┌─────────────────────────────────────────────────────────────────────┐
-│ campaignId?fields=daily_budget,effective_status                    │
-│ Se effective_status !== 'ACTIVE' → budget = 0                      │
-│ Apenas campanhas ativas terão budget > 0                           │
-└─────────────────────────────────────────────────────────────────────┘
+**De (linhas 420-427):**
+```typescript
+const uniqueCampaignBudgets = new Map<string, number>();
+filteredAdSpend?.forEach(a => {
+  if (a.campaign_id && a.daily_budget && !uniqueCampaignBudgets.has(a.campaign_id)) {
+    uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget);
+  }
+});
+const dailyBudget = Array.from(uniqueCampaignBudgets.values()).reduce((sum, b) => sum + b, 0);
 ```
 
-### Lógica Detalhada
-
+**Para:**
 ```typescript
-// Fetch daily_budget AND effective_status for each campaign
-const budgetPromises = campaignIds.map(async (campaignId) => {
-  try {
-    const campaignResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget,effective_status&access_token=${credentials.access_token}`
-    );
-    if (campaignResponse.ok) {
-      const campaignData = await campaignResponse.json();
-      
-      // Only count budget for ACTIVE campaigns
-      const isActive = campaignData.effective_status === 'ACTIVE';
-      const budget = isActive && campaignData.daily_budget 
-        ? parseFloat(campaignData.daily_budget) / 100 
-        : 0;
-      
-      console.log(`[META] Campaign ${campaignId}: status=${campaignData.effective_status}, budget=${budget}`);
-      
-      return { campaignId, budget };
-    }
-  } catch (e) {
-    console.error(`[META] Failed to fetch budget for campaign ${campaignId}`);
+// Get daily budget from the most recent date only (reflects current campaign status)
+const mostRecentDate = filteredAdSpend?.length 
+  ? filteredAdSpend.reduce((max, a) => (a.date > max ? a.date : max), filteredAdSpend[0].date)
+  : null;
+
+const uniqueCampaignBudgets = new Map<string, number>();
+filteredAdSpend?.forEach(a => {
+  // Only use budget from the most recent date to reflect current active campaigns
+  if (a.date === mostRecentDate && a.campaign_id && !uniqueCampaignBudgets.has(a.campaign_id)) {
+    uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget || 0);
   }
-  return { campaignId, budget: 0 };
 });
+const dailyBudget = Array.from(uniqueCampaignBudgets.values()).reduce((sum, b) => sum + b, 0);
 ```
 
 ---
 
 ## Comportamento Esperado
 
-| Status da Campanha | `daily_budget` na Meta | Resultado no Dashboard |
-|--------------------|------------------------|------------------------|
-| `ACTIVE`           | R$ 100,00              | **R$ 100,00** ✅        |
-| `PAUSED`           | R$ 100,00              | **R$ 0,00** (ignorado) |
-| `DELETED`          | R$ 50,00               | **R$ 0,00** (ignorado) |
-| `ARCHIVED`         | R$ 75,00               | **R$ 0,00** (ignorado) |
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Dados de hoje + históricos | Soma todos (R$ 355) | Usa apenas hoje (R$ 165) |
+| Campanha pausada hoje | Pode usar budget antigo | Usa R$ 0,00 |
+| Campanhas ativas | Pode duplicar | Apenas do dia atual |
 
 ---
 
-## Arquivo a Modificar
+## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/sync-project-data/index.ts` | Linhas 590-608: Adicionar `effective_status` à query e filtrar campanhas não-ativas |
+| `src/pages/ProjectView.tsx` | Linhas 420-427: Filtrar por data mais recente |
 
 ---
 
 ## Resultado Esperado
 
-O KPI "Orçamento Diário" no dashboard mostrará apenas a soma dos orçamentos de campanhas que estão **efetivamente rodando**, refletindo o gasto real projetado para o dia.
-
----
-
-## Seção Técnica
-
-### Por que usar `effective_status` e não `status`?
-
-A Meta tem dois campos de status:
-- **`status`**: O que o usuário configurou (pode ser ACTIVE mesmo se a conta estiver pausada)
-- **`effective_status`**: O estado real considerando hierarquia (conta → campanha → conjunto → anúncio)
-
-Uma campanha pode ter `status: ACTIVE` mas `effective_status: CAMPAIGN_PAUSED` se o usuário pausou via BM. Por isso, `effective_status` é o campo correto.
+O KPI "Orçamento Diário" mostrará **R$ 165,00** (soma apenas das 2 campanhas ativas no dia mais recente), não mais a soma incorreta que incluía campanhas pausadas de dias anteriores.
 
