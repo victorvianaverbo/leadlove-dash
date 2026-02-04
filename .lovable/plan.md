@@ -1,197 +1,171 @@
 
 
-# Sistema de Recuperacao de Senha e Gerenciamento de Conta
+# Email Personalizado para Confirmacao de Email
 
-## Visao Geral
+## Objetivo
 
-Implementar um sistema completo de:
-1. **Recuperacao de senha** - Envio de email com link de reset via Resend
-2. **Redefinicao de senha** - Pagina para definir nova senha
-3. **Pagina de configuracoes do usuario** - Alterar email, nome e senha
+Substituir o email padrao do Supabase Auth por um email customizado via Resend quando o usuario solicita alteracao de email, seguindo o mesmo design visual do email de recuperacao de senha.
 
 ---
 
-## Arquitetura do Fluxo
+## Situacao Atual
+
+| Funcionalidade | Servico | Template |
+|----------------|---------|----------|
+| Recuperacao de senha | Resend | HTML customizado com branding MetrikaPRO |
+| Alteracao de email | Supabase Auth | Template padrao do Supabase |
+
+---
+
+## Solucao Proposta
+
+Criar uma nova Edge Function que gera o link de confirmacao e envia via Resend com template personalizado.
 
 ```text
-RECUPERAR SENHA:
+FLUXO ATUAL:
 ┌─────────────────────────────────────────────────────────────────────┐
-│  /auth (link "Esqueci minha senha")                                │
-└─────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  /forgot-password (formulario com email)                           │
-└─────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  Edge Function: send-password-reset                                │
-│  - Gera token via Supabase Auth                                    │
-│  - Envia email via Resend com link de reset                        │
-└─────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  /reset-password?token=xxx (formulario nova senha)                 │
-│  - Valida token                                                    │
-│  - Atualiza senha via Supabase Auth                                │
+│  Settings.tsx                                                      │
+│  supabase.auth.updateUser({ email })                               │
+│  → Supabase envia email padrao automaticamente                     │
 └─────────────────────────────────────────────────────────────────────┘
 
-
-ALTERAR DADOS DA CONTA:
+NOVO FLUXO:
 ┌─────────────────────────────────────────────────────────────────────┐
-│  /settings (nova pagina)                                           │
-│  - Alterar nome                                                    │
-│  - Alterar email (requer confirmacao)                              │
-│  - Alterar senha (requer senha atual)                              │
+│  Settings.tsx                                                      │
+│  supabase.functions.invoke('send-email-change')                    │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Edge Function: send-email-change                                  │
+│  - Gera link via admin.generateLink({ type: 'email_change_new' })  │
+│  - Envia email customizado via Resend                              │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Usuario recebe email bonito com link de confirmacao               │
+│  → Clica e confirma a alteracao                                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
-
----
-
-## Componentes a Criar
-
-### 1. Edge Function: send-password-reset
-
-| Campo | Valor |
-|-------|-------|
-| Caminho | `supabase/functions/send-password-reset/index.ts` |
-| Metodo | POST |
-| Body | `{ email: string }` |
-| Acao | Gera link de reset e envia via Resend |
-
-### 2. Novas Paginas
-
-| Pagina | Rota | Descricao |
-|--------|------|-----------|
-| ForgotPassword | `/forgot-password` | Formulario para solicitar reset |
-| ResetPassword | `/reset-password` | Formulario para definir nova senha |
-| Settings | `/settings` | Configuracoes da conta do usuario |
 
 ---
 
 ## Alteracoes Necessarias
 
-### Backend (Edge Functions)
+### 1. Nova Edge Function
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `supabase/functions/send-email-change/index.ts` | Gera link de confirmacao e envia email via Resend |
+
+**Funcionalidade:**
+- Recebe `currentEmail`, `newEmail` e `redirectUrl`
+- Usa `supabaseAdmin.auth.admin.generateLink({ type: 'email_change_new' })`
+- Envia email para o **novo endereco** com template identico ao de recuperacao de senha
+
+### 2. Atualizar Config
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `supabase/functions/send-password-reset/index.ts` | **Novo** - Envia email de recuperacao via Resend |
 | `supabase/config.toml` | Adicionar configuracao da nova funcao |
 
-### Frontend (Paginas)
+### 3. Atualizar Settings.tsx
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/pages/ForgotPassword.tsx` | **Novo** - Formulario para solicitar reset de senha |
-| `src/pages/ResetPassword.tsx` | **Novo** - Formulario para definir nova senha |
-| `src/pages/Settings.tsx` | **Novo** - Pagina de configuracoes da conta |
-| `src/pages/Auth.tsx` | Adicionar link "Esqueci minha senha" |
-| `src/App.tsx` | Adicionar novas rotas |
+| Alteracao | Descricao |
+|-----------|-----------|
+| Remover | `supabase.auth.updateUser({ email })` |
+| Adicionar | `supabase.functions.invoke('send-email-change', { body: { currentEmail, newEmail } })` |
 
 ---
 
-## Pre-requisito: API Key do Resend
+## Template do Email
 
-Antes de implementar, sera necessario configurar o secret `RESEND_API_KEY`:
+O email de confirmacao tera o mesmo estilo visual do email de recuperacao:
 
-- Criar conta em https://resend.com (se ainda nao tiver)
-- Validar dominio em https://resend.com/domains
-- Criar API key em https://resend.com/api-keys
-- Adicionar o secret no projeto
+- Header com logo MetrikaPRO (gradiente roxo)
+- Titulo "Confirmacao de Email"
+- Texto explicativo
+- Botao "Confirmar Novo Email"
+- Informacoes de seguranca
+- Link alternativo no rodape
 
 ---
 
 ## Secao Tecnica
 
-### Edge Function: send-password-reset
+### Edge Function: send-email-change
 
 ```typescript
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // ... CORS handling ...
 
+  const { currentEmail, newEmail, redirectUrl } = await req.json();
+
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  // Gerar link de confirmacao para o novo email
+  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "email_change_new",
+    email: currentEmail,
+    newEmail: newEmail,
+    options: {
+      redirectTo: redirectUrl || "https://metrikapro.com.br/settings",
+    },
+  });
+
+  // Enviar email via Resend
+  await resend.emails.send({
+    from: "MetrikaPRO <noreply@metrikapro.com.br>",
+    to: [newEmail],
+    subject: "Confirme seu novo email - MetrikaPRO",
+    html: `
+      <!-- Template identico ao de recuperacao de senha -->
+      <!-- Com titulo "Confirmacao de Email" -->
+      <!-- E botao "Confirmar Novo Email" -->
+    `,
+  });
+});
+```
+
+### Atualizacao no Settings.tsx
+
+```typescript
+const handleUpdateEmail = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  setIsUpdatingEmail(true);
   try {
-    const { email } = await req.json();
-    
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Gerar link de reset via Supabase
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: {
-        redirectTo: `${req.headers.get("origin")}/reset-password`,
+    const { error } = await supabase.functions.invoke('send-email-change', {
+      body: {
+        currentEmail: user!.email,
+        newEmail: newEmail.trim(),
+        redirectUrl: window.location.origin + '/settings',
       },
     });
 
     if (error) throw error;
 
-    // Enviar email via Resend
-    await resend.emails.send({
-      from: "MetrikaPRO <noreply@SEU-DOMINIO.com>",
-      to: [email],
-      subject: "Recupere sua senha - MetrikaPRO",
-      html: `
-        <h1>Recuperacao de Senha</h1>
-        <p>Clique no link abaixo para redefinir sua senha:</p>
-        <a href="${data.properties.action_link}">Redefinir Senha</a>
-        <p>Este link expira em 1 hora.</p>
-      `,
+    toast({
+      title: 'Email de confirmacao enviado!',
+      description: 'Verifique a caixa de entrada do novo email.',
     });
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    setNewEmail('');
+  } catch (error: any) {
+    // ... error handling ...
+  } finally {
+    setIsUpdatingEmail(false);
   }
-});
-```
-
-### Pagina Settings - Funcionalidades
-
-```typescript
-// Alterar nome
-await supabase.from('profiles').update({ full_name: newName }).eq('user_id', user.id);
-
-// Alterar email
-await supabase.auth.updateUser({ email: newEmail });
-// Usuario recebe email de confirmacao
-
-// Alterar senha
-await supabase.auth.updateUser({ password: newPassword });
-```
-
-### Pagina Reset Password
-
-```typescript
-// Quando o usuario clica no link do email, Supabase seta a sessao automaticamente
-// Basta verificar se ha sessao e permitir alterar a senha
-
-const { data: { session } } = await supabase.auth.getSession();
-if (session) {
-  await supabase.auth.updateUser({ password: newPassword });
-}
+};
 ```
 
 ---
@@ -200,27 +174,17 @@ if (session) {
 
 | Arquivo | Tipo | Descricao |
 |---------|------|-----------|
-| `supabase/functions/send-password-reset/index.ts` | Novo | Edge function para envio de email |
+| `supabase/functions/send-email-change/index.ts` | Novo | Edge function para envio de email de confirmacao |
 | `supabase/config.toml` | Editar | Adicionar config da nova funcao |
-| `src/pages/ForgotPassword.tsx` | Novo | Solicitar reset de senha |
-| `src/pages/ResetPassword.tsx` | Novo | Definir nova senha |
-| `src/pages/Settings.tsx` | Novo | Configuracoes da conta |
-| `src/pages/Auth.tsx` | Editar | Adicionar link "Esqueci senha" |
-| `src/App.tsx` | Editar | Adicionar novas rotas |
-| `src/pages/Dashboard.tsx` | Editar | Adicionar link para Settings no header |
+| `src/pages/Settings.tsx` | Editar | Usar Edge Function ao inves do updateUser |
 
 ---
 
 ## Resultado Esperado
 
-| Funcionalidade | Status |
-|----------------|--------|
-| Link "Esqueci minha senha" na pagina de login | Novo |
-| Formulario para solicitar reset de senha | Novo |
-| Email enviado via Resend com link de recuperacao | Novo |
-| Pagina para definir nova senha | Novo |
-| Pagina de configuracoes da conta | Novo |
-| Alterar nome do usuario | Novo |
-| Alterar email (com confirmacao) | Novo |
-| Alterar senha (requer senha atual) | Novo |
+| Antes | Depois |
+|-------|--------|
+| Email padrao do Supabase | Email customizado MetrikaPRO |
+| Template generico | Design consistente com a marca |
+| Sem branding | Logo, cores e estilo da aplicacao |
 
