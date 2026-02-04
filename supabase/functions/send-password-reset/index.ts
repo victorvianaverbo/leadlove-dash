@@ -86,7 +86,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
-      from: "MetrikaPRO <noreply@metrikapro.com.br>",
+      from: "MetrikaPRO <noreply@vianamidias.com.br>",
       to: [email],
       subject: "Recupere sua senha - MetrikaPRO",
       html: `
