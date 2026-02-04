@@ -166,6 +166,27 @@ function normalizeStatus(status: string, source: string): string {
   return statusLower; // Return as-is if no match
 }
 
+// Convert timestamp (ms or seconds) to ISO string for database compatibility
+function convertTimestampToISO(value: unknown): string {
+  if (!value) return new Date().toISOString();
+  
+  // If already a string in ISO format, return as-is
+  if (typeof value === 'string' && value.includes('-')) {
+    return value;
+  }
+  
+  // If numeric timestamp
+  const numValue = Number(value);
+  if (!isNaN(numValue)) {
+    // Hotmart uses milliseconds - values > year 2100 in seconds = definitely ms
+    const isMilliseconds = numValue > 4102444800; // ~2100 in seconds
+    const timestamp = isMilliseconds ? numValue : numValue * 1000;
+    return new Date(timestamp).toISOString();
+  }
+  
+  return new Date().toISOString();
+}
+
 // ============ PLATFORM SYNC FUNCTIONS (for Promise.all parallelization) ============
 
 interface SaleRecord {
@@ -410,7 +431,7 @@ async function syncHotmart(
                 payment_method: sale.purchase?.payment?.type || sale.payment_type || null,
                 customer_name: sale.buyer?.name || sale.buyer_name || null,
                 customer_email: sale.buyer?.email || sale.buyer_email || null,
-                sale_date: sale.purchase?.approved_date || sale.approved_date || sale.order_date,
+                sale_date: convertTimestampToISO(sale.purchase?.approved_date || sale.approved_date || sale.order_date),
                 utm_source: sale.purchase?.tracking?.source || sale.tracking?.source || null,
                 utm_medium: sale.purchase?.tracking?.medium || sale.tracking?.medium || null,
                 utm_campaign: sale.purchase?.tracking?.utm_campaign || null,
