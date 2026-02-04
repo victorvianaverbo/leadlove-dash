@@ -364,9 +364,20 @@ const parseCurrencyInput = (value: string): number => {
     toast({ title: 'Link copiado!', description: 'O link foi copiado para a área de transferência.' });
   };
 
-  const filteredSales = sales?.filter(s => 
-    !project?.kiwify_product_ids?.length || project.kiwify_product_ids.includes(s.product_id)
-  );
+  const filteredSales = sales?.filter(s => {
+    // Combine all product IDs from all platforms
+    const kiwifyIds = project?.kiwify_product_ids || [];
+    const hotmartIds = project?.hotmart_product_ids || [];
+    const guruIds = project?.guru_product_ids || [];
+    
+    const allProductIds = [...kiwifyIds, ...hotmartIds, ...guruIds];
+    
+    // If no products selected in any platform, show all sales
+    if (allProductIds.length === 0) return true;
+    
+    // Include sales that match any selected product from any platform
+    return allProductIds.includes(s.product_id);
+  });
 
   // Filter ad spend by selected campaigns (from project settings)
   const filteredAdSpend = adSpend?.filter(a =>
@@ -406,8 +417,14 @@ const parseCurrencyInput = (value: string): number => {
     const totalLandingPageViews = filteredAdSpend?.reduce((sum, a) => sum + (a.landing_page_views || 0), 0) || 0;
     const totalLinkClicks = filteredAdSpend?.reduce((sum, a) => sum + (a.link_clicks || 0), 0) || 0;
 
-    // Get daily budget from most recent ad spend record
-    const dailyBudget = filteredAdSpend?.[0]?.daily_budget || 0;
+    // Sum daily budgets from all unique campaigns (avoid duplicates from multiple days)
+    const uniqueCampaignBudgets = new Map<string, number>();
+    filteredAdSpend?.forEach(a => {
+      if (a.campaign_id && a.daily_budget && !uniqueCampaignBudgets.has(a.campaign_id)) {
+        uniqueCampaignBudgets.set(a.campaign_id, a.daily_budget);
+      }
+    });
+    const dailyBudget = Array.from(uniqueCampaignBudgets.values()).reduce((sum, b) => sum + b, 0);
 
     // New metrics: checkouts, thruplays, video 3s views
     const totalCheckoutsInitiated = filteredAdSpend?.reduce((sum, a) => sum + (a.checkouts_initiated || 0), 0) || 0;
