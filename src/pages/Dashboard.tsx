@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, LogOut, Loader2, BarChart3, HelpCircle, Crown, Settings } from "lucide-react";
+import { Plus, LogOut, Loader2, BarChart3, HelpCircle, Crown, Settings, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { STRIPE_PLANS } from "@/lib/stripe-plans";
 import { toast } from "@/hooks/use-toast";
@@ -333,6 +333,17 @@ export default function Dashboard() {
             
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 sm:h-9 sm:w-9" 
+                asChild 
+                title="Configurações da conta"
+              >
+                <Link to="/settings">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Link>
+              </Button>
               <Button 
                 id="tour-documentation"
                 variant="ghost" 
