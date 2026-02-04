@@ -417,7 +417,8 @@ async function syncHotmart(
 
             for (const sale of sales) {
               const saleId = `hotmart_${sale.purchase?.transaction || sale.transaction || Date.now()}`;
-              const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
+              // Hotmart returns price in decimal format (e.g., 235.76), NOT in cents like Kiwify
+              const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0);
               
               result.sales.push({
                 kiwify_sale_id: saleId,
