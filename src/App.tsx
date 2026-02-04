@@ -19,6 +19,9 @@ import CheckoutCancel from "./pages/CheckoutCancel";
 import Admin from "./pages/Admin";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +35,9 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/projects/new" element={<ProjectNew />} />
             <Route path="/projects/:id" element={<ProjectView />} />
