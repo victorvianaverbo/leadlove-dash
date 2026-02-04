@@ -12,6 +12,8 @@ import { Link } from "react-router-dom";
 import { STRIPE_PLANS } from "@/lib/stripe-plans";
 import { toast } from "@/hooks/use-toast";
 import { DeleteProjectDialog } from "@/components/DeleteProjectDialog";
+import { OnboardingTour } from "@/components/onboarding";
+import { useOnboardingTour } from "@/hooks/useOnboardingTour";
 import { 
   ProjectCard, 
   PlanCard, 
@@ -83,6 +85,7 @@ export default function Dashboard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
   const queryClient = useQueryClient();
+  const { showTour, finishTour } = useOnboardingTour();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -330,13 +333,21 @@ export default function Dashboard() {
             
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" asChild title="Documentação">
+              <Button 
+                id="tour-documentation"
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 sm:h-9 sm:w-9" 
+                asChild 
+                title="Documentação"
+              >
                 <Link to="/documentacao">
                   <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Link>
               </Button>
               {subscribed && (
                 <Button 
+                  id="tour-manage-subscription"
                   variant="outline" 
                   size="sm" 
                   onClick={handleManageSubscription}
@@ -355,6 +366,7 @@ export default function Dashboard() {
               )}
               {subscribed && (
                 <Button 
+                  id="tour-new-project"
                   onClick={() => navigate('/projects/new')}
                   variant={canCreateProject ? 'default' : 'outline'}
                   size="sm"
@@ -402,7 +414,7 @@ export default function Dashboard() {
 
             {/* Plan Card */}
             {subscribed && currentPlan && (
-              <div className="mb-6 sm:mb-8">
+              <div id="tour-plan-card" className="mb-6 sm:mb-8">
                 <PlanCard
                   planName={currentPlan.name}
                   projectCount={projects?.length ?? 0}
@@ -475,6 +487,9 @@ export default function Dashboard() {
           isDeleting={deleteProject.isPending}
         />
       </main>
+
+      {/* Onboarding Tour */}
+      <OnboardingTour run={showTour} onFinish={finishTour} />
     </div>
   );
 }
