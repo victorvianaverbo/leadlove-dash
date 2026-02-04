@@ -587,15 +587,25 @@ async function syncMetaAds(
     const since = syncStartDate.toISOString().split('T')[0];
     const until = formatBrasiliaDateString(0);
 
-    // Fetch daily_budget for each campaign in parallel
+    // Fetch daily_budget AND effective_status for each campaign in parallel
+    // Only ACTIVE campaigns will have their budget counted
     const budgetPromises = campaignIds.map(async (campaignId) => {
       try {
         const campaignResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget&access_token=${credentials.access_token}`
+          `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget,effective_status&access_token=${credentials.access_token}`
         );
         if (campaignResponse.ok) {
           const campaignData = await campaignResponse.json();
-          return { campaignId, budget: campaignData.daily_budget ? parseFloat(campaignData.daily_budget) / 100 : 0 };
+          
+          // Only count budget for ACTIVE campaigns
+          const isActive = campaignData.effective_status === 'ACTIVE';
+          const budget = isActive && campaignData.daily_budget 
+            ? parseFloat(campaignData.daily_budget) / 100 
+            : 0;
+          
+          console.log(`[META] Campaign ${campaignId}: status=${campaignData.effective_status}, budget=${budget}`);
+          
+          return { campaignId, budget };
         }
       } catch (e) {
         console.error(`[META] Failed to fetch budget for campaign ${campaignId}`);
