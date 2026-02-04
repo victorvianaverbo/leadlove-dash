@@ -1,57 +1,77 @@
 
 
-# Correção: Faturamento Hotmart Dividido por 100 Incorretamente
+# Orçamento Diário: Considerar Apenas Campanhas Ativas
 
-## Problema Identificado
+## Problema Atual
 
-As vendas Hotmart estão com valores incorretos no banco:
-```
-amount: 0.27  → Deveria ser R$ 27,00
-amount: 0.37  → Deveria ser R$ 37,00  
-amount: 0.01  → Deveria ser R$ 1,00
-```
-
-### Causa Raiz
-
-Na linha 420 do `sync-project-data/index.ts`:
-```typescript
-const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
-```
-
-O código divide por 100, assumindo que o valor vem em centavos (como a Kiwify). Porém, a **API Hotmart retorna valores em reais** (decimal), não em centavos.
-
-**Documentação Hotmart confirma:**
-```json
-"price": {
-  "value": 235.76,  // ← Já em reais, não centavos
-  "currency_code": "USD"
-}
-```
-
----
+O orçamento diário exibido no dashboard soma o `daily_budget` de **todas** as campanhas configuradas, incluindo campanhas pausadas, arquivadas ou desativadas. Isso gera um valor incorreto que não reflete o gasto real projetado.
 
 ## Solução
 
-Remover a divisão por 100 **apenas** para o mapeamento Hotmart.
+Modificar a sincronização Meta Ads para verificar o `effective_status` da campanha antes de atribuir o `daily_budget`. Apenas campanhas com status `ACTIVE` terão seu orçamento computado.
 
-### Alteração em `supabase/functions/sync-project-data/index.ts`
+---
 
-**De (linha 420):**
-```typescript
-const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0) / 100;
+## Alterações Necessárias
+
+### Arquivo: `supabase/functions/sync-project-data/index.ts`
+
+**Linha 590-608** - Modificar busca de budgets para incluir `effective_status`:
+
+```text
+De:
+┌─────────────────────────────────────────────────────────────────────┐
+│ campaignId?fields=daily_budget                                     │
+│ return { campaignId, budget: ... }                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+Para:
+┌─────────────────────────────────────────────────────────────────────┐
+│ campaignId?fields=daily_budget,effective_status                    │
+│ Se effective_status !== 'ACTIVE' → budget = 0                      │
+│ Apenas campanhas ativas terão budget > 0                           │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Para:**
+### Lógica Detalhada
+
 ```typescript
-// Hotmart returns price in decimal format (e.g., 235.76), NOT in cents like Kiwify
-const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0);
+// Fetch daily_budget AND effective_status for each campaign
+const budgetPromises = campaignIds.map(async (campaignId) => {
+  try {
+    const campaignResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget,effective_status&access_token=${credentials.access_token}`
+    );
+    if (campaignResponse.ok) {
+      const campaignData = await campaignResponse.json();
+      
+      // Only count budget for ACTIVE campaigns
+      const isActive = campaignData.effective_status === 'ACTIVE';
+      const budget = isActive && campaignData.daily_budget 
+        ? parseFloat(campaignData.daily_budget) / 100 
+        : 0;
+      
+      console.log(`[META] Campaign ${campaignId}: status=${campaignData.effective_status}, budget=${budget}`);
+      
+      return { campaignId, budget };
+    }
+  } catch (e) {
+    console.error(`[META] Failed to fetch budget for campaign ${campaignId}`);
+  }
+  return { campaignId, budget: 0 };
+});
 ```
 
 ---
 
-## Correção dos Dados Existentes
+## Comportamento Esperado
 
-Após deploy, será necessário **re-sincronizar** o projeto para atualizar os valores das vendas já inseridas (o upsert sobrescreverá com os valores corretos).
+| Status da Campanha | `daily_budget` na Meta | Resultado no Dashboard |
+|--------------------|------------------------|------------------------|
+| `ACTIVE`           | R$ 100,00              | **R$ 100,00** ✅        |
+| `PAUSED`           | R$ 100,00              | **R$ 0,00** (ignorado) |
+| `DELETED`          | R$ 50,00               | **R$ 0,00** (ignorado) |
+| `ARCHIVED`         | R$ 75,00               | **R$ 0,00** (ignorado) |
 
 ---
 
@@ -59,28 +79,23 @@ Após deploy, será necessário **re-sincronizar** o projeto para atualizar os v
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/sync-project-data/index.ts` | Linha 420: Remover `/ 100` do cálculo Hotmart |
+| `supabase/functions/sync-project-data/index.ts` | Linhas 590-608: Adicionar `effective_status` à query e filtrar campanhas não-ativas |
 
 ---
 
 ## Resultado Esperado
 
-| Antes | Depois |
-|-------|--------|
-| R$ 0,27 | **R$ 27,00** |
-| R$ 0,37 | **R$ 37,00** |
-| R$ 0,01 | **R$ 1,00** |
-| Faturamento total ~R$ 0,65 | **Faturamento correto** |
+O KPI "Orçamento Diário" no dashboard mostrará apenas a soma dos orçamentos de campanhas que estão **efetivamente rodando**, refletindo o gasto real projetado para o dia.
 
 ---
 
 ## Seção Técnica
 
-### Por que Kiwify divide por 100 e Hotmart não?
+### Por que usar `effective_status` e não `status`?
 
-| Plataforma | Formato do Valor | Tratamento |
-|------------|------------------|------------|
-| **Kiwify** | Centavos (2700 = R$ 27,00) | `/ 100` ✅ |
-| **Hotmart** | Decimal (27.00 = R$ 27,00) | Sem divisão ✅ |
-| **Guru** | Decimal | Sem divisão (já implementado) |
+A Meta tem dois campos de status:
+- **`status`**: O que o usuário configurou (pode ser ACTIVE mesmo se a conta estiver pausada)
+- **`effective_status`**: O estado real considerando hierarquia (conta → campanha → conjunto → anúncio)
+
+Uma campanha pode ter `status: ACTIVE` mas `effective_status: CAMPAIGN_PAUSED` se o usuário pausou via BM. Por isso, `effective_status` é o campo correto.
 
