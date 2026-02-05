@@ -1,50 +1,87 @@
 
-# Plano: Corrigir Integração Eduzz + Melhorias de Escalabilidade
+# Plano: Corrigir Erro de Constraint em Integrações Desativadas
 
-## ✅ Fase 1: Corrigir Eduzz (CONCLUÍDA)
+## Diagnóstico
 
-- [x] Adicionar `eduzz` ao tipo e config em `SalesIntegrationCard.tsx`
-- [x] Adicionar state `eduzzProducts` + card Eduzz em `ProjectEdit.tsx`
-- [x] Salvar `eduzz_product_ids` no update do projeto
+O erro **"duplicate key value violates unique constraint 'integrations_project_type_unique'"** ocorre no componente `MetaAdsIntegrationCard.tsx`.
 
----
+### Causa Raiz
 
-## ✅ Fase 2: Melhorias de Alta Prioridade (CONCLUÍDA)
+No `MetaAdsIntegrationCard.tsx` (linha 80), a lógica de save usa:
 
-| # | Ação | Status |
-|---|------|--------|
-| 1 | Criar índice parcial `idx_sales_paid_project_date WHERE status = 'paid'` | ✅ |
-| 2 | Renomear `kiwify_sale_id` → `external_sale_id` | ✅ |
-| 3 | Adicionar índices GIN para arrays de product_ids | ✅ |
-| 4 | Criar índice `idx_ad_spend_project_date` para otimizar joins | ✅ |
-| 5 | Atualizar view `sales_public` com security_invoker | ✅ |
-| 6 | Atualizar código das edge functions para usar `external_sale_id` | ✅ |
-| 7 | Atualizar constraint única para `external_sale_id` | ✅ |
+```typescript
+if (integration?.is_active) {
+  // UPDATE - só entra aqui se is_active === true
+} else {
+  // INSERT - entra aqui quando is_active === false
+}
+```
 
----
+Quando o cliente Charles **desconecta** o Meta Ads:
+1. A integração é marcada como `is_active: false`
+2. Ao tentar **reconectar**, o código verifica `integration?.is_active` que é `false`
+3. Entra no bloco `else` e tenta fazer INSERT
+4. O INSERT falha porque já existe registro com `(project_id, type)`
 
-## Fase 3: Melhorias de Média Prioridade (PRÓXIMAS)
+### Comparação
 
-| # | Ação | Esforço |
-|---|------|---------|
-| 4 | Otimizar queries N+1 do Dashboard | 4h |
-| 5 | Error Boundaries granulares | 2h |
-| 6 | Rate limiting por usuário | 1 dia |
-
----
-
-## Fase 4: Escalabilidade Futura
-
-| # | Ação | Quando |
-|---|------|--------|
-| 7 | Sistema de filas (pg_notify ou BullMQ) | > 500 usuários |
-| 8 | Particionamento de tabelas | > 1M registros |
-| 9 | Servidor dedicado (Railway/Fly.io) | > 1000 usuários |
+| Componente | Condição | Comportamento |
+|------------|----------|---------------|
+| `SalesIntegrationCard` | `if (integration)` | Correto - UPDATE se existe |
+| `MetaAdsIntegrationCard` | `if (integration?.is_active)` | Errado - INSERT se desativado |
 
 ---
 
-## Notas de Segurança
+## Solução
 
-Os warnings restantes são pré-existentes e não são críticos:
-- **Function Search Path Mutable**: Funções internas do Supabase
-- **Leaked Password Protection**: Pode ser habilitado via dashboard de auth
+### Arquivo: `src/components/integrations/MetaAdsIntegrationCard.tsx`
+
+Alterar a condição na linha 80 de:
+```typescript
+if (integration?.is_active) {
+```
+
+Para:
+```typescript
+if (integration) {
+```
+
+Isso garante que:
+- Se a integração existe (ativa ou não) → faz UPDATE
+- Se não existe → faz INSERT
+
+### Ajustes Adicionais
+
+A validação de campos também precisa ser ajustada para reconectar integrações desativadas:
+
+```typescript
+// ANTES (linha 98-101)
+} else {
+  if (!accessToken || !adAccountId) {
+    throw new Error("Preencha todas as credenciais");
+  }
+  
+// DEPOIS - validar sempre que não tiver integração OU integração desativada
+} else {
+  if (!accessToken || (!adAccountId && !integration)) {
+    throw new Error("Preencha todas as credenciais");
+  }
+```
+
+---
+
+## Impacto
+
+- Corrige o erro do cliente Charles
+- Permite reconectar integrações que foram desconectadas
+- Mantém compatibilidade com fluxo de primeira conexão
+
+---
+
+## Resumo Técnico
+
+| Mudança | Linha | De | Para |
+|---------|-------|----|----|
+| Condição principal | 80 | `integration?.is_active` | `integration` |
+| Validação adAccountId | 99 | `!adAccountId` | `!adAccountId && !integration` |
+| Bloco UPDATE | 87-97 | Credenciais existentes se is_active | Credenciais existentes se integration |
