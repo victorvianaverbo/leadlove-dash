@@ -39,7 +39,7 @@ interface SalesPublic {
   id: string;
   project_id: string;
   user_id: string;
-  kiwify_sale_id: string;
+  external_sale_id: string;
   product_id: string;
   product_name: string | null;
   amount: number;
