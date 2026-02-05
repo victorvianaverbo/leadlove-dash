@@ -543,27 +543,40 @@ async function syncGuru(
 
           // Debug logging for first page to capture actual API structure
           if (sales.length > 0 && page === 1) {
-            console.log(`[GURU] Sample sale structure:`, JSON.stringify(Object.keys(sales[0])));
-            console.log(`[GURU] Sample payment:`, JSON.stringify(sales[0].payment));
-            console.log(`[GURU] Sample items:`, JSON.stringify(sales[0].items));
-            console.log(`[GURU] Sample invoice:`, JSON.stringify(sales[0].invoice));
+            const sample = sales[0];
+            console.log(`[GURU] Sample sale keys:`, Object.keys(sample));
+            console.log(`[GURU] Sample payment:`, JSON.stringify(sample.payment || null));
+            console.log(`[GURU] Sample items:`, JSON.stringify(sample.items || null));
+            console.log(`[GURU] Sample invoice:`, JSON.stringify(sample.invoice || null));
+            console.log(`[GURU] Sample contracts:`, JSON.stringify(sample.contracts || null));
+            console.log(`[GURU] Sample dates:`, JSON.stringify(sample.dates || null));
           }
 
           for (const sale of sales) {
             const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
             
             // Buscar valor nos campos corretos da API v2
-            // Prioridade: payment > items > invoice > campos legados
-            const paymentAmount = sale.payment?.amount || sale.payment?.value || sale.payment?.total || 0;
+            // Prioridade: payment > invoice > items > contracts > campos legados
+            const paymentAmount = sale.payment?.amount || sale.payment?.total_value || 
+                                  sale.payment?.value || sale.payment?.total || 0;
+            const invoiceTotal = sale.invoice?.total || sale.invoice?.value || 
+                                 sale.invoice?.total_value || sale.invoice?.amount || 0;
             const itemsTotal = Array.isArray(sale.items) 
-              ? sale.items.reduce((sum: number, item: any) => sum + parseAmount(item.price || item.value || item.amount || 0), 0)
+              ? sale.items.reduce((sum: number, item: any) => 
+                  sum + parseAmount(item.price || item.value || item.total || item.amount || 0), 0)
               : 0;
-            const invoiceTotal = sale.invoice?.total || sale.invoice?.amount || sale.invoice?.value || 0;
+            const contractAmount = sale.contracts?.[0]?.value || sale.contracts?.[0]?.amount || 0;
             
-            const saleAmount = parseAmount(paymentAmount || itemsTotal || invoiceTotal || sale.amount || sale.value || sale.price || 0);
+            const saleAmount = parseAmount(
+              paymentAmount || invoiceTotal || itemsTotal || contractAmount || 
+              sale.amount || sale.value || sale.price || 0
+            );
             
-            // Buscar data nos campos corretos da API v2
-            const saleDate = sale.dates?.confirmed_at || sale.confirmed_at || sale.dates?.created_at || sale.created_at || sale.date || sale.approved_at || new Date().toISOString();
+            // Buscar data nos campos corretos da API v2 - CONVERTER TIMESTAMP UNIX
+            const rawDate = sale.dates?.confirmed_at || sale.confirmed_at || 
+                           sale.dates?.created_at || sale.created_at || 
+                           sale.date || sale.approved_at;
+            const saleDate = convertTimestampToISO(rawDate);
             
             productSales.push({
               kiwify_sale_id: saleId,
