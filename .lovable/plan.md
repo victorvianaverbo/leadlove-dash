@@ -1,143 +1,118 @@
 
+# Corrigir Labels Dinâmicos de Fonte de Vendas
 
-# Corrigir Sincronização Guru - Valores e Datas
+## Problema
 
-## Diagnóstico
+No `ProjectView.tsx`, os cards de KPIs do funil mostram "Kiwify" fixo como fonte das vendas, mesmo quando o projeto usa Guru ou Hotmart.
 
-A sincronização do Guru apresenta **dois problemas**:
+| Atual | Esperado |
+|-------|----------|
+| `subtitle="Kiwify"` | `subtitle="Guru"` (quando só tem Guru) |
+| `subtitle="Meta ÷ Kiwify"` | `subtitle="Meta ÷ Multi-checkout"` (quando tem mais de uma fonte) |
 
-### 1. Erro de Data
-```
-date/time field value out of range: "1770246407"
-```
-O campo `confirmed_at` vem como **timestamp Unix em segundos**, mas está sendo passado diretamente ao banco sem conversão para ISO.
+## Cards Afetados
 
-### 2. Valores Zerados
-O código busca campos que não existem na estrutura da API v2:
-```typescript
-// Código atual - campos incorretos
-sale.amount || sale.value || sale.price  // NÃO existem na raiz
-```
+| Card | Linha | Subtitle Atual |
+|------|-------|----------------|
+| Vendas | 946 | "Kiwify" |
+| Custo/Venda | 947 | "Meta ÷ Kiwify" |
 
-A API retorna valores dentro de objetos aninhados:
-- `payment.amount` / `payment.total_value`
-- `items[].price` / `items[].value`
-- `invoice.total` / `invoice.value`
+## Dados Disponíveis
 
----
+A tabela `sales` possui o campo `source` com valores possíveis:
+- `kiwify`
+- `hotmart`
+- `guru`
 
-## Evidências (Medsimple)
-
-| Métrica | Valor |
-|---------|-------|
-| Vendas importadas | 118 |
-| Valor total | R$ 0,00 |
-| Erros de insert | 82 (todas Guru + Hotmart) |
-| Causa | Timestamp não convertido |
+Os dados de vendas já são carregados em `filteredSales` e incluem o campo `source`.
 
 ---
 
 ## Solução
 
-### Mudanças no sync-project-data/index.ts
-
-**1. Usar `convertTimestampToISO()` para datas do Guru** (linha 566)
+### 1. Criar função para detectar fontes ativas
 
 ```typescript
-// ANTES
-const saleDate = sale.dates?.confirmed_at || sale.confirmed_at || ...;
-
-// DEPOIS
-const saleDate = convertTimestampToISO(
-  sale.dates?.confirmed_at || sale.confirmed_at || 
-  sale.dates?.created_at || sale.created_at
-);
+// Dentro do useMemo de calculatedMetrics ou separado
+const salesSources = useMemo(() => {
+  const sources = new Set<string>();
+  filteredSales?.forEach(s => {
+    if ((s as any).source) {
+      sources.add((s as any).source);
+    }
+  });
+  return sources;
+}, [filteredSales]);
 ```
 
-**2. Expandir busca de valores com campos adicionais**
+### 2. Criar helper para formatar label
 
 ```typescript
-// Buscar em payment (campos comuns da API Guru)
-const paymentAmount = sale.payment?.amount || sale.payment?.total_value || 
-                      sale.payment?.value || sale.payment?.total || 0;
-
-// Buscar em invoice  
-const invoiceTotal = sale.invoice?.total || sale.invoice?.value || 
-                     sale.invoice?.total_value || 0;
-
-// Buscar em items (somando todos)
-const itemsTotal = Array.isArray(sale.items) 
-  ? sale.items.reduce((sum, item) => 
-      sum + parseAmount(item.price || item.value || item.total || 0), 0)
-  : 0;
-
-// Buscar em contracts (alternativa para assinaturas)
-const contractAmount = sale.contracts?.[0]?.value || 0;
-
-// Prioridade de seleção
-const saleAmount = parseAmount(
-  paymentAmount || invoiceTotal || itemsTotal || contractAmount || 0
-);
+const formatSalesSourceLabel = (sources: Set<string>): string => {
+  const sourceNames: Record<string, string> = {
+    kiwify: 'Kiwify',
+    hotmart: 'Hotmart',
+    guru: 'Guru',
+    eduzz: 'Eduzz',
+  };
+  
+  if (sources.size === 0) return 'Checkout';
+  if (sources.size === 1) {
+    const source = Array.from(sources)[0];
+    return sourceNames[source] || source;
+  }
+  return 'Multi-checkout';
+};
 ```
 
-**3. Adicionar logs de debug robustos**
+### 3. Atualizar os KpiCards
 
-```typescript
-if (sales.length > 0 && page === 1) {
-  const sample = sales[0];
-  console.log(`[GURU] Sample sale keys:`, Object.keys(sample));
-  console.log(`[GURU] Sample payment:`, JSON.stringify(sample.payment || null));
-  console.log(`[GURU] Sample items:`, JSON.stringify(sample.items || null));
-  console.log(`[GURU] Sample invoice:`, JSON.stringify(sample.invoice || null));
-  console.log(`[GURU] Sample contracts:`, JSON.stringify(sample.contracts || null));
-  console.log(`[GURU] Sample dates:`, JSON.stringify(sample.dates || null));
-}
+```tsx
+// Linha 946
+<KpiCard 
+  title="Vendas" 
+  value={totalSales} 
+  subtitle={formatSalesSourceLabel(salesSources)}  // Era: "Kiwify"
+  icon={ShoppingCart} 
+  variant="success" 
+/>
+
+// Linha 947
+<KpiCard 
+  title="Custo/Venda" 
+  value={formatCurrency(custoPerVenda)} 
+  subtitle={`Meta ÷ ${formatSalesSourceLabel(salesSources)}`}  // Era: "Meta ÷ Kiwify"
+  icon={DollarSign} 
+  variant="success" 
+/>
 ```
 
 ---
 
-## Fluxo de Dados Corrigido
+## Resultado Visual
 
-```text
-API Guru v2 Response
-       │
-       ▼
-┌──────────────────────────────────┐
-│ Extração de Valor                │
-│ payment.amount                   │
-│ ├─ payment.total_value           │
-│ ├─ invoice.total                 │
-│ ├─ items[].price (soma)          │
-│ └─ contracts[0].value            │
-└──────────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────┐
-│ Extração de Data                 │
-│ convertTimestampToISO()          │
-│ ├─ dates.confirmed_at            │
-│ ├─ confirmed_at                  │
-│ └─ dates.created_at              │
-└──────────────────────────────────┘
-       │
-       ▼
-   Database INSERT
-```
+| Cenário | Card "Vendas" | Card "Custo/Venda" |
+|---------|--------------|-------------------|
+| Só Kiwify | "Kiwify" | "Meta ÷ Kiwify" |
+| Só Guru | "Guru" | "Meta ÷ Guru" |
+| Só Hotmart | "Hotmart" | "Meta ÷ Hotmart" |
+| Multi-checkout | "Multi-checkout" | "Meta ÷ Multi-checkout" |
+| Sem vendas | "Checkout" | "Meta ÷ Checkout" |
 
 ---
 
-## Arquivos
+## Arquivo a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/sync-project-data/index.ts` | Atualizar lógica de extração do Guru (linhas 545-590) |
+| `src/pages/ProjectView.tsx` | Adicionar useMemo para detectar fontes + helper de formatação + atualizar KpiCards |
 
 ---
 
-## Pós-Implementação
+## Detalhes Técnicos
 
-1. Deploy automático da edge function
-2. Re-sincronizar projeto Medsimple
-3. Verificar logs para confirmar estrutura real
-4. Validar se valores e datas estão corretos
+### Localização das mudanças
 
+1. **Linha ~430-445**: Adicionar useMemo para `salesSources`
+2. **Linha ~555-565**: Adicionar helper `formatSalesSourceLabel`
+3. **Linhas 946-948**: Atualizar subtítulos dos KpiCards
