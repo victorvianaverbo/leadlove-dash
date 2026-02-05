@@ -48,11 +48,12 @@ export function MetaAdsIntegrationCard({
   const [showToken, setShowToken] = useState(false);
   const [campaignSearch, setCampaignSearch] = useState("");
 
-  // Load non-sensitive credentials
+  // Load non-sensitive credentials (strip act_ prefix for display)
   useEffect(() => {
     if (integration?.credentials) {
       const creds = integration.credentials as { ad_account_id?: string };
-      setAdAccountId(creds.ad_account_id || "");
+      const storedId = creds.ad_account_id || "";
+      setAdAccountId(storedId.replace(/^act_/, ""));
     }
   }, [integration]);
 
@@ -81,12 +82,14 @@ export function MetaAdsIntegrationCard({
           throw new Error("Digite o Access Token para atualizar");
         }
         const currentCreds = integration.credentials as { ad_account_id?: string };
+        const currentIdWithoutPrefix = (currentCreds.ad_account_id || "").replace(/^act_/, "");
+        const finalAdAccountId = adAccountId || currentIdWithoutPrefix;
         const { error } = await supabase
           .from('integrations')
           .update({ 
             credentials: { 
               access_token: accessToken, 
-              ad_account_id: adAccountId || currentCreds.ad_account_id 
+              ad_account_id: finalAdAccountId ? `act_${finalAdAccountId}` : ""
             }, 
             is_active: true 
           })
@@ -102,7 +105,7 @@ export function MetaAdsIntegrationCard({
             user_id: user!.id,
             project_id: projectId,
             type: 'meta_ads',
-            credentials: { access_token: accessToken, ad_account_id: adAccountId },
+            credentials: { access_token: accessToken, ad_account_id: `act_${adAccountId}` },
             is_active: true,
           }]);
         if (error) throw error;
@@ -255,12 +258,20 @@ export function MetaAdsIntegrationCard({
               </div>
               <div>
                 <label className="text-sm font-medium">Ad Account ID</label>
-                <Input
-                  value={adAccountId}
-                  onChange={(e) => setAdAccountId(e.target.value)}
-                  placeholder="Ex: act_123456789"
-                  className={isConnected && adAccountId ? 'bg-muted/30' : ''}
-                />
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground">
+                    act_
+                  </span>
+                  <Input
+                    value={adAccountId}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/^act_/, '');
+                      setAdAccountId(value);
+                    }}
+                    placeholder="123456789"
+                    className={`rounded-l-none ${isConnected && adAccountId ? 'bg-muted/30' : ''}`}
+                  />
+                </div>
                 {isConnected && adAccountId && (
                   <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
                 )}
