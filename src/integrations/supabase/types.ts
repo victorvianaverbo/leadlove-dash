@@ -395,9 +395,9 @@ export type Database = {
           created_at: string
           customer_email: string | null
           customer_name: string | null
+          external_sale_id: string
           gross_amount: number | null
           id: string
-          kiwify_sale_id: string
           payment_method: string | null
           product_id: string
           product_name: string | null
@@ -417,9 +417,9 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
+          external_sale_id: string
           gross_amount?: number | null
           id?: string
-          kiwify_sale_id: string
           payment_method?: string | null
           product_id: string
           product_name?: string | null
@@ -439,9 +439,9 @@ export type Database = {
           created_at?: string
           customer_email?: string | null
           customer_name?: string | null
+          external_sale_id?: string
           gross_amount?: number | null
           id?: string
-          kiwify_sale_id?: string
           payment_method?: string | null
           product_id?: string
           product_name?: string | null
@@ -605,9 +605,9 @@ export type Database = {
         Row: {
           amount: number | null
           created_at: string | null
+          external_sale_id: string | null
           gross_amount: number | null
           id: string | null
-          kiwify_sale_id: string | null
           payment_method: string | null
           product_id: string | null
           product_name: string | null
@@ -623,9 +623,9 @@ export type Database = {
         Insert: {
           amount?: number | null
           created_at?: string | null
+          external_sale_id?: string | null
           gross_amount?: number | null
           id?: string | null
-          kiwify_sale_id?: string | null
           payment_method?: string | null
           product_id?: string | null
           product_name?: string | null
@@ -641,9 +641,9 @@ export type Database = {
         Update: {
           amount?: number | null
           created_at?: string | null
+          external_sale_id?: string | null
           gross_amount?: number | null
           id?: string | null
-          kiwify_sale_id?: string | null
           payment_method?: string | null
           product_id?: string | null
           product_name?: string | null
