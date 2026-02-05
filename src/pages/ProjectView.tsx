@@ -809,7 +809,7 @@ const parseCurrencyInput = (value: string): number => {
               <Share2 className="h-5 w-5 text-primary" />
               <CardTitle className="text-lg">Compartilhar Dashboard</CardTitle>
             </div>
-            <CardDescription>Gere um link para o cliente visualizar o dashboard sem login</CardDescription>
+            <CardDescription>Acesse o dashboard sem login ou compartilhe com clientes e veja a análise da IA</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
