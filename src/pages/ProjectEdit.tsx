@@ -32,6 +32,7 @@ export default function ProjectEdit() {
   const [kiwifyProducts, setKiwifyProducts] = useState<string[]>([]);
   const [hotmartProducts, setHotmartProducts] = useState<string[]>([]);
   const [guruProducts, setGuruProducts] = useState<string[]>([]);
+  const [eduzzProducts, setEduzzProducts] = useState<string[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
 
   // Benchmark states
@@ -89,6 +90,7 @@ export default function ProjectEdit() {
   const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
   const hotmartIntegration = integrations?.find(i => i.type === 'hotmart');
   const guruIntegration = integrations?.find(i => i.type === 'guru');
+  const eduzzIntegration = integrations?.find(i => i.type === 'eduzz');
   const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
 
   // Load project data into form
@@ -99,6 +101,7 @@ export default function ProjectEdit() {
       setKiwifyProducts(project.kiwify_product_ids || []);
       setHotmartProducts((project as any).hotmart_product_ids || []);
       setGuruProducts((project as any).guru_product_ids || []);
+      setEduzzProducts((project as any).eduzz_product_ids || []);
       setSelectedCampaigns(project.meta_campaign_ids || []);
       // Load benchmarks
       setBenchmarkEngagement((project as any).benchmark_engagement ?? 2.0);
@@ -149,6 +152,7 @@ export default function ProjectEdit() {
           kiwify_product_ids: kiwifyProducts,
           hotmart_product_ids: hotmartProducts,
           guru_product_ids: guruProducts,
+          eduzz_product_ids: eduzzProducts,
           meta_campaign_ids: selectedCampaigns,
           benchmark_engagement: benchmarkEngagement,
           benchmark_ctr: benchmarkCtr,
@@ -323,6 +327,15 @@ export default function ProjectEdit() {
               onProductsChange={setGuruProducts}
               isOpen={openIntegrations.includes('guru')}
               onOpenChange={() => toggleIntegration('guru')}
+            />
+            <SalesIntegrationCard
+              type="eduzz"
+              projectId={projectId!}
+              integration={eduzzIntegration}
+              selectedProducts={eduzzProducts}
+              onProductsChange={setEduzzProducts}
+              isOpen={openIntegrations.includes('eduzz')}
+              onOpenChange={() => toggleIntegration('eduzz')}
             />
           </CardContent>
         </Card>
