@@ -1,71 +1,102 @@
 
 
-# Prefixo "act_" Fixo no Campo Ad Account ID
+# Corrigir Faturamento Guru - Projeto MEMORIMED
 
-## Resumo
+## Diagnóstico
 
-Modificar o campo "Ad Account ID" para exibir o prefixo `act_` fixo antes do input, permitindo que o usuário cole apenas o número do ID.
+O faturamento do Guru está aparecendo como **R$ 0,00** porque o código de sincronização não está extraindo o valor monetário corretamente da API v2.
+
+### Evidências
+
+| Dado | Valor |
+|------|-------|
+| Vendas importadas | 6 registros |
+| Amount | 0.00 (todas) |
+| Gross Amount | 0 (todas) |
+
+### Estrutura Real da API (logs)
+
+```json
+["affiliations","checkout_url","contact","contracts","dates","ecommerces",
+"extras","has_order_bump","id","infrastructure","invoice","is_order_bump",
+"is_reissue","items","last_transaction","payment","product","shipment",
+"shipping","status","subscription","trackings","type","self_attribution"]
+```
+
+O código atual busca:
+```typescript
+sale.amount || sale.value || sale.price  // INCORRETO - esses campos não existem
+```
 
 ---
 
-## Interface Atual vs Nova
+## Solução
 
-| Atual | Nova |
-|-------|------|
-| `[_________________]` | `act_ [_____________]` |
-| Placeholder: "Ex: act_123456789" | Placeholder: "123456789" |
+Atualizar a extração de valor na função `syncGuru` para buscar nos campos corretos:
+
+| Campo API | Caminho Provável |
+|-----------|------------------|
+| Valor do pagamento | `payment.amount` ou `payment.value` |
+| Valor dos itens | `items[0].price` ou soma de `items[].price` |
+| Valor bruto | `invoice.total` ou `payment.gross_amount` |
 
 ---
 
 ## Alterações
 
-### MetaAdsIntegrationCard.tsx
+### supabase/functions/sync-project-data/index.ts
 
-| Linhas | Modificação |
-|--------|-------------|
-| 47 | Estado `adAccountId` armazena apenas o número (sem `act_`) |
-| 52-56 | useEffect remove prefixo `act_` ao carregar credenciais existentes |
-| 89, 105 | Ao salvar, concatena `act_` + número |
-| 256-267 | Campo com prefixo fixo visual usando flex container |
+**Linhas 548-560** - Atualizar extração de valores:
 
----
+```typescript
+for (const sale of sales) {
+  const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
+  
+  // Buscar valor nos campos corretos da API v2
+  const paymentAmount = sale.payment?.amount || sale.payment?.value || 0;
+  const itemsTotal = Array.isArray(sale.items) 
+    ? sale.items.reduce((sum: number, item: any) => sum + parseAmount(item.price || item.value || item.amount || 0), 0)
+    : 0;
+  const invoiceTotal = sale.invoice?.total || sale.invoice?.amount || 0;
+  
+  // Prioridade: payment > items > invoice > 0
+  const saleAmount = parseAmount(paymentAmount || itemsTotal || invoiceTotal || sale.amount || sale.value || sale.price || 0);
+  
+  const saleDate = sale.dates?.confirmed_at || sale.confirmed_at || sale.dates?.created_at || sale.created_at || new Date().toISOString();
+  
+  productSales.push({
+    // ... resto do código
+    amount: saleAmount,
+    gross_amount: saleAmount,
+    // ...
+  });
+}
+```
 
-## Código do Campo
+Também adicionar log de debug para capturar a estrutura exata:
 
-```tsx
-<div>
-  <label className="text-sm font-medium">Ad Account ID</label>
-  <div className="flex">
-    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground">
-      act_
-    </span>
-    <Input
-      value={adAccountId}
-      onChange={(e) => {
-        // Remove act_ se o usuário colar o ID completo
-        const value = e.target.value.replace(/^act_/, '');
-        setAdAccountId(value);
-      }}
-      placeholder="123456789"
-      className="rounded-l-none"
-    />
-  </div>
-</div>
+```typescript
+if (sales.length > 0 && page === 1) {
+  console.log(`[GURU] Sample sale structure:`, JSON.stringify(Object.keys(sales[0])));
+  console.log(`[GURU] Sample payment:`, JSON.stringify(sales[0].payment));
+  console.log(`[GURU] Sample items:`, JSON.stringify(sales[0].items));
+  console.log(`[GURU] Sample invoice:`, JSON.stringify(sales[0].invoice));
+}
 ```
 
 ---
 
-## Lógica de Tratamento
-
-1. **Ao carregar**: Remove `act_` do valor existente para exibir apenas o número
-2. **Ao digitar/colar**: Remove `act_` automaticamente se usuário colar ID completo
-3. **Ao salvar**: Concatena `act_` + número para enviar à API
-
----
-
-## Arquivo a Modificar
+## Arquivos
 
 | Arquivo | Tipo |
 |---------|------|
-| `src/components/integrations/MetaAdsIntegrationCard.tsx` | Editar |
+| `supabase/functions/sync-project-data/index.ts` | Editar |
+
+---
+
+## Pós-Implementação
+
+1. Deploy da edge function
+2. Re-sincronizar o projeto MEMORIMED
+3. Verificar se os valores aparecem corretamente
 
