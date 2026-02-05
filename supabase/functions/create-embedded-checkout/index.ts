@@ -54,9 +54,22 @@ serve(async (req) => {
       logStep("No existing Stripe customer found");
     }
 
+    // Check if customer has active/trialing subscription (no trial for upgrades)
+    let hasActiveSubscription = false;
+    if (customerId) {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        limit: 10,
+      });
+      hasActiveSubscription = subscriptions.data.some(
+        (sub: { status: string }) => sub.status === "active" || sub.status === "trialing"
+      );
+      logStep("Subscription check", { hasActiveSubscription });
+    }
+
     const origin = req.headers.get("origin") || "https://leadlove-dash.lovable.app";
 
-    // Create embedded checkout session
+    // Create embedded checkout session - no trial if already subscribed
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
@@ -69,12 +82,9 @@ serve(async (req) => {
       mode: "subscription",
       ui_mode: "embedded",
       allow_promotion_codes: true,
-      subscription_data: {
-        trial_period_days: 7,
-        metadata: {
-          user_id: user.id,
-        },
-      },
+      subscription_data: hasActiveSubscription
+        ? { metadata: { user_id: user.id } }
+        : { trial_period_days: 7, metadata: { user_id: user.id } },
       return_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
         user_id: user.id,
