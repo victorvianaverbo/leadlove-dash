@@ -80,7 +80,7 @@ async function batchUpsertSales(
     const batch = sales.slice(i, i + batchSize);
     const { error } = await supabase
       .from('sales')
-      .upsert(batch, { onConflict: 'kiwify_sale_id' });
+      .upsert(batch, { onConflict: 'external_sale_id' });
 
     if (error) {
       console.error(`Batch upsert error (batch ${Math.floor(i / batchSize) + 1}):`, error);
@@ -201,7 +201,7 @@ function convertTimestampToISO(value: unknown): string {
 // ============ PLATFORM SYNC FUNCTIONS (for Promise.all parallelization) ============
 
 interface SaleRecord {
-  kiwify_sale_id: string;
+  external_sale_id: string;
   project_id: string;
   user_id: string;
   product_id: string;
@@ -315,7 +315,7 @@ async function syncKiwify(
             }
             
             productSales.push({
-              kiwify_sale_id: sale.id,
+              external_sale_id: sale.id,
               project_id: projectId,
               user_id: userId,
               product_id: sale.product?.id || productId,
@@ -442,7 +442,7 @@ async function syncHotmart(
               const saleAmount = parseAmount(sale.purchase?.price?.value || sale.price || 0);
               
               productSales.push({
-                kiwify_sale_id: saleId,
+                external_sale_id: saleId,
                 project_id: projectId,
                 user_id: userId,
                 product_id: productId,
@@ -579,7 +579,7 @@ async function syncGuru(
             const saleDate = convertTimestampToISO(rawDate);
             
             productSales.push({
-              kiwify_sale_id: saleId,
+              external_sale_id: saleId,
               project_id: projectId,
               user_id: userId,
               product_id: productId,
@@ -711,7 +711,7 @@ async function syncEduzz(
             productSales.push({
               project_id: projectId,
               user_id: userId,
-              kiwify_sale_id: `eduzz_${saleId}`, // Prefix to avoid ID conflicts
+              external_sale_id: `eduzz_${saleId}`, // Prefix to avoid ID conflicts
               product_id: productIdFromSale,
               product_name: productName,
               amount: parseFloat(String(netAmount)),

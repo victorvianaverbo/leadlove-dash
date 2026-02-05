@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
           const { error: upsertError } = await supabase
             .from('sales')
             .upsert({
-              kiwify_sale_id: sale.id,
+              external_sale_id: sale.id,
               project_id: project.id,
               user_id: project.user_id,
               product_id: sale.product?.id,
@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
               utm_campaign: tracking.utm_campaign,
               utm_content: tracking.utm_content,
               utm_term: tracking.utm_term,
-            }, { onConflict: 'kiwify_sale_id' });
+            }, { onConflict: 'external_sale_id' });
 
           if (!upsertError) salesSynced++;
         }
