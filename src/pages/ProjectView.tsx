@@ -23,6 +23,9 @@ import { cn, generateSlug, isUUID } from '@/lib/utils';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all' | 'custom';
 
+// ID do usuário autorizado a ver o card de Configurações do Projeto
+const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
+
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
   const { user, loading } = useAuth();
@@ -689,7 +692,8 @@ const parseCurrencyInput = (value: string): number => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {/* Project Settings - Editable Fields */}
+        {/* Project Settings - Editable Fields - Visible only for specific user */}
+        {user?.id === SETTINGS_CARD_USER_ID && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Configurações do Projeto</CardTitle>
@@ -801,6 +805,7 @@ const parseCurrencyInput = (value: string): number => {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Share Dashboard Card */}
         <Card className="mb-6">
