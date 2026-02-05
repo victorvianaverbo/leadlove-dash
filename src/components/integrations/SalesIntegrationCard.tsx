@@ -14,7 +14,7 @@ import {
   Search, ChevronDown, ChevronRight 
 } from "lucide-react";
 
-type IntegrationType = 'kiwify' | 'hotmart' | 'guru';
+type IntegrationType = 'kiwify' | 'hotmart' | 'guru' | 'eduzz';
 
 interface Integration {
   id: string;
@@ -61,6 +61,14 @@ const integrationConfig = {
       { key: 'api_token', label: 'API Token', type: 'password', sensitive: true },
     ],
     productsEndpoint: 'guru-products',
+  },
+  eduzz: {
+    name: 'Eduzz',
+    description: 'Conecte a conta Eduzz para importar vendas',
+    fields: [
+      { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
+    ],
+    productsEndpoint: 'eduzz-products',
   },
 };
 
