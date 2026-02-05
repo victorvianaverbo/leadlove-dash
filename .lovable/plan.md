@@ -1,207 +1,94 @@
 
-# Implementar Integração Eduzz
+# Plano: Corrigir Integração Eduzz + Melhorias de Escalabilidade
 
-## Visão Geral
+## Fase 1: Corrigir Eduzz (Prioridade Máxima)
 
-Adicionar Eduzz como 4ª plataforma de checkout, seguindo o padrão já estabelecido para Kiwify, Hotmart e Guru.
+### Problema Atual
+O código da Eduzz **não foi adicionado ao frontend**:
+- `SalesIntegrationCard.tsx` não tem `eduzz` no tipo nem config
+- `ProjectEdit.tsx` não renderiza o card de Eduzz
 
----
+### Credenciais da Eduzz
+A API Eduzz usa **apenas 1 chave para autenticação server-side**:
+- **API Key** - Token Bearer para `/myeduzz/v1/products` e `/myeduzz/v1/sales`
 
-## Componentes a Implementar
+Public Key e Origin Key são para validações client-side e webhooks - não precisamos delas para sincronização.
 
-| Componente | Descrição |
-|------------|-----------|
-| Edge Function `eduzz-products` | Buscar produtos da conta Eduzz |
-| Atualização `sync-project-data` | Sincronizar vendas da Eduzz |
-| UI ProjectEdit | Adicionar card de integração Eduzz |
-| UI ProjectView | Garantir label dinâmico para "Eduzz" |
-| Banco de dados | Adicionar `eduzz_product_ids` na tabela `projects` |
+### Arquivos a Modificar
 
----
-
-## API Eduzz (Developer Hub)
-
-### Autenticação
-```
-Header: Authorization: Bearer {API_KEY}
-```
-
-A API Key é obtida no painel Órbita: **Avançado → Configurações da API**
-
-### Endpoints Utilizados
-
-| Endpoint | Método | Escopo |
-|----------|--------|--------|
-| `https://api.eduzz.com/myeduzz/v1/products` | GET | Listar produtos |
-| `https://api.eduzz.com/myeduzz/v1/sales` | GET | Listar vendas |
-
-### Parâmetros de Vendas
-```
-?page=1
-&itemsPerPage=100
-&startDate=2024-01-01
-&endDate=2025-02-05
-&productId=123456
-&status=paid
-```
-
-### Estrutura de Resposta (Sales)
-```json
-{
-  "items": [{
-    "id": "sale_id",
-    "status": "paid",
-    "grossGain": { "value": 197.00 },
-    "netGain": { "value": 177.30 },
-    "total": { "value": 197.00 },
-    "paidAt": "2024-05-10T14:00:00Z",
-    "createdAt": "2024-05-10T12:00:00Z",
-    "payment": { "method": "creditCard" },
-    "product": { "id": "123", "name": "Curso X" },
-    "buyer": { "name": "João", "email": "joao@email.com" },
-    "tracker": "facebook_cpc",
-    "tracker2": "campanha_maio"
-  }]
-}
-```
+| Arquivo | Mudança |
+|---------|---------|
+| `SalesIntegrationCard.tsx` | Adicionar `'eduzz'` ao tipo e config com campo `api_key` |
+| `ProjectEdit.tsx` | Adicionar state `eduzzProducts` + card Eduzz + salvar `eduzz_product_ids` |
 
 ---
 
-## Normalização de Status
+## Fase 2: Melhorias de Alta Prioridade (Próximas)
 
-| Eduzz | Interno |
-|-------|---------|
-| paid | paid |
-| refunded, waitingRefund | refunded |
-| canceled, expired, duplicated | canceled |
-| open, processing, waitingPayment, recovering | pending |
+Baseado no documento de análise, concordo com as recomendações. Após corrigir Eduzz:
+
+| # | Ação | Esforço |
+|---|------|---------|
+| 1 | Criar índice parcial `idx_sales_paid_project_date WHERE status = 'paid'` | 5 min |
+| 2 | Renomear `kiwify_sale_id` → `external_sale_id` | 30 min |
+| 3 | Adicionar índices GIN para arrays de product_ids | 10 min |
 
 ---
 
-## Arquivos a Criar/Modificar
+## Fase 3: Melhorias de Média Prioridade
 
-### 1. Nova Edge Function: `supabase/functions/eduzz-products/index.ts`
+| # | Ação | Esforço |
+|---|------|---------|
+| 4 | Otimizar queries N+1 do Dashboard | 4h |
+| 5 | Error Boundaries granulares | 2h |
+| 6 | Rate limiting por usuário | 1 dia |
 
-Estrutura idêntica ao `guru-products`:
-- Autenticação via Bearer token do usuário
-- Valida project_id e ownership
-- Busca credenciais (api_key) da tabela integrations
-- Chama `https://api.eduzz.com/myeduzz/v1/products`
-- Retorna lista formatada
+---
 
-### 2. Atualizar `supabase/functions/sync-project-data/index.ts`
+## Fase 4: Escalabilidade Futura
 
-Adicionar função `syncEduzz()`:
+| # | Ação | Quando |
+|---|------|--------|
+| 7 | Sistema de filas (pg_notify ou BullMQ) | > 500 usuários |
+| 8 | Particionamento de tabelas | > 1M registros |
+| 9 | Servidor dedicado (Railway/Fly.io) | > 1000 usuários |
+
+---
+
+## Implementação Imediata (Fase 1)
+
+### 1. SalesIntegrationCard.tsx
+
 ```typescript
-async function syncEduzz(
-  credentials: { api_key: string },
-  productIds: string[],
-  projectId: string,
-  userId: string,
-  syncStartDate: Date
-): Promise<SyncResult>
+type IntegrationType = 'kiwify' | 'hotmart' | 'guru' | 'eduzz';
+
+const integrationConfig = {
+  // ... existing ...
+  eduzz: {
+    name: 'Eduzz',
+    description: 'Conecte a conta Eduzz para importar vendas',
+    fields: [
+      { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
+    ],
+    productsEndpoint: 'eduzz-products',
+  },
+};
 ```
 
-**Lógica de sincronização:**
-- Endpoint: `https://api.eduzz.com/myeduzz/v1/sales`
-- Paginação: `page` + `itemsPerPage=100`
-- Filtros: `startDate`, `endDate`, `productId`
-- Valores: `netGain.value` (líquido) e `total.value` (bruto)
-- Datas: `paidAt` ou `createdAt`
-- UTMs: `tracker`, `tracker2`, `tracker3`
+### 2. ProjectEdit.tsx
 
-Adicionar normalização de status para Eduzz:
-```typescript
-if (source === 'eduzz') {
-  if (statusLower === 'paid') return 'paid';
-  if (statusLower === 'refunded' || statusLower === 'waitingrefund') return 'refunded';
-  if (statusLower === 'canceled' || statusLower === 'expired' || statusLower === 'duplicated') return 'canceled';
-  if (['open', 'processing', 'waitingpayment', 'recovering', 'scheduled', 'negotiated'].includes(statusLower)) return 'pending';
-}
-```
-
-Integrar no fluxo principal (onde Kiwify/Hotmart/Guru são chamados).
-
-### 3. Atualizar `supabase/config.toml`
-
-```toml
-[functions.eduzz-products]
-verify_jwt = false
-```
-
-### 4. Atualizar `src/components/integrations/SalesIntegrationCard.tsx`
-
-Adicionar configuração Eduzz no `integrationConfig`:
-```typescript
-eduzz: {
-  name: 'Eduzz',
-  description: 'Conecte a conta Eduzz para importar vendas',
-  fields: [
-    { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
-  ],
-  productsEndpoint: 'eduzz-products',
-}
-```
-
-Adicionar tipo `'eduzz'` ao `IntegrationType`.
-
-### 5. Atualizar `src/pages/ProjectEdit.tsx`
-
-- Adicionar state `eduzzProducts`
-- Buscar integração Eduzz
-- Adicionar `<SalesIntegrationCard type="eduzz" ... />`
-- Salvar `eduzz_product_ids` no update
-
-### 6. Migração de Banco de Dados
-
-```sql
-ALTER TABLE projects ADD COLUMN eduzz_product_ids TEXT[] DEFAULT '{}';
-```
+Adicionar:
+- State: `const [eduzzProducts, setEduzzProducts] = useState<string[]>([]);`
+- Buscar integração: `const eduzzIntegration = integrations?.find(i => i.type === 'eduzz');`
+- Carregar do projeto: `setEduzzProducts((project as any).eduzz_product_ids || []);`
+- Renderizar card após Guru
+- Salvar no update: `eduzz_product_ids: eduzzProducts`
 
 ---
 
-## Fluxo de Sincronização
+## Resumo
 
-```text
-ProjectEdit (salva eduzz_product_ids)
-        │
-        ▼
-sync-project-data
-        │
-        ├─► Kiwify (se houver produtos)
-        ├─► Hotmart (se houver produtos)
-        ├─► Guru (se houver produtos)
-        └─► Eduzz (se houver produtos) ◄── NOVO
-        │
-        ▼
-   batchUpsertSales (source: 'eduzz')
-```
-
----
-
-## Campos Mapeados
-
-| Eduzz API | Campo DB |
-|-----------|----------|
-| `id` | `kiwify_sale_id` (prefixo `eduzz_`) |
-| `netGain.value` | `amount` |
-| `total.value` / `grossGain.value` | `gross_amount` |
-| `status` | `status` (normalizado) |
-| `payment.method` | `payment_method` |
-| `buyer.name` | `customer_name` |
-| `buyer.email` | `customer_email` |
-| `paidAt` / `createdAt` | `sale_date` |
-| `tracker` | `utm_source` |
-| `tracker2` | `utm_campaign` |
-| `tracker3` | `utm_content` |
-| (fixo) | `source: 'eduzz'` |
-
----
-
-## Verificações Pós-Implementação
-
-1. Conectar credenciais Eduzz no ProjectEdit
-2. Verificar se lista de produtos é carregada
-3. Sincronizar projeto
-4. Confirmar vendas Eduzz aparecem no dashboard
-5. Validar que o label dinâmico mostra "Eduzz"
+Vamos implementar em fases:
+1. **Agora**: Corrigir frontend do Eduzz (já temos backend pronto)
+2. **Depois**: Aplicar melhorias de índices/renomeação
+3. **Futuro**: Otimizações de arquitetura para escala
