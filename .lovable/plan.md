@@ -1,118 +1,54 @@
 
-# Corrigir Labels Dinâmicos de Fonte de Vendas
 
-## Problema
+# Limpar Vendas Incorretas do MEMORIMED
 
-No `ProjectView.tsx`, os cards de KPIs do funil mostram "Kiwify" fixo como fonte das vendas, mesmo quando o projeto usa Guru ou Hotmart.
+## Diagnóstico
 
-| Atual | Esperado |
-|-------|----------|
-| `subtitle="Kiwify"` | `subtitle="Guru"` (quando só tem Guru) |
-| `subtitle="Meta ÷ Kiwify"` | `subtitle="Meta ÷ Multi-checkout"` (quando tem mais de uma fonte) |
+As 6 vendas que aparecem no projeto MEMORIMED são **dados corrompidos** de uma sincronização anterior:
 
-## Cards Afetados
+| Evidência | Valor |
+|-----------|-------|
+| Total de vendas | 6 (3 paid + 3 refunded) |
+| Valor de todas | R$ 0,00 |
+| Data de todas | 2026-02-05 12:23:28 (timestamp da sync, não da venda real) |
+| Syncs recentes | Retornam 0 vendas do Guru |
 
-| Card | Linha | Subtitle Atual |
-|------|-------|----------------|
-| Vendas | 946 | "Kiwify" |
-| Custo/Venda | 947 | "Meta ÷ Kiwify" |
+### O que aconteceu
 
-## Dados Disponíveis
-
-A tabela `sales` possui o campo `source` com valores possíveis:
-- `kiwify`
-- `hotmart`
-- `guru`
-
-Os dados de vendas já são carregados em `filteredSales` e incluem o campo `source`.
+1. Uma sincronização às 12:23 importou 6 transações do Guru
+2. O `convertTimestampToISO()` falhou na conversão de datas
+3. A função usou `new Date().toISOString()` como fallback (hora atual)
+4. Todas as vendas ficaram com a mesma data incorreta
+5. Após o fix, sincronizações novas retornam 0 vendas (filtro de datas correto)
 
 ---
 
 ## Solução
 
-### 1. Criar função para detectar fontes ativas
+Executar SQL para deletar as vendas corrompidas do projeto MEMORIMED:
 
-```typescript
-// Dentro do useMemo de calculatedMetrics ou separado
-const salesSources = useMemo(() => {
-  const sources = new Set<string>();
-  filteredSales?.forEach(s => {
-    if ((s as any).source) {
-      sources.add((s as any).source);
-    }
-  });
-  return sources;
-}, [filteredSales]);
+```sql
+DELETE FROM sales 
+WHERE project_id = '7c109c12-bdc1-462a-a5c3-ad8ddd385ac5'
+  AND source = 'guru'
+  AND amount = 0;
 ```
 
-### 2. Criar helper para formatar label
-
-```typescript
-const formatSalesSourceLabel = (sources: Set<string>): string => {
-  const sourceNames: Record<string, string> = {
-    kiwify: 'Kiwify',
-    hotmart: 'Hotmart',
-    guru: 'Guru',
-    eduzz: 'Eduzz',
-  };
-  
-  if (sources.size === 0) return 'Checkout';
-  if (sources.size === 1) {
-    const source = Array.from(sources)[0];
-    return sourceNames[source] || source;
-  }
-  return 'Multi-checkout';
-};
-```
-
-### 3. Atualizar os KpiCards
-
-```tsx
-// Linha 946
-<KpiCard 
-  title="Vendas" 
-  value={totalSales} 
-  subtitle={formatSalesSourceLabel(salesSources)}  // Era: "Kiwify"
-  icon={ShoppingCart} 
-  variant="success" 
-/>
-
-// Linha 947
-<KpiCard 
-  title="Custo/Venda" 
-  value={formatCurrency(custoPerVenda)} 
-  subtitle={`Meta ÷ ${formatSalesSourceLabel(salesSources)}`}  // Era: "Meta ÷ Kiwify"
-  icon={DollarSign} 
-  variant="success" 
-/>
-```
+Isso irá remover as 6 vendas incorretas (3 paid + 3 refunded).
 
 ---
 
-## Resultado Visual
+## Alternativa
 
-| Cenário | Card "Vendas" | Card "Custo/Venda" |
-|---------|--------------|-------------------|
-| Só Kiwify | "Kiwify" | "Meta ÷ Kiwify" |
-| Só Guru | "Guru" | "Meta ÷ Guru" |
-| Só Hotmart | "Hotmart" | "Meta ÷ Hotmart" |
-| Multi-checkout | "Multi-checkout" | "Meta ÷ Multi-checkout" |
-| Sem vendas | "Checkout" | "Meta ÷ Checkout" |
+Se o usuário preferir manter histórico para análise, podemos:
+1. Atualizar o status para `canceled` ao invés de deletar
+2. Ou apenas marcar com um campo de flag
 
 ---
 
-## Arquivo a Modificar
+## Pós-Execução
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/ProjectView.tsx` | Adicionar useMemo para detectar fontes + helper de formatação + atualizar KpiCards |
+Após a limpeza:
+- O dashboard mostrará 0 vendas (correto)
+- Futuras sincronizações não trarão vendas duplicadas
 
----
-
-## Detalhes Técnicos
-
-### Localização das mudanças
-
-1. **Linha ~430-445**: Adicionar useMemo para `salesSources`
-2. **Linha ~555-565**: Adicionar helper `formatSalesSourceLabel`
-3. **Linhas 946-948**: Atualizar subtítulos dos KpiCards
