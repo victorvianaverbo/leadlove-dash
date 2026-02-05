@@ -1,36 +1,65 @@
 
 
-# Esconder Card "Configurações do Projeto" para Usuários Específicos
+# Prefixo "act_" Fixo no Campo Ad Account ID
 
 ## Resumo
 
-O card "Configurações do Projeto" será exibido **apenas** para o usuário com UUID `3ce82838-0c77-48ed-9530-9788e885778f`. Todos os outros usuários não verão esse card.
+Modificar o campo "Ad Account ID" para exibir o prefixo `act_` fixo antes do input, permitindo que o usuário cole apenas o número do ID.
 
 ---
 
-## Alteração
+## Interface Atual vs Nova
 
-Adicionar uma verificação condicional que renderiza o card apenas se o usuário logado tiver o ID específico.
-
-| Local | Modificação |
-|-------|-------------|
-| `src/pages/ProjectView.tsx` | Envolver o card (linhas 693-803) em uma condição que verifica `user?.id` |
+| Atual | Nova |
+|-------|------|
+| `[_________________]` | `act_ [_____________]` |
+| Placeholder: "Ex: act_123456789" | Placeholder: "123456789" |
 
 ---
 
-## Código
+## Alterações
 
-```typescript
-// Constante com o ID do cliente autorizado
-const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
+### MetaAdsIntegrationCard.tsx
 
-// Renderização condicional
-{user?.id === SETTINGS_CARD_USER_ID && (
-  <Card className="mb-6">
-    {/* ... conteúdo do card ... */}
-  </Card>
-)}
+| Linhas | Modificação |
+|--------|-------------|
+| 47 | Estado `adAccountId` armazena apenas o número (sem `act_`) |
+| 52-56 | useEffect remove prefixo `act_` ao carregar credenciais existentes |
+| 89, 105 | Ao salvar, concatena `act_` + número |
+| 256-267 | Campo com prefixo fixo visual usando flex container |
+
+---
+
+## Código do Campo
+
+```tsx
+<div>
+  <label className="text-sm font-medium">Ad Account ID</label>
+  <div className="flex">
+    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground">
+      act_
+    </span>
+    <Input
+      value={adAccountId}
+      onChange={(e) => {
+        // Remove act_ se o usuário colar o ID completo
+        const value = e.target.value.replace(/^act_/, '');
+        setAdAccountId(value);
+      }}
+      placeholder="123456789"
+      className="rounded-l-none"
+    />
+  </div>
+</div>
 ```
+
+---
+
+## Lógica de Tratamento
+
+1. **Ao carregar**: Remove `act_` do valor existente para exibir apenas o número
+2. **Ao digitar/colar**: Remove `act_` automaticamente se usuário colar ID completo
+3. **Ao salvar**: Concatena `act_` + número para enviar à API
 
 ---
 
@@ -38,5 +67,5 @@ const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
 
 | Arquivo | Tipo |
 |---------|------|
-| `src/pages/ProjectView.tsx` | Editar |
+| `src/components/integrations/MetaAdsIntegrationCard.tsx` | Editar |
 
