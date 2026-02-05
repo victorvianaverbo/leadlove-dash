@@ -633,6 +633,135 @@ async function syncGuru(
 }
 
 /**
+ * Sync Eduzz - returns array of normalized sales for batch insert
+ */
+async function syncEduzz(
+  credentials: { api_key: string },
+  productIds: string[],
+  projectId: string,
+  userId: string,
+  syncStartDate: Date
+): Promise<SyncResult> {
+  const result: SyncResult = { sales: [], source: 'eduzz' };
+  
+  try {
+    console.log(`[EDUZZ] Starting sync for ${productIds.length} products since ${syncStartDate.toISOString()}`);
+    
+    const startDateStr = syncStartDate.toISOString().split('T')[0];
+    const endDateStr = formatBrasiliaDateString(0);
+    
+    // Helper to fetch sales for a single product
+    const fetchProductSales = async (productId: string): Promise<SaleRecord[]> => {
+      const productSales: SaleRecord[] = [];
+      let page = 1;
+      let hasMore = true;
+      const maxPages = 50;
+      
+      console.log(`[EDUZZ] Fetching product ${productId}`);
+      
+      while (hasMore && page <= maxPages) {
+        const salesUrl = `https://api.eduzz.com/myeduzz/v1/sales?page=${page}&itemsPerPage=100&startDate=${startDateStr}&endDate=${endDateStr}&productId=${productId}`;
+        
+        const salesResponse = await fetch(salesUrl, {
+          headers: {
+            'Authorization': `Bearer ${credentials.api_key}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        });
+        
+        if (salesResponse.ok) {
+          const salesData = await salesResponse.json();
+          const sales = salesData.items || salesData.data || [];
+          
+          console.log(`[EDUZZ] Product ${productId} page ${page}: ${sales.length} sales`);
+          
+          for (const sale of sales) {
+            // Get sale ID
+            const saleId = sale.id?.toString() || sale.sale_id?.toString();
+            if (!saleId) continue;
+            
+            // Get amounts - netGain is the net amount, total/grossGain is the gross
+            const netAmount = sale.netGain?.value || sale.net_gain || sale.net_amount || 0;
+            const grossAmount = sale.total?.value || sale.grossGain?.value || sale.gross_gain || sale.gross_amount || netAmount;
+            
+            // Get status
+            const rawStatus = sale.status || 'pending';
+            const normalizedStatus = normalizeStatus(rawStatus, 'eduzz');
+            
+            // Get date - prefer paidAt for paid sales
+            const saleDate = sale.paidAt || sale.paid_at || sale.createdAt || sale.created_at || new Date().toISOString();
+            
+            // Get product info
+            const productName = sale.product?.name || sale.product_name || 'Produto Eduzz';
+            const productIdFromSale = sale.product?.id?.toString() || productId;
+            
+            // Get buyer info
+            const customerName = sale.buyer?.name || sale.customer_name || null;
+            const customerEmail = sale.buyer?.email || sale.customer_email || null;
+            
+            // Get payment method
+            const paymentMethod = sale.payment?.method || sale.payment_method || null;
+            
+            // UTM tracking - Eduzz uses tracker, tracker2, tracker3
+            const utmSource = sale.tracker || sale.utm_source || null;
+            const utmCampaign = sale.tracker2 || sale.utm_campaign || null;
+            const utmContent = sale.tracker3 || sale.utm_content || null;
+            
+            productSales.push({
+              project_id: projectId,
+              user_id: userId,
+              kiwify_sale_id: `eduzz_${saleId}`, // Prefix to avoid ID conflicts
+              product_id: productIdFromSale,
+              product_name: productName,
+              amount: parseFloat(String(netAmount)),
+              gross_amount: parseFloat(String(grossAmount)),
+              status: normalizedStatus,
+              sale_date: saleDate,
+              customer_name: customerName,
+              customer_email: customerEmail,
+              payment_method: paymentMethod,
+              utm_source: utmSource,
+              utm_campaign: utmCampaign,
+              utm_content: utmContent,
+              source: 'eduzz',
+            });
+          }
+          
+          // Check for pagination
+          const totalPages = salesData.meta?.last_page || salesData.lastPage || salesData.totalPages || 1;
+          hasMore = page < totalPages && sales.length >= 100;
+          page++;
+        } else {
+          console.error(`[EDUZZ] Error fetching product ${productId}:`, await salesResponse.text());
+          hasMore = false;
+        }
+      }
+      
+      return productSales;
+    };
+
+    // Process products in parallel chunks of 3
+    const PRODUCT_CHUNK_SIZE = 3;
+    const productChunks = chunkArray(productIds, PRODUCT_CHUNK_SIZE);
+    
+    for (const chunk of productChunks) {
+      const chunkResults = await Promise.all(chunk.map(fetchProductSales));
+      for (const productSales of chunkResults) {
+        result.sales.push(...productSales);
+      }
+    }
+
+    console.log(`[EDUZZ] Completed: ${result.sales.length} sales fetched`);
+  } catch (error) {
+    result.error = (error as Error).message;
+    console.error('[EDUZZ] Exception:', error);
+  }
+  
+  return result;
+}
+
+/**
  * Sync Meta Ads - returns array of ad_spend records for batch insert
  * Campaigns are already parallelized via Promise.all for budget fetch
  */
@@ -795,6 +924,7 @@ async function backgroundHistoricalSync(
     const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
     const hotmartIntegration = integrations?.find(i => i.type === 'hotmart');
     const guruIntegration = integrations?.find(i => i.type === 'guru');
+    const eduzzIntegration = integrations?.find(i => i.type === 'eduzz');
     const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
     
     const ticketPrice = project.kiwify_ticket_price ? parseFloat(project.kiwify_ticket_price) : null;
@@ -833,6 +963,18 @@ async function backgroundHistoricalSync(
         syncGuru(
           guruIntegration.credentials as any,
           project.guru_product_ids,
+          project.id,
+          userId,
+          historicalStartDate
+        )
+      );
+    }
+
+    if (eduzzIntegration && project.eduzz_product_ids?.length > 0) {
+      syncPromises.push(
+        syncEduzz(
+          eduzzIntegration.credentials as any,
+          project.eduzz_product_ids,
           project.id,
           userId,
           historicalStartDate
@@ -968,13 +1110,14 @@ Deno.serve(async (req) => {
     const kiwifyIntegration = integrations?.find(i => i.type === 'kiwify');
     const hotmartIntegration = integrations?.find(i => i.type === 'hotmart');
     const guruIntegration = integrations?.find(i => i.type === 'guru');
+    const eduzzIntegration = integrations?.find(i => i.type === 'eduzz');
     const metaIntegration = integrations?.find(i => i.type === 'meta_ads');
 
     // === SYNC SUMMARY LOG ===
     console.log(`\n${'='.repeat(60)}`);
     console.log(`=== SYNC START (OPTIMIZED - 30 DAYS INITIAL): Project ${project_id} ===`);
-    console.log(`=== Integrations: Kiwify=${!!kiwifyIntegration}, Hotmart=${!!hotmartIntegration}, Guru=${!!guruIntegration}, Meta=${!!metaIntegration} ===`);
-    console.log(`=== Products: Kiwify=${project.kiwify_product_ids?.length || 0}, Hotmart=${project.hotmart_product_ids?.length || 0}, Guru=${project.guru_product_ids?.length || 0}, Meta=${project.meta_campaign_ids?.length || 0} ===`);
+    console.log(`=== Integrations: Kiwify=${!!kiwifyIntegration}, Hotmart=${!!hotmartIntegration}, Guru=${!!guruIntegration}, Eduzz=${!!eduzzIntegration}, Meta=${!!metaIntegration} ===`);
+    console.log(`=== Products: Kiwify=${project.kiwify_product_ids?.length || 0}, Hotmart=${project.hotmart_product_ids?.length || 0}, Guru=${project.guru_product_ids?.length || 0}, Eduzz=${project.eduzz_product_ids?.length || 0}, Meta=${project.meta_campaign_ids?.length || 0} ===`);
     console.log(`${'='.repeat(60)}\n`);
 
     // ============ OPTIMIZED SYNC CONFIGURATION ============
@@ -1037,6 +1180,18 @@ Deno.serve(async (req) => {
         syncGuru(
           guruIntegration.credentials as any,
           project.guru_product_ids,
+          project.id,
+          userId,
+          syncStartDate
+        )
+      );
+    }
+
+    if (eduzzIntegration && project.eduzz_product_ids?.length > 0) {
+      syncPromises.push(
+        syncEduzz(
+          eduzzIntegration.credentials as any,
+          project.eduzz_product_ids,
           project.id,
           userId,
           syncStartDate
