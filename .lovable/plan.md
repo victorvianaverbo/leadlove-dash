@@ -1,41 +1,29 @@
 
 # Plano: Corrigir Integração Eduzz + Melhorias de Escalabilidade
 
-## Fase 1: Corrigir Eduzz (Prioridade Máxima)
+## ✅ Fase 1: Corrigir Eduzz (CONCLUÍDA)
 
-### Problema Atual
-O código da Eduzz **não foi adicionado ao frontend**:
-- `SalesIntegrationCard.tsx` não tem `eduzz` no tipo nem config
-- `ProjectEdit.tsx` não renderiza o card de Eduzz
-
-### Credenciais da Eduzz
-A API Eduzz usa **apenas 1 chave para autenticação server-side**:
-- **API Key** - Token Bearer para `/myeduzz/v1/products` e `/myeduzz/v1/sales`
-
-Public Key e Origin Key são para validações client-side e webhooks - não precisamos delas para sincronização.
-
-### Arquivos a Modificar
-
-| Arquivo | Mudança |
-|---------|---------|
-| `SalesIntegrationCard.tsx` | Adicionar `'eduzz'` ao tipo e config com campo `api_key` |
-| `ProjectEdit.tsx` | Adicionar state `eduzzProducts` + card Eduzz + salvar `eduzz_product_ids` |
+- [x] Adicionar `eduzz` ao tipo e config em `SalesIntegrationCard.tsx`
+- [x] Adicionar state `eduzzProducts` + card Eduzz em `ProjectEdit.tsx`
+- [x] Salvar `eduzz_product_ids` no update do projeto
 
 ---
 
-## Fase 2: Melhorias de Alta Prioridade (Próximas)
+## ✅ Fase 2: Melhorias de Alta Prioridade (CONCLUÍDA)
 
-Baseado no documento de análise, concordo com as recomendações. Após corrigir Eduzz:
-
-| # | Ação | Esforço |
-|---|------|---------|
-| 1 | Criar índice parcial `idx_sales_paid_project_date WHERE status = 'paid'` | 5 min |
-| 2 | Renomear `kiwify_sale_id` → `external_sale_id` | 30 min |
-| 3 | Adicionar índices GIN para arrays de product_ids | 10 min |
+| # | Ação | Status |
+|---|------|--------|
+| 1 | Criar índice parcial `idx_sales_paid_project_date WHERE status = 'paid'` | ✅ |
+| 2 | Renomear `kiwify_sale_id` → `external_sale_id` | ✅ |
+| 3 | Adicionar índices GIN para arrays de product_ids | ✅ |
+| 4 | Criar índice `idx_ad_spend_project_date` para otimizar joins | ✅ |
+| 5 | Atualizar view `sales_public` com security_invoker | ✅ |
+| 6 | Atualizar código das edge functions para usar `external_sale_id` | ✅ |
+| 7 | Atualizar constraint única para `external_sale_id` | ✅ |
 
 ---
 
-## Fase 3: Melhorias de Média Prioridade
+## Fase 3: Melhorias de Média Prioridade (PRÓXIMAS)
 
 | # | Ação | Esforço |
 |---|------|---------|
@@ -55,40 +43,8 @@ Baseado no documento de análise, concordo com as recomendações. Após corrigi
 
 ---
 
-## Implementação Imediata (Fase 1)
+## Notas de Segurança
 
-### 1. SalesIntegrationCard.tsx
-
-```typescript
-type IntegrationType = 'kiwify' | 'hotmart' | 'guru' | 'eduzz';
-
-const integrationConfig = {
-  // ... existing ...
-  eduzz: {
-    name: 'Eduzz',
-    description: 'Conecte a conta Eduzz para importar vendas',
-    fields: [
-      { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
-    ],
-    productsEndpoint: 'eduzz-products',
-  },
-};
-```
-
-### 2. ProjectEdit.tsx
-
-Adicionar:
-- State: `const [eduzzProducts, setEduzzProducts] = useState<string[]>([]);`
-- Buscar integração: `const eduzzIntegration = integrations?.find(i => i.type === 'eduzz');`
-- Carregar do projeto: `setEduzzProducts((project as any).eduzz_product_ids || []);`
-- Renderizar card após Guru
-- Salvar no update: `eduzz_product_ids: eduzzProducts`
-
----
-
-## Resumo
-
-Vamos implementar em fases:
-1. **Agora**: Corrigir frontend do Eduzz (já temos backend pronto)
-2. **Depois**: Aplicar melhorias de índices/renomeação
-3. **Futuro**: Otimizações de arquitetura para escala
+Os warnings restantes são pré-existentes e não são críticos:
+- **Function Search Path Mutable**: Funções internas do Supabase
+- **Leaked Password Protection**: Pode ser habilitado via dashboard de auth
