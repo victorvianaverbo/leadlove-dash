@@ -1,78 +1,42 @@
 
-# Remover Trial em Upgrades
 
-## Problema Identificado
+# Esconder Card "Configurações do Projeto" para Usuários Específicos
 
-Ambas as edge functions de checkout sempre adicionam `trial_period_days: 7`, mesmo quando o usuário já é assinante e está fazendo upgrade:
+## Resumo
 
-- `create-embedded-checkout/index.ts` → linha 73: `trial_period_days: 7`
-- `create-checkout/index.ts` → linha 73: `trial_period_days: 7`
+O card "Configurações do Projeto" será exibido **apenas** para o usuário com UUID `3ce82838-0c77-48ed-9530-9788e885778f`. Todos os outros usuários não verão esse card.
 
 ---
 
-## Solução
+## Alteração
 
-Antes de criar a sessão Stripe, verificar se o cliente já possui uma assinatura ativa ou em trial. Se sim, não adicionar trial.
+Adicionar uma verificação condicional que renderiza o card apenas se o usuário logado tiver o ID específico.
 
-```text
-FLUXO:
-┌─────────────────────────────────────────────────────────────────────┐
-│  1. Buscar cliente Stripe pelo email                               │
-│  2. SE cliente existe → buscar assinaturas (active ou trialing)    │
-│  3. SE tem assinatura → criar sessão SEM trial_period_days         │
-│  4. SE não tem → criar sessão COM trial_period_days: 7             │
-└─────────────────────────────────────────────────────────────────────┘
-```
+| Local | Modificação |
+|-------|-------------|
+| `src/pages/ProjectView.tsx` | Envolver o card (linhas 693-803) em uma condição que verifica `user?.id` |
 
 ---
 
-## Alterações
-
-### create-embedded-checkout/index.ts
-
-| Linha | Antes | Depois |
-|-------|-------|--------|
-| 55-77 | Cria sessão com trial fixo | Verifica assinatura antes de adicionar trial |
-
-### create-checkout/index.ts
-
-| Linha | Antes | Depois |
-|-------|-------|--------|
-| 57-80 | Cria sessão com trial fixo | Verifica assinatura antes de adicionar trial |
-
----
-
-## Código da Verificação
+## Código
 
 ```typescript
-// Verificar se cliente tem assinatura ativa/trialing
-let hasActiveSubscription = false;
-if (customerId) {
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    limit: 10,
-  });
-  hasActiveSubscription = subscriptions.data.some(
-    (sub) => sub.status === "active" || sub.status === "trialing"
-  );
-  logStep("Subscription check", { hasActiveSubscription });
-}
+// Constante com o ID do cliente autorizado
+const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
 
-// Criar sessão - sem trial se já tem assinatura
-const session = await stripe.checkout.sessions.create({
-  // ... configs ...
-  subscription_data: hasActiveSubscription
-    ? { metadata: { user_id: user.id } }
-    : { trial_period_days: 7, metadata: { user_id: user.id } },
-  // ... resto ...
-});
+// Renderização condicional
+{user?.id === SETTINGS_CARD_USER_ID && (
+  <Card className="mb-6">
+    {/* ... conteúdo do card ... */}
+  </Card>
+)}
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Tipo |
 |---------|------|
-| `supabase/functions/create-embedded-checkout/index.ts` | Editar |
-| `supabase/functions/create-checkout/index.ts` | Editar |
+| `src/pages/ProjectView.tsx` | Editar |
+
