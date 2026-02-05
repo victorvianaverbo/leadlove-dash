@@ -415,6 +415,36 @@ const parseCurrencyInput = (value: string): number => {
     return allProductIds.includes(s.product_id);
   });
 
+  // Detect sales sources dynamically
+  const salesSources = useMemo(() => {
+    const sources = new Set<string>();
+    filteredSales?.forEach(s => {
+      if ((s as any).source) {
+        sources.add((s as any).source);
+      }
+    });
+    return sources;
+  }, [filteredSales]);
+
+  // Format sales source label for display
+  const formatSalesSourceLabel = (sources: Set<string>): string => {
+    const sourceNames: Record<string, string> = {
+      kiwify: 'Kiwify',
+      hotmart: 'Hotmart',
+      guru: 'Guru',
+      eduzz: 'Eduzz',
+    };
+    
+    if (sources.size === 0) return 'Checkout';
+    if (sources.size === 1) {
+      const source = Array.from(sources)[0];
+      return sourceNames[source] || source;
+    }
+    return 'Multi-checkout';
+  };
+
+  const salesSourceLabel = formatSalesSourceLabel(salesSources);
+
   // Filter ad spend by selected campaigns (from project settings)
   const filteredAdSpend = adSpend?.filter(a =>
     !project?.meta_campaign_ids?.length || project.meta_campaign_ids.includes(a.campaign_id)
@@ -943,8 +973,8 @@ const parseCurrencyInput = (value: string): number => {
             <FunnelCard title="Checkouts" value={totalCheckoutsInitiated.toLocaleString('pt-BR')} subtitle="Meta Ads" icon={CheckCircle} />
             <FunnelCard title="Custo/Checkout" value={formatCurrency(custoPerCheckout)} subtitle="Gasto ÷ Checkouts" icon={Wallet} />
             <FunnelCard title="Conv. Checkout" value={`${checkoutConversionRate.toFixed(1)}%`} subtitle="Vendas / Checkouts" icon={Percent} />
-            <KpiCard title="Vendas" value={totalSales} subtitle="Kiwify" icon={ShoppingCart} variant="success" />
-            <KpiCard title="Custo/Venda" value={formatCurrency(custoPerVenda)} subtitle="Meta ÷ Kiwify" icon={DollarSign} variant="success" />
+            <KpiCard title="Vendas" value={totalSales} subtitle={salesSourceLabel} icon={ShoppingCart} variant="success" />
+            <KpiCard title="Custo/Venda" value={formatCurrency(custoPerVenda)} subtitle={`Meta ÷ ${salesSourceLabel}`} icon={DollarSign} variant="success" />
             <KpiCard title="Taxa Venda/LP" value={`${vendaPerLP.toFixed(2)}%`} subtitle="Conversão final" icon={TrendingUp} variant="success" />
           </div>
         </div>
