@@ -541,14 +541,29 @@ async function syncGuru(
           
           console.log(`[GURU] Product ${productId} - Page ${page}: ${sales.length} sales`);
 
+          // Debug logging for first page to capture actual API structure
           if (sales.length > 0 && page === 1) {
             console.log(`[GURU] Sample sale structure:`, JSON.stringify(Object.keys(sales[0])));
+            console.log(`[GURU] Sample payment:`, JSON.stringify(sales[0].payment));
+            console.log(`[GURU] Sample items:`, JSON.stringify(sales[0].items));
+            console.log(`[GURU] Sample invoice:`, JSON.stringify(sales[0].invoice));
           }
 
           for (const sale of sales) {
             const saleId = `guru_${sale.id || sale.transaction_id || Date.now()}`;
-            const saleAmount = parseAmount(sale.amount || sale.value || sale.price || 0);
-            const saleDate = sale.confirmed_at || sale.created_at || sale.date || sale.approved_at || new Date().toISOString();
+            
+            // Buscar valor nos campos corretos da API v2
+            // Prioridade: payment > items > invoice > campos legados
+            const paymentAmount = sale.payment?.amount || sale.payment?.value || sale.payment?.total || 0;
+            const itemsTotal = Array.isArray(sale.items) 
+              ? sale.items.reduce((sum: number, item: any) => sum + parseAmount(item.price || item.value || item.amount || 0), 0)
+              : 0;
+            const invoiceTotal = sale.invoice?.total || sale.invoice?.amount || sale.invoice?.value || 0;
+            
+            const saleAmount = parseAmount(paymentAmount || itemsTotal || invoiceTotal || sale.amount || sale.value || sale.price || 0);
+            
+            // Buscar data nos campos corretos da API v2
+            const saleDate = sale.dates?.confirmed_at || sale.confirmed_at || sale.dates?.created_at || sale.created_at || sale.date || sale.approved_at || new Date().toISOString();
             
             productSales.push({
               kiwify_sale_id: saleId,
