@@ -77,7 +77,7 @@ export function MetaAdsIntegrationCard({
   // Save integration mutation
   const saveIntegration = useMutation({
     mutationFn: async () => {
-      if (integration?.is_active) {
+      if (integration) {
         if (!accessToken) {
           throw new Error("Digite o Access Token para atualizar");
         }
@@ -99,16 +99,35 @@ export function MetaAdsIntegrationCard({
         if (!accessToken || !adAccountId) {
           throw new Error("Preencha todas as credenciais");
         }
-        const { error } = await supabase
+        const existingIntegration = await supabase
           .from('integrations')
-          .insert([{
-            user_id: user!.id,
-            project_id: projectId,
-            type: 'meta_ads',
-            credentials: { access_token: accessToken, ad_account_id: `act_${adAccountId}` },
-            is_active: true,
-          }]);
-        if (error) throw error;
+          .select('id')
+          .eq('project_id', projectId)
+          .eq('type', 'meta_ads')
+          .maybeSingle();
+        
+        if (existingIntegration.data) {
+          // Integration exists but was not passed (edge case) - update it
+          const { error } = await supabase
+            .from('integrations')
+            .update({ 
+              credentials: { access_token: accessToken, ad_account_id: `act_${adAccountId}` }, 
+              is_active: true 
+            })
+            .eq('id', existingIntegration.data.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('integrations')
+            .insert([{
+              user_id: user!.id,
+              project_id: projectId,
+              credentials: { access_token: accessToken, ad_account_id: `act_${adAccountId}` },
+              type: 'meta_ads',
+              is_active: true,
+            }]);
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {
