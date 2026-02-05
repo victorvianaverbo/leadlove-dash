@@ -309,6 +309,7 @@ export type Database = {
           class_date: string | null
           created_at: string
           description: string | null
+          eduzz_product_ids: string[] | null
           guru_product_ids: string[] | null
           hotmart_product_ids: string[] | null
           id: string
@@ -338,6 +339,7 @@ export type Database = {
           class_date?: string | null
           created_at?: string
           description?: string | null
+          eduzz_product_ids?: string[] | null
           guru_product_ids?: string[] | null
           hotmart_product_ids?: string[] | null
           id?: string
@@ -367,6 +369,7 @@ export type Database = {
           class_date?: string | null
           created_at?: string
           description?: string | null
+          eduzz_product_ids?: string[] | null
           guru_product_ids?: string[] | null
           hotmart_product_ids?: string[] | null
           id?: string
