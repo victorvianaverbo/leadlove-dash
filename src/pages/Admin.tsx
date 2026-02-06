@@ -125,7 +125,6 @@ export default function Admin() {
 
     try {
       const { error } = await supabase.functions.invoke("admin-users", {
-        method: "PUT",
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: {
           user_id: data.userId,
