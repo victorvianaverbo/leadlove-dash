@@ -1,161 +1,51 @@
 
+## Reestruturar Dashboard Publico + Adicionar Acoes Recomendadas no Dashboard Principal
 
-# Plano: Gerenciamento Completo de Usuários Admin
+### 1. PublicDashboard.tsx - Reorganizar secoes
 
-## Objetivo
-Adicionar funcionalidades para:
-1. Alterar senha de usuários
-2. Alterar email de usuários (já existe)
-3. Marcar/desmarcar usuários como admin do Metrika
+**Remover** a secao "Analise dos Ultimos 3 Dias" (linhas 512-576) com metricas medias e resumo da IA.
 
----
+**Adicionar** secao "Ontem" entre Hoje e Acumulado:
+- Nova query `public-sales-yesterday` buscando vendas com `gte(brasiliaToUTC(yesterday))` e `lt(brasiliaToUTC(today))`
+- Nova query `public-ad-spend-yesterday` buscando gastos com `eq('date', yesterday)`
+- Calcular `yesterdayRevenue`, `yesterdaySpend`, `yesterdayRoas`, `yesterdayCpa`, `yesterdaySalesCount`
+- Card com borda neutra (`border-border`), 5 metricas no mesmo grid do card de hoje
 
-## Arquitetura Atual
+**Layout final:**
+1. Resumo de Hoje (sem alteracoes)
+2. Ontem (novo)
+3. Acumulado do Periodo (sem alteracoes)
+4. Acoes Recomendadas (sem alteracoes, continua usando dados dos 3 dias do relatorio da IA)
 
-A estrutura existente já suporta grande parte do que você precisa:
+### 2. ProjectView.tsx - Adicionar Acoes Recomendadas
 
-| Componente | Status | Descrição |
-|------------|--------|-----------|
-| `user_roles` | Existe | Tabela com enum `app_role` ('admin', 'user') |
-| `admin-users` | Existe | Edge function que já atualiza email |
-| `EditUserModal` | Existe | Modal de edição (precisa expandir) |
+**Adicionar query** para buscar o `daily_report` mais recente do projeto (igual ao PublicDashboard).
 
----
+**Adicionar secao** apos o Funil de Midia (antes do DeleteProjectDialog, ~linha 1024) com:
+- Card com destaque visual: borda `border-primary/30`, fundo `bg-gradient-to-r from-primary/5 to-transparent`
+- Header com icone Sparkles roxo, titulo "Acoes Recomendadas da IA" e badge "Diferencial MetrikaPRO"
+- Subtitulo: "Baseado na analise automatica dos ultimos 3 dias do seu funil"
+- Lista de acoes recomendadas no mesmo formato do PublicDashboard (metrica + benchmark, prioridade, acao, motivo)
+- Componentes `PriorityBadge` e layout de acao reutilizados (copiados inline no arquivo)
+- Se nao houver relatorio, mostrar card convidando a sincronizar primeiro
 
-## Mudanças Necessárias
+### Detalhes tecnicos
 
-### Fase 1: Atualizar Edge Function `admin-users`
-
-**Arquivo:** `supabase/functions/admin-users/index.ts`
-
-Adicionar suporte para:
-- **Alterar senha** via `supabase.auth.admin.updateUserById(userId, { password })`
-- **Toggle admin** via INSERT/DELETE na tabela `user_roles`
-- **Retornar status de admin** na listagem de usuários
-
-```typescript
-// Novo no PUT:
-if (password) {
-  await supabaseAdmin.auth.admin.updateUserById(user_id, { password });
-}
-
-if (is_admin !== undefined) {
-  if (is_admin) {
-    // Inserir role admin
-    await supabaseAdmin.from("user_roles").upsert({ user_id, role: 'admin' });
-  } else {
-    // Remover role admin
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id).eq("role", "admin");
-  }
-}
-```
-
-Novo campo no retorno GET:
-```json
-{
-  "users": [{
-    "is_admin": true,
-    ...
-  }]
-}
-```
-
----
-
-### Fase 2: Atualizar Modal de Edição
-
-**Arquivo:** `src/components/admin/EditUserModal.tsx`
-
-Adicionar campos:
-1. **Nova Senha** - Campo password com toggle de visibilidade
-2. **Confirmar Senha** - Validação de confirmação
-3. **Admin Metrika** - Switch on/off
-
-Layout atualizado:
+**PublicDashboard - Queries de ontem:**
 ```text
-┌─────────────────────────────────────────┐
-│ Editar Usuário                          │
-├─────────────────────────────────────────┤
-│ Nome: [João Silva        ] (desabilitado)│
-│ Email: [joao@email.com   ]              │
-│                                         │
-│ ─────── Alterar Senha ───────           │
-│ Nova Senha: [••••••••    ] 👁           │
-│ Confirmar:  [••••••••    ] 👁           │
-│                                         │
-│ ─────── Permissões ───────              │
-│ Admin Metrika: [  ON  ]                 │
-│                                         │
-│ ─────── Overrides ───────               │
-│ Projetos Extras: [  5  ]                │
-│ Notas: [________________]               │
-├─────────────────────────────────────────┤
-│              [Cancelar] [Salvar]        │
-└─────────────────────────────────────────┘
+sales: .gte('sale_date', brasiliaToUTC(yesterday)).lt('sale_date', brasiliaToUTC(today))
+ad_spend: .eq('date', yesterday)
 ```
 
----
-
-### Fase 3: Atualizar Página Admin
-
-**Arquivo:** `src/pages/Admin.tsx`
-
-Adicionar:
-1. **Coluna "Admin"** na tabela com badge
-2. **Interface atualizada** para passar `is_admin` e `password`
-
----
-
-## Fluxo de Dados
-
+**ProjectView - Query do relatorio:**
 ```text
-EditUserModal
-    │
-    ├── email (existente)
-    ├── password (novo)
-    ├── is_admin (novo)
-    ├── extra_projects (existente)
-    └── notes (existente)
-           │
-           ▼
-    Admin.tsx (handleSaveUser)
-           │
-           ▼
-    Edge Function admin-users (PUT)
-           │
-           ├── supabase.auth.admin.updateUserById({ email, password })
-           ├── profiles.update({ email })
-           ├── user_roles.upsert/delete (admin toggle)
-           └── user_overrides.upsert (extra_projects, notes)
+supabase.from('daily_reports').select('*')
+  .eq('project_id', projectId)
+  .order('report_date', { ascending: false })
+  .limit(1).single()
 ```
 
----
-
-## Segurança
-
-| Aspecto | Implementacao |
-|---------|---------------|
-| Autenticacao | JWT validado na edge function |
-| Autorizacao | Verificacao `has_role(user_id, 'admin')` |
-| Senha | Minimo 6 caracteres, confirmacao obrigatoria |
-| Self-protection | Admin nao pode remover proprio role |
-
----
-
-## Resumo das Alteracoes
-
-| Arquivo | Acao | Descricao |
-|---------|------|-----------|
-| `admin-users/index.ts` | Editar | Adicionar password e is_admin no PUT, is_admin no GET |
-| `EditUserModal.tsx` | Editar | Adicionar campos senha e switch admin |
-| `Admin.tsx` | Editar | Adicionar coluna admin, atualizar interface |
-
----
-
-## Validacoes
-
-- Senha deve ter minimo 6 caracteres
-- Confirmacao de senha deve coincidir
-- Admin nao pode remover seu proprio acesso admin (protecao)
-- Campos de senha sao opcionais (deixar vazio = nao alterar)
-
+**Destaque visual no ProjectView** para reforcar o diferencial da ferramenta:
+- Gradiente roxo sutil no card
+- Badge "IA" ou "Diferencial MetrikaPRO" no header
+- Icone Sparkles animado com `text-primary`
