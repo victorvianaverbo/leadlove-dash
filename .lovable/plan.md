@@ -1,186 +1,161 @@
 
-# Plano: Visão Administrativa de Todos os Projetos
+
+# Plano: Gerenciamento Completo de Usuários Admin
 
 ## Objetivo
-Criar uma página administrativa em `/admin/projects` (rota escondida, sem botão no frontend) que permite visualizar e acessar todos os projetos de todos os clientes para suporte técnico.
+Adicionar funcionalidades para:
+1. Alterar senha de usuários
+2. Alterar email de usuários (já existe)
+3. Marcar/desmarcar usuários como admin do Metrika
 
 ---
 
-## Acesso
-- **Login:** Seu login atual de administrador
-- **Rota:** `/admin/projects` (acessar diretamente pela URL)
-- **Sem botão no frontend** - rota oculta para acesso direto
+## Arquitetura Atual
+
+A estrutura existente já suporta grande parte do que você precisa:
+
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| `user_roles` | Existe | Tabela com enum `app_role` ('admin', 'user') |
+| `admin-users` | Existe | Edge function que já atualiza email |
+| `EditUserModal` | Existe | Modal de edição (precisa expandir) |
 
 ---
 
-## Arquitetura
+## Mudanças Necessárias
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  /admin/projects (rota escondida)                            │
-├──────────────────────────────────────────────────────────────┤
-│  Buscar: [_______________]  Plataforma: [▼ Todas]            │
-├──────────────────────────────────────────────────────────────┤
-│  Projeto        │ Cliente        │ Integrações │ Ações       │
-│  ─────────────────────────────────────────────────────────── │
-│  Curso XYZ      │ Charles Silva  │ Kiwify,Meta │ [Acessar]   │
-│  Plataforma IRD │ João           │ Hotmart     │ [Acessar]   │
-└──────────────────────────────────────────────────────────────┘
+### Fase 1: Atualizar Edge Function `admin-users`
+
+**Arquivo:** `supabase/functions/admin-users/index.ts`
+
+Adicionar suporte para:
+- **Alterar senha** via `supabase.auth.admin.updateUserById(userId, { password })`
+- **Toggle admin** via INSERT/DELETE na tabela `user_roles`
+- **Retornar status de admin** na listagem de usuários
+
+```typescript
+// Novo no PUT:
+if (password) {
+  await supabaseAdmin.auth.admin.updateUserById(user_id, { password });
+}
+
+if (is_admin !== undefined) {
+  if (is_admin) {
+    // Inserir role admin
+    await supabaseAdmin.from("user_roles").upsert({ user_id, role: 'admin' });
+  } else {
+    // Remover role admin
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id).eq("role", "admin");
+  }
+}
 ```
 
----
-
-## Fase 1: Atualizar Políticas RLS
-
-Adicionar políticas que permitem admins visualizarem dados de qualquer projeto:
-
-**Tabela projects:**
-```sql
-CREATE POLICY "Admins can view all projects"
-ON public.projects FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-```
-
-**Tabela sales:**
-```sql
-CREATE POLICY "Admins can view all sales"
-ON public.sales FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-```
-
-**Tabela ad_spend:**
-```sql
-CREATE POLICY "Admins can view all ad_spend"
-ON public.ad_spend FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-```
-
-**Tabela integrations:**
-```sql
-CREATE POLICY "Admins can view all integrations"
-ON public.integrations FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Admins can update all integrations"
-ON public.integrations FOR UPDATE
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-```
-
-A função `has_role()` já existe no projeto e usa `SECURITY DEFINER` para evitar recursão RLS.
-
----
-
-## Fase 2: Criar Edge Function `admin-projects`
-
-**Arquivo:** `supabase/functions/admin-projects/index.ts`
-
-Funcionalidades:
-- Listar todos os projetos com dados do proprietário (nome, email)
-- Incluir integrações ativas de cada projeto
-- Filtrar por nome do projeto ou cliente
-
-Retorno:
+Novo campo no retorno GET:
 ```json
 {
-  "projects": [
-    {
-      "id": "uuid",
-      "name": "Curso XYZ",
-      "slug": "curso-xyz",
-      "created_at": "2026-01-15",
-      "owner": {
-        "user_id": "uuid",
-        "full_name": "Charles Silva",
-        "email": "charles@email.com"
-      },
-      "integrations": ["kiwify", "meta_ads"]
-    }
-  ]
+  "users": [{
+    "is_admin": true,
+    ...
+  }]
 }
 ```
 
 ---
 
-## Fase 3: Criar Página AdminProjects
+### Fase 2: Atualizar Modal de Edição
 
-**Arquivo:** `src/pages/AdminProjects.tsx`
+**Arquivo:** `src/components/admin/EditUserModal.tsx`
 
-Funcionalidades:
-- Listagem de todos os projetos com paginação
-- Busca por nome do projeto ou cliente
-- Coluna com nome e email do proprietário
-- Coluna com integrações ativas (badges)
-- Botão "Acessar" que abre `/projects/:id`
-- Botão "Sincronizar" para forçar sync de dados
-- Verificação de admin igual ao `/admin` existente
+Adicionar campos:
+1. **Nova Senha** - Campo password com toggle de visibilidade
+2. **Confirmar Senha** - Validação de confirmação
+3. **Admin Metrika** - Switch on/off
 
-Layout similar ao `Admin.tsx` existente:
-- Header com título e voltar
-- Card com tabela de projetos
-- Campo de busca
-- Design consistente
-
----
-
-## Fase 4: Atualizar ProjectView para Modo Admin
-
-**Arquivo:** `src/pages/ProjectView.tsx`
-
-Modificações:
-- Detectar se admin está visualizando projeto de outro usuário
-- Mostrar banner "Visualizando como Admin - Cliente: [nome]"
-- Permitir sincronização e debug
-- Esconder botão de exclusão (segurança)
-- Permitir editar integrações do cliente
-
-```typescript
-const isViewingAsAdmin = project?.user_id !== user?.id && isAdmin;
+Layout atualizado:
+```text
+┌─────────────────────────────────────────┐
+│ Editar Usuário                          │
+├─────────────────────────────────────────┤
+│ Nome: [João Silva        ] (desabilitado)│
+│ Email: [joao@email.com   ]              │
+│                                         │
+│ ─────── Alterar Senha ───────           │
+│ Nova Senha: [••••••••    ] 👁           │
+│ Confirmar:  [••••••••    ] 👁           │
+│                                         │
+│ ─────── Permissões ───────              │
+│ Admin Metrika: [  ON  ]                 │
+│                                         │
+│ ─────── Overrides ───────               │
+│ Projetos Extras: [  5  ]                │
+│ Notas: [________________]               │
+├─────────────────────────────────────────┤
+│              [Cancelar] [Salvar]        │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## Fase 5: Adicionar Rota
+### Fase 3: Atualizar Página Admin
 
-**Arquivo:** `src/App.tsx`
+**Arquivo:** `src/pages/Admin.tsx`
 
-Adicionar a rota escondida:
-```typescript
-<Route path="/admin/projects" element={<AdminProjects />} />
-```
+Adicionar:
+1. **Coluna "Admin"** na tabela com badge
+2. **Interface atualizada** para passar `is_admin` e `password`
 
 ---
 
-## Resumo das Alterações
+## Fluxo de Dados
 
-| Componente | Ação | Descrição |
-|------------|------|-----------|
-| RLS Policies | Migração SQL | 5 novas policies para role admin |
-| `admin-projects/index.ts` | Criar | Edge function para listar projetos |
-| `AdminProjects.tsx` | Criar | Página de gestão de projetos |
-| `ProjectView.tsx` | Editar | Modo admin com banner e permissões |
-| `App.tsx` | Editar | Adicionar rota `/admin/projects` |
-| `AuthContext.tsx` | Já existe | `isAdmin` já disponível no contexto |
+```text
+EditUserModal
+    │
+    ├── email (existente)
+    ├── password (novo)
+    ├── is_admin (novo)
+    ├── extra_projects (existente)
+    └── notes (existente)
+           │
+           ▼
+    Admin.tsx (handleSaveUser)
+           │
+           ▼
+    Edge Function admin-users (PUT)
+           │
+           ├── supabase.auth.admin.updateUserById({ email, password })
+           ├── profiles.update({ email })
+           ├── user_roles.upsert/delete (admin toggle)
+           └── user_overrides.upsert (extra_projects, notes)
+```
 
 ---
 
 ## Segurança
 
-- Verificação de admin via `has_role()` (SECURITY DEFINER)
-- RLS policies garantem isolamento de usuários normais
-- Ações destrutivas (DELETE) bloqueadas no modo admin
-- Edge function valida JWT antes de qualquer operação
+| Aspecto | Implementacao |
+|---------|---------------|
+| Autenticacao | JWT validado na edge function |
+| Autorizacao | Verificacao `has_role(user_id, 'admin')` |
+| Senha | Minimo 6 caracteres, confirmacao obrigatoria |
+| Self-protection | Admin nao pode remover proprio role |
 
 ---
 
-## Fluxo de Uso
+## Resumo das Alteracoes
 
-1. Acesse `https://metrikapro.com.br/admin/projects`
-2. Busque pelo nome do cliente (ex: "Charles")
-3. Clique em "Acessar" no projeto desejado
-4. Visualize e corrija problemas (integrações, sync, etc.)
-5. Banner indica que está em modo admin
+| Arquivo | Acao | Descricao |
+|---------|------|-----------|
+| `admin-users/index.ts` | Editar | Adicionar password e is_admin no PUT, is_admin no GET |
+| `EditUserModal.tsx` | Editar | Adicionar campos senha e switch admin |
+| `Admin.tsx` | Editar | Adicionar coluna admin, atualizar interface |
+
+---
+
+## Validacoes
+
+- Senha deve ter minimo 6 caracteres
+- Confirmacao de senha deve coincidir
+- Admin nao pode remover seu proprio acesso admin (protecao)
+- Campos de senha sao opcionais (deixar vazio = nao alterar)
+
