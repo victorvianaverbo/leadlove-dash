@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.admin-projects]
 verify_jwt = false
+
+[functions.meta-oauth-callback]
+verify_jwt = false
