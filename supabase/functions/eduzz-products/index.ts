@@ -87,7 +87,9 @@ Deno.serve(async (req) => {
 
     const { api_key } = integration.credentials as { api_key: string };
 
-    console.log('Fetching Eduzz products...');
+    // Debug: log token prefix to help diagnose auth issues
+    const tokenPrefix = api_key ? api_key.substring(0, 10) : 'EMPTY';
+    console.log(`Fetching Eduzz products with token starting: ${tokenPrefix}...`);
 
     const productsResponse = await fetch('https://api.eduzz.com/myeduzz/v1/products', {
       headers: {
@@ -101,6 +103,18 @@ Deno.serve(async (req) => {
     if (!productsResponse.ok) {
       const errorText = await productsResponse.text();
       console.error('Eduzz products error:', errorText);
+
+      if (productsResponse.status === 401) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Token inválido ou expirado. Use o Token Pessoal do Console Eduzz (console.eduzz.com). A API Key do Órbita não funciona para este endpoint.', 
+            products: [],
+            auth_error: true
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: 'Failed to fetch products from Eduzz', products: [] }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -108,7 +122,10 @@ Deno.serve(async (req) => {
     }
 
     const productsData = await productsResponse.json();
-    const products = productsData.data || productsData.products || productsData.items || [];
+    console.log('Eduzz response keys:', Object.keys(productsData));
+
+    // Eduzz API returns products in "items" array
+    const products = productsData.items || productsData.data || productsData.products || [];
 
     console.log(`Fetched ${Array.isArray(products) ? products.length : 0} products from Eduzz`);
 
