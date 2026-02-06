@@ -1,48 +1,69 @@
 
 
-## Corrigir erro 401 na edge function admin-users
+## Corrigir crash na pagina Admin e sincronizar email no Stripe
 
-### Problema
-A funcao `verifyAdmin` cria um cliente Supabase com a **anon key** para validar o token do usuario. No Lovable Cloud, os tokens JWT usam algoritmo ES256 e a anon key (HS256) nao consegue verificar esses tokens, causando o erro "Unauthorized" antes mesmo de checar o role de admin.
+### Problema 1 - Logout ao acessar /admin
+A funcao `getFreshToken()` em `Admin.tsx` chama `supabase.auth.refreshSession()` antes de cada chamada a edge function. Essa chamada pode falhar e disparar o evento `SIGNED_OUT` no `onAuthStateChange` do AuthContext, que limpa o usuario e redireciona para `/auth`.
 
-### Solucao
-Usar o cliente com **service role key** (que ja existe como `supabaseAdmin`) para chamar `auth.getUser(token)`. O service role key tem permissao para validar qualquer token. Isso elimina a necessidade de criar um segundo cliente com a anon key.
+### Problema 2 - Projetos "sumindo" apos troca de email
+O `check-subscription` busca o cliente Stripe pelo email. Ao trocar o email no admin, o Stripe continua com o email antigo, retornando `subscribed: false` e escondendo os projetos.
 
-### Alteracao
+---
 
-**Arquivo: `supabase/functions/admin-users/index.ts`** (funcao `verifyAdmin`, linhas 15-47)
+### Correcao 1 - Remover `refreshSession()` do Admin.tsx
 
-Simplificar para usar apenas o `supabaseAdmin` (service role):
+No arquivo `src/pages/Admin.tsx`, remover a funcao `getFreshToken` e usar diretamente `session.access_token`. O token ja e valido (o usuario acabou de logar) e o refresh proativo no AuthContext ja cuida da renovacao a cada 10 minutos.
 
-```
-async function verifyAdmin(req: Request) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+Alterar as 3 chamadas de `getFreshToken()` para usar `session.access_token` diretamente:
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) throw new Error("No authorization header");
+```typescript
+// Antes:
+const freshToken = await getFreshToken();
+const { data, error } = await supabase.functions.invoke("admin-users", {
+  headers: { Authorization: `Bearer ${freshToken}` },
+});
 
-  const token = authHeader.replace("Bearer ", "");
-
-  // Usar service role para validar o token (compativel com ES256 do Lovable Cloud)
-  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-  if (userError || !user) throw new Error("Unauthorized");
-
-  // ... resto igual (checagem de admin role)
-}
+// Depois:
+const { data, error } = await supabase.functions.invoke("admin-users", {
+  headers: { Authorization: `Bearer ${session.access_token}` },
+});
 ```
 
-Remover a criacao do `supabaseClient` com anon key (linhas 25-27) pois nao e mais necessario.
+Remover a funcao `getFreshToken` inteiramente.
 
-Tambem atualizar o CORS headers para incluir os headers extras do Supabase client:
+### Correcao 2 - Sincronizar email no Stripe ao editar usuario
 
+No arquivo `supabase/functions/admin-users/index.ts`, na funcao `handlePut`, ao atualizar o email:
+
+1. Buscar o email atual do usuario no banco (profiles) ANTES de atualizar
+2. Buscar o cliente Stripe pelo email antigo
+3. Se encontrar, atualizar o email do cliente no Stripe para o novo email
+4. So entao prosseguir com a atualizacao no auth e profiles
+
+Isso garante que a assinatura continue sendo encontrada apos a troca de email.
+
+### Correcao 3 - Mostrar projetos mesmo sem assinatura ativa
+
+No arquivo `src/pages/Dashboard.tsx`, alterar a condicao para que projetos existentes sempre aparecam. O EmptyState sem assinatura so aparece se o usuario nao tiver nenhum projeto:
+
+```typescript
+// Antes:
+{!subscribed ? (
+  <EmptyState hasSubscription={false} />
+) : projects?.length === 0 ? (
+
+// Depois:
+{!subscribed && (!projects || projects.length === 0) ? (
+  <EmptyState hasSubscription={false} />
+) : projects?.length === 0 ? (
 ```
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
-```
 
-### Sobre projetos
-Nenhuma alteracao afeta projetos dos usuarios. A funcao so modifica email/senha via `auth.admin.updateUserById` e roles/overrides via tabelas separadas. Projetos sao vinculados por `user_id` que nao muda.
+### Correcao imediata para o Bruno
 
-### Redeploy
-A edge function sera redeployada automaticamente apos a alteracao.
+Apos o deploy, editar o Bruno novamente pelo painel admin (pode ser so salvar sem mudar nada). A funcao corrigida ira sincronizar o email no Stripe automaticamente.
+
+### Arquivos alterados
+- `src/pages/Admin.tsx` - remover getFreshToken, usar session.access_token
+- `supabase/functions/admin-users/index.ts` - adicionar sync de email no Stripe
+- `src/pages/Dashboard.tsx` - mostrar projetos sem assinatura
+
