@@ -600,15 +600,15 @@ const parseCurrencyInput = (value: string): number => {
   } = calculatedMetrics;
 
   // Use metrics cache hook
-  const { updateCache, isCacheValid } = useMetricsCache(id, dateRange);
+  const { updateCache, isCacheValid } = useMetricsCache(projectId, dateRange);
 
   // Update cache when metrics change AND cache is invalid
   useEffect(() => {
-    if (id && totalRevenue !== undefined && !salesLoading && !adSpendLoading && !isCacheValid) {
+    if (projectId && totalRevenue !== undefined && !salesLoading && !adSpendLoading && !isCacheValid) {
       // Update cache with calculated metrics (debounced internally)
       updateCache(calculatedMetrics);
     }
-  }, [id, calculatedMetrics, salesLoading, adSpendLoading, isCacheValid]);
+  }, [projectId, calculatedMetrics, salesLoading, adSpendLoading, isCacheValid]);
 
 
   if (loading || !user || projectLoading) {
