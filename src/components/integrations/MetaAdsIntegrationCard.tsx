@@ -214,8 +214,9 @@ export function MetaAdsIntegrationCard({
       ? "" : ""; // App ID comes from edge function
     
     // We'll use the SUPABASE_URL to build the redirect URI
-    const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-oauth-callback`;
-    const state = `${projectId}|${user!.id}`;
+    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+    const redirectUri = `${supabaseUrl}/functions/v1/meta-oauth-callback`;
+    const state = `${projectId}|${user!.id}|${window.location.origin}`;
     const scope = "ads_read,ads_management,read_insights";
     
     // We need the META_APP_ID from the edge function. Let's fetch it.
