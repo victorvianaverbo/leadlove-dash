@@ -284,6 +284,43 @@ export default function PublicDashboard() {
     enabled: !!project?.id,
   });
 
+  // Fetch YESTERDAY's sales
+  const { data: yesterdaySalesData } = useQuery({
+    queryKey: ['public-sales-yesterday', project?.id, yesterday],
+    queryFn: async (): Promise<SalesPublic[]> => {
+      const yesterdayStart = brasiliaToUTC(yesterday);
+      const yesterdayEnd = brasiliaToUTC(today);
+      
+      const { data, error } = await supabase
+        .from('sales_public' as any)
+        .select('*')
+        .eq('project_id', project!.id)
+        .eq('status', 'paid')
+        .gte('sale_date', yesterdayStart)
+        .lt('sale_date', yesterdayEnd);
+      
+      if (error) throw error;
+      return (data || []) as unknown as SalesPublic[];
+    },
+    enabled: !!project?.id,
+  });
+
+  // Fetch YESTERDAY's ad spend
+  const { data: yesterdayAdSpendData } = useQuery({
+    queryKey: ['public-ad-spend-yesterday', project?.id, yesterday],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ad_spend')
+        .select('*')
+        .eq('project_id', project!.id)
+        .eq('date', yesterday);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!project?.id,
+  });
+
   // Fetch ALL sales (total period)
   const { data: allSales } = useQuery({
     queryKey: ['public-sales-total', project?.id],
@@ -351,6 +388,15 @@ export default function PublicDashboard() {
   const todayRoas = todaySpend > 0 ? todayRevenue / todaySpend : 0;
   const todayCpa = todaySalesCount > 0 ? todaySpend / todaySalesCount : 0;
 
+  // Yesterday's metrics
+  const filteredYesterdaySales = filterSales(yesterdaySalesData);
+  const filteredYesterdayAdSpend = filterAdSpend(yesterdayAdSpendData);
+  const yesterdayRevenue = filteredYesterdaySales.reduce((sum, s) => sum + Number(getSaleValue(s)), 0);
+  const yesterdaySpend = filteredYesterdayAdSpend.reduce((sum, a) => sum + Number(a.spend), 0);
+  const yesterdaySalesCount = filteredYesterdaySales.length;
+  const yesterdayRoas = yesterdaySpend > 0 ? yesterdayRevenue / yesterdaySpend : 0;
+  const yesterdayCpa = yesterdaySalesCount > 0 ? yesterdaySpend / yesterdaySalesCount : 0;
+
   // Total period metrics
   const filteredAllSales = filterSales(allSales);
   const filteredAllAdSpend = filterAdSpend(allAdSpend);
@@ -398,6 +444,8 @@ export default function PublicDashboard() {
       await queryClient.invalidateQueries({ queryKey: ['public-daily-report', project.id] });
       await queryClient.invalidateQueries({ queryKey: ['public-sales-today', project.id] });
       await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-today', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-sales-yesterday', project.id] });
+      await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-yesterday', project.id] });
       await queryClient.invalidateQueries({ queryKey: ['public-sales-total', project.id] });
       await queryClient.invalidateQueries({ queryKey: ['public-ad-spend-total', project.id] });
 
@@ -509,71 +557,43 @@ export default function PublicDashboard() {
           </CardContent>
         </Card>
 
-        {/* Section 2: 3-Day Analysis (AI Generated) */}
-        {latestReport && (
-          <Card className="border border-border">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-muted rounded-lg">
-                    <Sparkles className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-lg">Análise dos Últimos 3 Dias</CardTitle>
-                </div>
-                <span className="text-sm text-muted-foreground capitalize">
-                  Atualizado em {formatReportDate(latestReport.report_date)}
-                </span>
+        {/* Section 2: Yesterday */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-muted rounded-lg">
+                <Target className="h-4 w-4 text-muted-foreground" />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Summary */}
-              <p className="text-sm leading-relaxed">{latestReport.summary}</p>
-
-              {/* Metrics - Use 3-day averages with fallback to D1 for older reports */}
-              {(() => {
-                const displayMetrics = latestReport.metrics_avg3days || latestReport.metrics;
-                const revenue = displayMetrics?.revenue || 0;
-                const spend = displayMetrics?.spend || 0;
-                const roas = displayMetrics?.roas || 0;
-                const cpa = displayMetrics?.cpa || 0;
-                const salesCount = 'salesCount' in displayMetrics 
-                  ? (displayMetrics as Metrics3DayAvg).salesCount 
-                  : (displayMetrics as FunnelMetrics)?.sales || 0;
-                
-                return (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Receita (média)</p>
-                      <p className="font-semibold text-success">
-                        {formatCurrency(revenue)}
-                      </p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Gasto (média)</p>
-                      <p className="font-semibold text-destructive">
-                        {formatCurrency(spend)}
-                      </p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">ROAS</p>
-                      <p className={`font-semibold ${roas >= 1 ? 'text-success' : 'text-destructive'}`}>
-                        {roas.toFixed(2)}x
-                      </p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">CPA</p>
-                      <p className="font-semibold">{formatCurrency(cpa)}</p>
-                    </div>
-                    <div className="bg-card rounded-lg p-3 border">
-                      <p className="text-xs text-muted-foreground mb-1">Vendas (média)</p>
-                      <p className="font-semibold">{salesCount.toFixed(1)}</p>
-                    </div>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        )}
+              <CardTitle className="text-lg">Ontem</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Receita</p>
+                <p className="font-semibold text-success">{formatCurrency(yesterdayRevenue)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Gasto</p>
+                <p className="font-semibold text-destructive">{formatCurrency(yesterdaySpend)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">ROAS</p>
+                <p className={`font-semibold ${yesterdayRoas >= 1 ? 'text-success' : 'text-destructive'}`}>
+                  {yesterdayRoas.toFixed(2)}x
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">CPA</p>
+                <p className="font-semibold">{formatCurrency(yesterdayCpa)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground mb-1">Vendas</p>
+                <p className="font-semibold">{yesterdaySalesCount}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Section 3: Total Period */}
         <Card>
