@@ -29,7 +29,7 @@ export function EduzzTutorial() {
         <h2 className="text-xl font-semibold mb-3">Introdução</h2>
         <p className="text-muted-foreground leading-relaxed">
           O MetrikaPRO utiliza a API da Eduzz para listar seus produtos e sincronizar vendas. 
-          Para isso, você precisa de um <strong>Token Pessoal</strong> gerado no{' '}
+          Para isso, você precisa do <strong>Client ID</strong> e do <strong>Access Token</strong> gerados no{' '}
           <strong>Console Eduzz</strong> (<code className="bg-muted px-1.5 py-0.5 rounded text-sm">console.eduzz.com</code>).
         </p>
       </section>
@@ -79,14 +79,15 @@ export function EduzzTutorial() {
             </ol>
           </StepSection>
 
-          <StepSection step={3} title="Copiar o Token Pessoal">
+          <StepSection step={3} title="Copiar Client ID e Access Token">
             <p className="text-muted-foreground mb-4">
               Após criar o aplicativo:
             </p>
             <ol className="list-decimal list-inside text-muted-foreground space-y-2 mb-4">
               <li>Na lista de aplicativos, localize o app que você acabou de criar</li>
-              <li>Clique em <strong>"Copiar access token"</strong> (Token Pessoal)</li>
-              <li>Guarde o token em local seguro</li>
+              <li>Clique nos <strong>três pontos (⋯)</strong> do app</li>
+              <li>Clique em <strong>"Copiar Client ID"</strong> e guarde</li>
+              <li>Clique em <strong>"Copiar Access Token"</strong> e guarde</li>
             </ol>
             <InfoCard>
               O Token Pessoal <strong>não expira</strong>, diferente de tokens OAuth2 temporários. 
@@ -99,7 +100,7 @@ export function EduzzTutorial() {
               <li>Acesse o MetrikaPRO e vá para seu projeto</li>
               <li>Clique em <strong>"Editar"</strong></li>
               <li>Na seção <strong>"Integrações de Vendas"</strong>, expanda <strong>"Eduzz"</strong></li>
-              <li>Cole o <strong>Client ID</strong> e o <strong>Client Secret</strong> nos campos correspondentes</li>
+              <li>Cole o <strong>Client ID</strong> e o <strong>Access Token</strong> nos campos correspondentes</li>
               <li>Clique em <strong>"Salvar Integração"</strong></li>
             </ol>
           </StepSection>

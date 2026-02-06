@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       if (productsResponse.status === 401) {
         return new Response(
           JSON.stringify({ 
-            error: 'Token inválido ou expirado. Use o Token Pessoal do Console Eduzz (console.eduzz.com). A API Key do Órbita não funciona para este endpoint.', 
+            error: 'Access Token inválido ou expirado. Use o Access Token do Console Eduzz (console.eduzz.com > Meus Aplicativos > menu do app > Copiar Access Token).', 
             products: [],
             auth_error: true
           }),
