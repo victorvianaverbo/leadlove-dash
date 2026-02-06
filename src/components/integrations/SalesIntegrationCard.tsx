@@ -67,7 +67,7 @@ const integrationConfig = {
     description: 'Conecte a conta Eduzz para importar vendas',
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text', sensitive: false },
-      { key: 'client_secret', label: 'Client Secret', type: 'password', sensitive: true },
+      { key: 'client_secret', label: 'Access Token', type: 'password', sensitive: true },
     ],
     productsEndpoint: 'eduzz-products',
   },
