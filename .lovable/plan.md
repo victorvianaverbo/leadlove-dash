@@ -1,73 +1,46 @@
 
 
-## Facebook Login OAuth para Meta Ads (usuario isolado)
+## Corrigir OAuth do Facebook - Meta Ads
 
-### Resumo
-Implementar conexao direta com Facebook Login (OAuth popup) para a integracao Meta Ads. O novo fluxo sera ativado **apenas para o usuario `ee3515c2-...`** como teste. Todos os outros usuarios continuam usando o metodo manual (token + ad account ID).
+### Problema
+A edge function `meta-oauth-callback` esta recebendo chamadas GET sem os parametros `code` e `state` do Facebook. Isso indica que o `redirect_uri` usado na chamada OAuth nao corresponde exatamente ao configurado no Meta App, ou o Facebook esta rejeitando a autorizacao.
 
-### Como vai funcionar
+### Causas identificadas
 
-1. O usuario clica em "Conectar com Facebook"
-2. Um popup abre pedindo permissao (ads_read, ads_management, read_insights)
-3. O Facebook retorna um codigo de autorizacao
-4. Uma Edge Function troca esse codigo por um token de longa duracao (60 dias)
-5. A funcao tambem busca as Ad Accounts disponiveis automaticamente
-6. O token e o ad_account_id sao salvos na tabela `integrations` (mesmo formato atual)
+1. **redirect_uri inconsistente**: O frontend monta o redirect_uri usando `VITE_SUPABASE_URL`, mas a URL pode ter diferenca de formato (barra final, protocolo) comparado ao que foi cadastrado no Meta App
+2. **Redirect de volta hardcoded**: A funcao redireciona para `metrikapro.com.br` apos sucesso, mas durante testes no Lovable preview isso nao funciona
+3. **Popup pode estar sendo bloqueado**: `window.open` com popup pode ser bloqueado pelo navegador
 
-O restante do sistema (sync-project-data, meta-campaigns) continua funcionando sem alteracao, pois o formato dos dados salvos e identico.
+### Solucao
 
-### Configuracao do Meta App (o que voce precisa fazer)
+**1. Edge Function (`meta-oauth-callback/index.ts`)**
+- Adicionar log do redirect_uri usado, para diagnostico
+- Usar a URL de origem (origin) passada no state para redirecionar de volta, em vez de URL hardcoded
+- Mudar o formato do state para: `projectId|userId|originUrl`
 
-No painel do Meta App (developers.facebook.com):
+**2. Frontend (`MetaAdsIntegrationCard.tsx`)**
+- Incluir `window.location.origin` no state para que o redirect volte para o ambiente correto (preview ou producao)
+- Garantir que o redirect_uri seja construido de forma consistente
 
-1. **Adicionar produto "Facebook Login for Business"** (ou "Facebook Login")
-2. Em **Settings > Basic**: confirmar que Privacy Policy URL e Terms URL estao preenchidos (metrikapro.com.br/privacy e /terms)
-3. Em **Facebook Login > Settings**:
-   - Habilitar "Client OAuth Login" = Sim
-   - Habilitar "Web OAuth Login" = Sim
-   - Em "Valid OAuth Redirect URIs", adicionar:
-     - `https://ohwaygqxelyaytljbcsb.supabase.co/functions/v1/meta-oauth-callback`
-   - Em "Allowed Domains for the JavaScript SDK", adicionar:
-     - `lovable.app`
-     - `metrikapro.com.br`
-4. Em **App Review > Permissions**: solicitar `ads_read`, `ads_management` e `read_insights`
-5. Copiar o **App ID** e o **App Secret** para fornecer quando eu pedir
+**3. Verificacao de redirect_uri**
+- A URI cadastrada no Meta App deve ser EXATAMENTE: `https://ohwaygqxelyaytljbcsb.supabase.co/functions/v1/meta-oauth-callback`
+- Sem barra no final
+- O frontend deve usar essa mesma string
 
 ### Detalhes tecnicos
 
-**Secrets necessarios:**
-- `META_APP_ID` - ID do App Meta
-- `META_APP_SECRET` - Secret do App Meta
-
-**Arquivos novos:**
-- `supabase/functions/meta-oauth-callback/index.ts` - Edge Function que recebe o codigo do Facebook, troca por token de longa duracao, busca ad accounts, e salva na tabela integrations
-
 **Arquivos alterados:**
-- `src/components/integrations/MetaAdsIntegrationCard.tsx` - Adicionar botao "Conectar com Facebook" que aparece apenas para o usuario teste. O fluxo manual permanece intacto para todos os outros
-- `supabase/config.toml` - Registrar a nova funcao meta-oauth-callback
 
-**Logica de isolamento no frontend:**
-```text
-if (user.id === "ee3515c2-6a17-40b1-971f-34a788b7d2ec") {
-  // Mostrar botao "Conectar com Facebook" (OAuth)
-} else {
-  // Mostrar formulario manual (token + ad account ID) - sem mudancas
-}
-```
+1. `supabase/functions/meta-oauth-callback/index.ts`
+   - Log do redirect_uri para debug
+   - Extrair origin do state (terceiro parametro)
+   - Usar origin dinamico no `getAppRedirectUrl` em vez de `metrikapro.com.br` fixo
 
-**Fluxo OAuth (Edge Function):**
-1. Recebe `code` e `project_id` via query params (redirect do Facebook)
-2. Troca code por short-lived token via `graph.facebook.com/v18.0/oauth/access_token`
-3. Troca short-lived por long-lived token via `graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token`
-4. Busca ad accounts do usuario via `graph.facebook.com/v18.0/me/adaccounts`
-5. Salva/atualiza na tabela `integrations` com as mesmas colunas
-6. Redireciona o usuario de volta para a pagina de edicao do projeto
+2. `src/components/integrations/MetaAdsIntegrationCard.tsx`
+   - Mudar state para incluir origin: `${projectId}|${user.id}|${window.location.origin}`
+   - Garantir redirect_uri consistente sem barra final
 
-**Nenhuma alteracao em:**
-- `sync-project-data` (usa o mesmo formato de credentials)
-- `meta-campaigns` (usa o mesmo formato de credentials)
-- Fluxo de outros usuarios
-
-### Proximo passo
-Apos aprovacao, vou pedir os secrets META_APP_ID e META_APP_SECRET antes de implementar o codigo.
-
+### Resultado esperado
+- O Facebook redireciona corretamente com `code` e `state`
+- A edge function troca o codigo por token e salva
+- O usuario e redirecionado de volta para a pagina correta (funciona tanto no preview quanto em producao)
