@@ -1,18 +1,32 @@
 
 
-## Simplificar documentacao Eduzz: remover mencoes ao Orbita
+## Corrigir campo de credencial Eduzz: "API Key" para "Token Pessoal"
 
 ### Problema
-O tutorial da Eduzz ainda menciona o Orbita em varios lugares (avisos, troubleshooting, FAQ), o que confunde os usuarios. O usuario quer que o tutorial mostre **apenas** o metodo do Console Eduzz, sem referencias ao Orbita.
+Quando o usuario cria um app no Console Eduzz, ele recebe um **Client ID** e um **Token Pessoal**. Porem, o formulario do MetrikaPRO mostra apenas um campo chamado "API Key", o que confunde o usuario -- ele nao sabe qual dos dois colar.
 
-### Alteracoes no arquivo `src/components/docs/EduzzTutorial.tsx`
+### Solucao
+Renomear o campo no formulario de "API Key" para **"Token Pessoal"** e adicionar um placeholder explicativo. Nao e necessario adicionar o campo Client ID, pois a edge function usa apenas o token Bearer.
 
-1. **Remover o WarningCard** na introducao que menciona "A API Key do painel Orbita nao funciona"
-2. **Remover o card de troubleshooting** "Token invalido ou expirado" que fala sobre Orbita como causa
-3. **Remover a pergunta FAQ** "Posso usar a API Key do Orbita?" 
-4. **Simplificar a introducao** para focar apenas no Token Pessoal do Console, sem mencionar alternativas que nao funcionam
-5. Manter o tutorial limpo com apenas os 4 passos do Console Eduzz
+### Alteracao
+
+**Arquivo: `src/components/integrations/SalesIntegrationCard.tsx`** (linhas 65-72)
+
+Alterar a configuracao do Eduzz de:
+```
+fields: [
+  { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
+],
+```
+
+Para:
+```
+fields: [
+  { key: 'api_key', label: 'Token Pessoal (Console Eduzz)', type: 'password', sensitive: true },
+],
+```
+
+O `key` permanece `api_key` para manter compatibilidade com credenciais ja salvas e com a edge function. Apenas o `label` visivel ao usuario muda.
 
 ### Resultado
-Tutorial direto e limpo, mostrando apenas o caminho correto: Console Eduzz > Meus Aplicativos > Token Pessoal. Sem confusao com Orbita.
-
+O usuario vera "Token Pessoal (Console Eduzz)" no formulario, deixando claro que deve colar o token gerado no Console -- nao o Client ID.
