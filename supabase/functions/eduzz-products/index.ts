@@ -85,15 +85,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { api_key } = integration.credentials as { api_key: string };
+    const creds = integration.credentials as { api_key?: string; client_secret?: string; client_id?: string };
+    // Support both legacy (api_key) and new (client_secret) credential formats
+    const bearerToken = creds.client_secret || creds.api_key;
+    
+    if (!bearerToken) {
+      return new Response(
+        JSON.stringify({ error: 'Token não encontrado nas credenciais', products: [] }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Debug: log token prefix to help diagnose auth issues
-    const tokenPrefix = api_key ? api_key.substring(0, 10) : 'EMPTY';
+    const tokenPrefix = bearerToken.substring(0, 10);
     console.log(`Fetching Eduzz products with token starting: ${tokenPrefix}...`);
 
     const productsResponse = await fetch('https://api.eduzz.com/myeduzz/v1/products', {
       headers: {
-        'Authorization': `Bearer ${api_key}`,
+        'Authorization': `Bearer ${bearerToken}`,
         'Accept': 'application/json',
       },
     });

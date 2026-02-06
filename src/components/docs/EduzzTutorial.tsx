@@ -99,7 +99,7 @@ export function EduzzTutorial() {
               <li>Acesse o MetrikaPRO e vá para seu projeto</li>
               <li>Clique em <strong>"Editar"</strong></li>
               <li>Na seção <strong>"Integrações de Vendas"</strong>, expanda <strong>"Eduzz"</strong></li>
-              <li>Cole o <strong>Token Pessoal</strong> no campo <strong>"API Key"</strong></li>
+              <li>Cole o <strong>Client ID</strong> e o <strong>Client Secret</strong> nos campos correspondentes</li>
               <li>Clique em <strong>"Salvar Integração"</strong></li>
             </ol>
           </StepSection>
