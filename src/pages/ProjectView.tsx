@@ -15,7 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useMetricsCache } from '@/hooks/useMetricsCache';
 
 import { KpiGridSkeleton, FunnelSectionSkeleton, SettingsCardSkeleton } from '@/components/skeletons';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2, Shield } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,7 +29,7 @@ const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
 
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -94,7 +95,13 @@ const parseCurrencyInput = (value: string): number => {
       if (isUUID(id!)) {
         query = query.eq('id', id);
       } else {
-        query = query.eq('slug', id).eq('user_id', user!.id);
+        // For slug lookup, only filter by user_id if NOT admin
+        // Admins can access any project via RLS
+        if (!isAdmin) {
+          query = query.eq('slug', id).eq('user_id', user!.id);
+        } else {
+          query = query.eq('slug', id);
+        }
       }
       
       const { data, error } = await query.single();
@@ -102,6 +109,24 @@ const parseCurrencyInput = (value: string): number => {
       return data;
     },
     enabled: !!user && !!id,
+  });
+
+  // Detect if admin is viewing another user's project
+  const isViewingAsAdmin = project?.user_id !== user?.id && isAdmin;
+
+  // Fetch owner profile when viewing as admin
+  const { data: ownerProfile } = useQuery({
+    queryKey: ['owner-profile', project?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('user_id', project!.user_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: isViewingAsAdmin && !!project?.user_id,
   });
 
   // Sync editable fields when project data loads
@@ -708,20 +733,37 @@ const parseCurrencyInput = (value: string): number => {
                   <Settings className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {/* Hide delete button when admin is viewing another user's project */}
+              {!isViewingAsAdmin && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        {/* Admin Mode Banner */}
+        {isViewingAsAdmin && (
+          <Alert className="mb-6 border-primary/50 bg-primary/10">
+            <Shield className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-foreground">
+              <span className="font-medium">Modo Administrador</span> — Visualizando projeto de{' '}
+              <span className="font-semibold">{ownerProfile?.full_name || ownerProfile?.email || 'outro usuário'}</span>
+              {ownerProfile?.email && ownerProfile?.full_name && (
+                <span className="text-muted-foreground ml-1">({ownerProfile.email})</span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Project Settings - Editable Fields - Visible only for specific user */}
         {user?.id === SETTINGS_CARD_USER_ID && (
         <Card className="mb-6">
