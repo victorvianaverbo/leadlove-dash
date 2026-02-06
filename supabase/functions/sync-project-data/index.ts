@@ -1085,15 +1085,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch project
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', project_id)
+    // Check if user is admin
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('role')
       .eq('user_id', userId)
+      .eq('role', 'admin')
       .single();
+    
+    const isAdmin = !!adminRole;
+
+    // Fetch project - admins can access any project, regular users only their own
+    let projectQuery = supabase.from('projects').select('*').eq('id', project_id);
+    
+    if (!isAdmin) {
+      projectQuery = projectQuery.eq('user_id', userId);
+    }
+    
+    const { data: project, error: projectError } = await projectQuery.single();
 
     if (projectError || !project) {
+      console.error('Project lookup failed:', projectError?.message, { project_id, userId, isAdmin });
       return new Response(
         JSON.stringify({ error: 'Project not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1146,6 +1158,9 @@ Deno.serve(async (req) => {
     console.log('\n>>> STARTING OPTIMIZED PARALLEL SYNC <<<\n');
     const startTime = Date.now();
 
+    // Use the project owner's ID for sales/ad_spend records (important for admin syncs)
+    const projectOwnerId = project.user_id;
+
     // Build array of sync promises (only for active integrations with products)
     const syncPromises: Promise<SyncResult | { records: any[]; source: string; error?: string }>[] = [];
 
@@ -1155,7 +1170,7 @@ Deno.serve(async (req) => {
           kiwifyIntegration.credentials as any,
           project.kiwify_product_ids,
           project.id,
-          userId,
+          projectOwnerId,
           syncStartDate,
           ticketPrice
         )
@@ -1168,7 +1183,7 @@ Deno.serve(async (req) => {
           hotmartIntegration.credentials as any,
           project.hotmart_product_ids,
           project.id,
-          userId,
+          projectOwnerId,
           syncStartDate,
           nowBrasilia
         )
@@ -1181,7 +1196,7 @@ Deno.serve(async (req) => {
           guruIntegration.credentials as any,
           project.guru_product_ids,
           project.id,
-          userId,
+          projectOwnerId,
           syncStartDate
         )
       );
@@ -1193,7 +1208,7 @@ Deno.serve(async (req) => {
           eduzzIntegration.credentials as any,
           project.eduzz_product_ids,
           project.id,
-          userId,
+          projectOwnerId,
           syncStartDate
         )
       );
@@ -1205,7 +1220,7 @@ Deno.serve(async (req) => {
           metaIntegration.credentials as any,
           project.meta_campaign_ids,
           project.id,
-          userId,
+          projectOwnerId,
           syncStartDate
         )
       );
