@@ -784,20 +784,42 @@ async function syncMetaAds(
     // Fetch daily_budget AND effective_status for each campaign in parallel
     const budgetPromises = campaignIds.map(async (campaignId) => {
       try {
+        // 1. Try campaign-level budget (CBO)
         const campaignResponse = await fetch(
           `https://graph.facebook.com/v18.0/${campaignId}?fields=daily_budget,effective_status&access_token=${credentials.access_token}`
         );
         if (campaignResponse.ok) {
           const campaignData = await campaignResponse.json();
-          
           const isActive = campaignData.effective_status === 'ACTIVE';
-          const budget = isActive && campaignData.daily_budget 
-            ? parseFloat(campaignData.daily_budget) / 100 
-            : 0;
           
-          console.log(`[META] Campaign ${campaignId}: status=${campaignData.effective_status}, budget=${budget}`);
+          if (!isActive) {
+            console.log(`[META] Campaign ${campaignId}: status=${campaignData.effective_status}, skipping budget`);
+            return { campaignId, budget: 0 };
+          }
           
-          return { campaignId, budget };
+          // If campaign has daily_budget (CBO mode), use it
+          if (campaignData.daily_budget && parseFloat(campaignData.daily_budget) > 0) {
+            const budget = parseFloat(campaignData.daily_budget) / 100;
+            console.log(`[META] Campaign ${campaignId}: CBO budget=${budget}`);
+            return { campaignId, budget };
+          }
+          
+          // 2. No campaign budget = ABO mode. Fetch adset budgets
+          const adsetsResponse = await fetch(
+            `https://graph.facebook.com/v18.0/${campaignId}/adsets?fields=daily_budget,effective_status&limit=100&access_token=${credentials.access_token}`
+          );
+          if (adsetsResponse.ok) {
+            const adsetsData = await adsetsResponse.json();
+            const adsets = adsetsData.data || [];
+            let totalAdsetBudget = 0;
+            for (const adset of adsets) {
+              if (adset.effective_status === 'ACTIVE' && adset.daily_budget) {
+                totalAdsetBudget += parseFloat(adset.daily_budget) / 100;
+              }
+            }
+            console.log(`[META] Campaign ${campaignId}: ABO budget=${totalAdsetBudget} (${adsets.length} adsets)`);
+            return { campaignId, budget: totalAdsetBudget };
+          }
         }
       } catch (e) {
         console.error(`[META] Failed to fetch budget for campaign ${campaignId}`);
