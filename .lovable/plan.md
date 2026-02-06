@@ -1,31 +1,33 @@
 
+## Corrigir erro "Erro ao atualizar usuario" no painel admin
 
-## Corrigir "Acoes Recomendadas" no Dashboard Principal e Publico
-
-### Problema identificado
-
-**Dashboard Principal (ProjectView)**: A secao "Acoes Recomendadas da IA" nao aparece porque a politica de seguranca (RLS) da tabela `daily_reports` so permite que o **dono** do projeto veja os relatorios. Quando um admin acessa o projeto de outro usuario, a query retorna vazio.
-
-**Dashboard Publico (PublicDashboard)**: A secao funciona para visitantes anonimos (projetos publicos), mas pode falhar silenciosamente para usuarios logados que nao sao donos.
+### Problema
+As requisicoes PUT para a edge function `admin-users` falham com "Failed to fetch" porque o relay de edge functions do Supabase nao suporta o metodo PUT. A edge function ja tem logica para tratar POST com `user_id` no body como operacao de update (linhas 244-250), mas o frontend esta enviando PUT.
 
 ### Solucao
+Alterar o `handleSaveUser` em `src/pages/Admin.tsx` para usar `method: "POST"` ao inves de `method: "PUT"`.
 
-**1. Adicionar politica RLS para admins na tabela `daily_reports`**
+### Alteracao
 
-Criar nova politica que permite admins lerem relatorios de qualquer projeto:
+**Arquivo: `src/pages/Admin.tsx` (~linha 113)**
 
-```text
-Policy: "Admins can view all reports"
-Operacao: SELECT
-Condicao: EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+Trocar:
+```typescript
+const { error } = await supabase.functions.invoke("admin-users", {
+  method: "PUT",
+  headers: { Authorization: `Bearer ${session.access_token}` },
+  body: { ... },
+});
 ```
 
-**2. Corrigir uso de `.single()` no PublicDashboard**
+Por:
+```typescript
+const { error } = await supabase.functions.invoke("admin-users", {
+  headers: { Authorization: `Bearer ${session.access_token}` },
+  body: { ... },
+});
+```
 
-A query do `latestReport` no PublicDashboard usa `.single()` que pode gerar erro quando nao ha dados. Trocar para `.maybeSingle()` para consistencia (igual ao ProjectView que ja usa `.maybeSingle()`).
+Remover o `method: "PUT"` e deixar o padrao POST. A edge function ja detecta que o body contem `user_id` e roteia para a funcao `handlePut` automaticamente.
 
-### Resultado esperado
-
-- Admin vera as acoes recomendadas ao acessar projetos de outros usuarios
-- Dashboard publico continuara funcionando normalmente para visitantes
-- Nenhuma mudanca visual - apenas correcao de acesso aos dados
+Nenhuma outra alteracao necessaria - a edge function ja esta preparada para isso.
