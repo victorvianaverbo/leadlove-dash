@@ -1,51 +1,31 @@
 
-## Reestruturar Dashboard Publico + Adicionar Acoes Recomendadas no Dashboard Principal
 
-### 1. PublicDashboard.tsx - Reorganizar secoes
+## Corrigir "Acoes Recomendadas" no Dashboard Principal e Publico
 
-**Remover** a secao "Analise dos Ultimos 3 Dias" (linhas 512-576) com metricas medias e resumo da IA.
+### Problema identificado
 
-**Adicionar** secao "Ontem" entre Hoje e Acumulado:
-- Nova query `public-sales-yesterday` buscando vendas com `gte(brasiliaToUTC(yesterday))` e `lt(brasiliaToUTC(today))`
-- Nova query `public-ad-spend-yesterday` buscando gastos com `eq('date', yesterday)`
-- Calcular `yesterdayRevenue`, `yesterdaySpend`, `yesterdayRoas`, `yesterdayCpa`, `yesterdaySalesCount`
-- Card com borda neutra (`border-border`), 5 metricas no mesmo grid do card de hoje
+**Dashboard Principal (ProjectView)**: A secao "Acoes Recomendadas da IA" nao aparece porque a politica de seguranca (RLS) da tabela `daily_reports` so permite que o **dono** do projeto veja os relatorios. Quando um admin acessa o projeto de outro usuario, a query retorna vazio.
 
-**Layout final:**
-1. Resumo de Hoje (sem alteracoes)
-2. Ontem (novo)
-3. Acumulado do Periodo (sem alteracoes)
-4. Acoes Recomendadas (sem alteracoes, continua usando dados dos 3 dias do relatorio da IA)
+**Dashboard Publico (PublicDashboard)**: A secao funciona para visitantes anonimos (projetos publicos), mas pode falhar silenciosamente para usuarios logados que nao sao donos.
 
-### 2. ProjectView.tsx - Adicionar Acoes Recomendadas
+### Solucao
 
-**Adicionar query** para buscar o `daily_report` mais recente do projeto (igual ao PublicDashboard).
+**1. Adicionar politica RLS para admins na tabela `daily_reports`**
 
-**Adicionar secao** apos o Funil de Midia (antes do DeleteProjectDialog, ~linha 1024) com:
-- Card com destaque visual: borda `border-primary/30`, fundo `bg-gradient-to-r from-primary/5 to-transparent`
-- Header com icone Sparkles roxo, titulo "Acoes Recomendadas da IA" e badge "Diferencial MetrikaPRO"
-- Subtitulo: "Baseado na analise automatica dos ultimos 3 dias do seu funil"
-- Lista de acoes recomendadas no mesmo formato do PublicDashboard (metrica + benchmark, prioridade, acao, motivo)
-- Componentes `PriorityBadge` e layout de acao reutilizados (copiados inline no arquivo)
-- Se nao houver relatorio, mostrar card convidando a sincronizar primeiro
+Criar nova politica que permite admins lerem relatorios de qualquer projeto:
 
-### Detalhes tecnicos
-
-**PublicDashboard - Queries de ontem:**
 ```text
-sales: .gte('sale_date', brasiliaToUTC(yesterday)).lt('sale_date', brasiliaToUTC(today))
-ad_spend: .eq('date', yesterday)
+Policy: "Admins can view all reports"
+Operacao: SELECT
+Condicao: EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
 ```
 
-**ProjectView - Query do relatorio:**
-```text
-supabase.from('daily_reports').select('*')
-  .eq('project_id', projectId)
-  .order('report_date', { ascending: false })
-  .limit(1).single()
-```
+**2. Corrigir uso de `.single()` no PublicDashboard**
 
-**Destaque visual no ProjectView** para reforcar o diferencial da ferramenta:
-- Gradiente roxo sutil no card
-- Badge "IA" ou "Diferencial MetrikaPRO" no header
-- Icone Sparkles animado com `text-primary`
+A query do `latestReport` no PublicDashboard usa `.single()` que pode gerar erro quando nao ha dados. Trocar para `.maybeSingle()` para consistencia (igual ao ProjectView que ja usa `.maybeSingle()`).
+
+### Resultado esperado
+
+- Admin vera as acoes recomendadas ao acessar projetos de outros usuarios
+- Dashboard publico continuara funcionando normalmente para visitantes
+- Nenhuma mudanca visual - apenas correcao de acesso aos dados
