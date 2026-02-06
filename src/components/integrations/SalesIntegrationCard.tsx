@@ -66,7 +66,7 @@ const integrationConfig = {
     name: 'Eduzz',
     description: 'Conecte a conta Eduzz para importar vendas',
     fields: [
-      { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
+      { key: 'api_key', label: 'Token Pessoal (Console Eduzz)', type: 'password', sensitive: true },
     ],
     productsEndpoint: 'eduzz-products',
   },
