@@ -1,87 +1,186 @@
 
-# Plano: Corrigir Erro de Constraint em Integrações Desativadas
+# Plano: Visão Administrativa de Todos os Projetos
 
-## Diagnóstico
+## Objetivo
+Criar uma página administrativa em `/admin/projects` (rota escondida, sem botão no frontend) que permite visualizar e acessar todos os projetos de todos os clientes para suporte técnico.
 
-O erro **"duplicate key value violates unique constraint 'integrations_project_type_unique'"** ocorre no componente `MetaAdsIntegrationCard.tsx`.
+---
 
-### Causa Raiz
+## Acesso
+- **Login:** Seu login atual de administrador
+- **Rota:** `/admin/projects` (acessar diretamente pela URL)
+- **Sem botão no frontend** - rota oculta para acesso direto
 
-No `MetaAdsIntegrationCard.tsx` (linha 80), a lógica de save usa:
+---
 
-```typescript
-if (integration?.is_active) {
-  // UPDATE - só entra aqui se is_active === true
-} else {
-  // INSERT - entra aqui quando is_active === false
+## Arquitetura
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  /admin/projects (rota escondida)                            │
+├──────────────────────────────────────────────────────────────┤
+│  Buscar: [_______________]  Plataforma: [▼ Todas]            │
+├──────────────────────────────────────────────────────────────┤
+│  Projeto        │ Cliente        │ Integrações │ Ações       │
+│  ─────────────────────────────────────────────────────────── │
+│  Curso XYZ      │ Charles Silva  │ Kiwify,Meta │ [Acessar]   │
+│  Plataforma IRD │ João           │ Hotmart     │ [Acessar]   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Fase 1: Atualizar Políticas RLS
+
+Adicionar políticas que permitem admins visualizarem dados de qualquer projeto:
+
+**Tabela projects:**
+```sql
+CREATE POLICY "Admins can view all projects"
+ON public.projects FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+```
+
+**Tabela sales:**
+```sql
+CREATE POLICY "Admins can view all sales"
+ON public.sales FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+```
+
+**Tabela ad_spend:**
+```sql
+CREATE POLICY "Admins can view all ad_spend"
+ON public.ad_spend FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+```
+
+**Tabela integrations:**
+```sql
+CREATE POLICY "Admins can view all integrations"
+ON public.integrations FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+
+CREATE POLICY "Admins can update all integrations"
+ON public.integrations FOR UPDATE
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+```
+
+A função `has_role()` já existe no projeto e usa `SECURITY DEFINER` para evitar recursão RLS.
+
+---
+
+## Fase 2: Criar Edge Function `admin-projects`
+
+**Arquivo:** `supabase/functions/admin-projects/index.ts`
+
+Funcionalidades:
+- Listar todos os projetos com dados do proprietário (nome, email)
+- Incluir integrações ativas de cada projeto
+- Filtrar por nome do projeto ou cliente
+
+Retorno:
+```json
+{
+  "projects": [
+    {
+      "id": "uuid",
+      "name": "Curso XYZ",
+      "slug": "curso-xyz",
+      "created_at": "2026-01-15",
+      "owner": {
+        "user_id": "uuid",
+        "full_name": "Charles Silva",
+        "email": "charles@email.com"
+      },
+      "integrations": ["kiwify", "meta_ads"]
+    }
+  ]
 }
 ```
 
-Quando o cliente Charles **desconecta** o Meta Ads:
-1. A integração é marcada como `is_active: false`
-2. Ao tentar **reconectar**, o código verifica `integration?.is_active` que é `false`
-3. Entra no bloco `else` e tenta fazer INSERT
-4. O INSERT falha porque já existe registro com `(project_id, type)`
+---
 
-### Comparação
+## Fase 3: Criar Página AdminProjects
 
-| Componente | Condição | Comportamento |
-|------------|----------|---------------|
-| `SalesIntegrationCard` | `if (integration)` | Correto - UPDATE se existe |
-| `MetaAdsIntegrationCard` | `if (integration?.is_active)` | Errado - INSERT se desativado |
+**Arquivo:** `src/pages/AdminProjects.tsx`
+
+Funcionalidades:
+- Listagem de todos os projetos com paginação
+- Busca por nome do projeto ou cliente
+- Coluna com nome e email do proprietário
+- Coluna com integrações ativas (badges)
+- Botão "Acessar" que abre `/projects/:id`
+- Botão "Sincronizar" para forçar sync de dados
+- Verificação de admin igual ao `/admin` existente
+
+Layout similar ao `Admin.tsx` existente:
+- Header com título e voltar
+- Card com tabela de projetos
+- Campo de busca
+- Design consistente
 
 ---
 
-## Solução
+## Fase 4: Atualizar ProjectView para Modo Admin
 
-### Arquivo: `src/components/integrations/MetaAdsIntegrationCard.tsx`
+**Arquivo:** `src/pages/ProjectView.tsx`
 
-Alterar a condição na linha 80 de:
-```typescript
-if (integration?.is_active) {
-```
-
-Para:
-```typescript
-if (integration) {
-```
-
-Isso garante que:
-- Se a integração existe (ativa ou não) → faz UPDATE
-- Se não existe → faz INSERT
-
-### Ajustes Adicionais
-
-A validação de campos também precisa ser ajustada para reconectar integrações desativadas:
+Modificações:
+- Detectar se admin está visualizando projeto de outro usuário
+- Mostrar banner "Visualizando como Admin - Cliente: [nome]"
+- Permitir sincronização e debug
+- Esconder botão de exclusão (segurança)
+- Permitir editar integrações do cliente
 
 ```typescript
-// ANTES (linha 98-101)
-} else {
-  if (!accessToken || !adAccountId) {
-    throw new Error("Preencha todas as credenciais");
-  }
-  
-// DEPOIS - validar sempre que não tiver integração OU integração desativada
-} else {
-  if (!accessToken || (!adAccountId && !integration)) {
-    throw new Error("Preencha todas as credenciais");
-  }
+const isViewingAsAdmin = project?.user_id !== user?.id && isAdmin;
 ```
 
 ---
 
-## Impacto
+## Fase 5: Adicionar Rota
 
-- Corrige o erro do cliente Charles
-- Permite reconectar integrações que foram desconectadas
-- Mantém compatibilidade com fluxo de primeira conexão
+**Arquivo:** `src/App.tsx`
+
+Adicionar a rota escondida:
+```typescript
+<Route path="/admin/projects" element={<AdminProjects />} />
+```
 
 ---
 
-## Resumo Técnico
+## Resumo das Alterações
 
-| Mudança | Linha | De | Para |
-|---------|-------|----|----|
-| Condição principal | 80 | `integration?.is_active` | `integration` |
-| Validação adAccountId | 99 | `!adAccountId` | `!adAccountId && !integration` |
-| Bloco UPDATE | 87-97 | Credenciais existentes se is_active | Credenciais existentes se integration |
+| Componente | Ação | Descrição |
+|------------|------|-----------|
+| RLS Policies | Migração SQL | 5 novas policies para role admin |
+| `admin-projects/index.ts` | Criar | Edge function para listar projetos |
+| `AdminProjects.tsx` | Criar | Página de gestão de projetos |
+| `ProjectView.tsx` | Editar | Modo admin com banner e permissões |
+| `App.tsx` | Editar | Adicionar rota `/admin/projects` |
+| `AuthContext.tsx` | Já existe | `isAdmin` já disponível no contexto |
+
+---
+
+## Segurança
+
+- Verificação de admin via `has_role()` (SECURITY DEFINER)
+- RLS policies garantem isolamento de usuários normais
+- Ações destrutivas (DELETE) bloqueadas no modo admin
+- Edge function valida JWT antes de qualquer operação
+
+---
+
+## Fluxo de Uso
+
+1. Acesse `https://metrikapro.com.br/admin/projects`
+2. Busque pelo nome do cliente (ex: "Charles")
+3. Clique em "Acessar" no projeto desejado
+4. Visualize e corrija problemas (integrações, sync, etc.)
+5. Banner indica que está em modo admin
