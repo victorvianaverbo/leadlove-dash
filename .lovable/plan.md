@@ -1,38 +1,33 @@
 
 
-## Corrigir erro "invalid input syntax for type uuid" no ProjectView
+## Criar Edge Function `eduzz-products`
 
 ### Problema
-Quando o usuario acessa um projeto pela URL com slug (ex: `/projects/emi-terapeuta`), o sistema usa o slug como se fosse UUID em queries de `sales`, `ad_spend`, `daily_reports`, etc. Isso gera dezenas de erros no banco a cada acesso.
+A integração Eduzz não funciona porque a edge function `eduzz-products` não existe. Quando o usuário conecta a Eduzz e tenta ver os produtos disponíveis, o sistema tenta chamar essa função e falha com erro 404.
 
-O mesmo problema existe no `ProjectEdit.tsx`.
+A sincronização de vendas já tem o código Eduzz implementado em `sync-project-data`, mas falta a função que lista os produtos para o usuário selecionar quais quer monitorar.
 
-### Causa raiz
-- `ProjectView.tsx` recebe `id` da URL via `useParams` (que pode ser UUID ou slug)
-- A query de projeto resolve corretamente (busca por slug quando nao e UUID)
-- Porem, queries subsequentes usam `id` da URL diretamente como `project_id`, em vez de usar `project.id` (o UUID real)
+### Solução
 
-### Correcao
+Criar a edge function `supabase/functions/eduzz-products/index.ts` seguindo o mesmo padrão das outras funções de produtos (kiwify-products, hotmart-products, guru-products):
 
-**Arquivo: `src/pages/ProjectView.tsx`**
+1. Autenticar o usuário via JWT
+2. Buscar credenciais da integração Eduzz no banco (campo `api_key`)
+3. Chamar a API Eduzz para listar produtos: `https://api.eduzz.com/myeduzz/v1/products`
+4. Retornar lista de produtos com `id` e `name`
 
-1. Criar variavel `projectId` derivada do projeto carregado:
-```typescript
-const projectId = project?.id;  // UUID real, nao o slug da URL
-```
+### Arquivo a criar
+- `supabase/functions/eduzz-products/index.ts`
 
-2. Garantir que TODAS as queries que usam `project_id` utilizem `projectId` (o UUID real do projeto) em vez de `id` (parametro da URL que pode ser slug).
+### Arquivo a atualizar
+- `supabase/config.toml` - adicionar entrada `[functions.eduzz-products]` com `verify_jwt = false`
 
-3. Verificar se queries de `integrations`, `sales`, `ad_spend`, `daily_reports` estao usando o `project.id` correto.
+### Detalhes técnicos
 
-**Arquivo: `src/pages/ProjectEdit.tsx`**
+A função seguirá o mesmo padrão de autenticação das outras (kiwify-products como referência):
+- Recebe `project_id` no body
+- Valida que o usuário é dono do projeto
+- Busca credenciais da integração tipo `eduzz`
+- Chama `GET https://api.eduzz.com/myeduzz/v1/products` com header `Authorization: Bearer {api_key}`
+- Retorna `{ products: [{ id, name }] }`
 
-1. Mesma correcao: garantir que queries usem `project.id` em vez do `id` da URL.
-
-### Verificacao
-
-Apos a correcao, os erros `invalid input syntax for type uuid: "emi-terapeuta"` devem parar completamente no banco de dados.
-
-### Arquivos alterados
-- `src/pages/ProjectView.tsx` - usar `project.id` em vez de `id` da URL nas queries
-- `src/pages/ProjectEdit.tsx` - mesma correcao
