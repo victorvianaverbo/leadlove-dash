@@ -129,12 +129,18 @@ async function handleGet(supabaseAdmin: ReturnType<typeof createClient>) {
 }
 
 async function handlePut(
-  req: Request,
+  body: Record<string, unknown>,
   supabaseAdmin: ReturnType<typeof createClient>,
   adminUserId: string
 ) {
-  const body = await req.json();
-  const { user_id, email, password, is_admin, extra_projects, notes } = body;
+  const { user_id, email, password, is_admin, extra_projects, notes } = body as {
+    user_id: string;
+    email?: string;
+    password?: string;
+    is_admin?: boolean;
+    extra_projects?: number;
+    notes?: string;
+  };
 
   if (!user_id) throw new Error("user_id is required");
 
@@ -220,7 +226,30 @@ serve(async (req) => {
   try {
     const { supabaseAdmin, adminUser } = await verifyAdmin(req);
 
-    if (req.method === "GET") {
+    // GET or POST without body = list users
+    if (req.method === "GET" || req.method === "POST") {
+      // Check if it's a PUT-like operation (has body with user_id)
+      let body = null;
+      if (req.method === "POST") {
+        try {
+          const text = await req.clone().text();
+          if (text) {
+            body = JSON.parse(text);
+          }
+        } catch {
+          // No body or invalid JSON, treat as list request
+        }
+      }
+
+      // If POST has user_id in body, treat as update operation
+      if (body?.user_id) {
+        const result = await handlePut(body, supabaseAdmin, adminUser.id);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Otherwise list users
       const users = await handleGet(supabaseAdmin);
       return new Response(JSON.stringify({ users }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -228,7 +257,8 @@ serve(async (req) => {
     }
 
     if (req.method === "PUT") {
-      const result = await handlePut(req, supabaseAdmin, adminUser.id);
+      const body = await req.json();
+      const result = await handlePut(body, supabaseAdmin, adminUser.id);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
