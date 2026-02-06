@@ -20,11 +20,13 @@ async function verifyAdmin(req: Request) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) throw new Error("No authorization header");
 
+  const token = authHeader.replace("Bearer ", "");
+
   const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: authHeader } },
   });
 
-  const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
   if (userError || !user) throw new Error("Unauthorized");
 
   logStep("Checking admin role", { userId: user.id });
