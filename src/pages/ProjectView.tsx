@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard, FunnelCard } from '@/components/ui/kpi-card';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMetricsCache } from '@/hooks/useMetricsCache';
 
 import { KpiGridSkeleton, FunnelSectionSkeleton, SettingsCardSkeleton } from '@/components/skeletons';
-import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2, Shield } from 'lucide-react';
+import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2, Shield, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
 import { format } from 'date-fns';
@@ -109,6 +110,24 @@ const parseCurrencyInput = (value: string): number => {
       return data;
     },
     enabled: !!user && !!id,
+  });
+
+  // Fetch latest daily report for AI recommendations
+  const { data: latestDailyReport } = useQuery({
+    queryKey: ['daily-report', project?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('daily_reports')
+        .select('*')
+        .eq('project_id', project!.id)
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!project?.id,
   });
 
   // Detect if admin is viewing another user's project
@@ -307,6 +326,7 @@ const parseCurrencyInput = (value: string): number => {
       queryClient.invalidateQueries({ queryKey: ['sales', projectId] });
       queryClient.invalidateQueries({ queryKey: ['ad_spend', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['daily-report', project?.id] });
       
       const salesCount = data?.salesSynced || 0;
       const adSpendCount = data?.adSpendSynced || 0;
@@ -1022,6 +1042,66 @@ const parseCurrencyInput = (value: string): number => {
         </div>
         )}
 
+        {/* Ações Recomendadas da IA */}
+        {latestDailyReport?.actions && Array.isArray(latestDailyReport.actions) && (latestDailyReport.actions as any[]).length > 0 ? (
+          <Card className="mb-6 sm:mb-8 border-primary/30 bg-gradient-to-r from-primary/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-primary/10 rounded-lg">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <CardTitle className="text-base sm:text-lg">Ações Recomendadas da IA</CardTitle>
+                  <Badge variant="secondary" className="text-xs">Diferencial MetrikaPRO</Badge>
+                </div>
+              </div>
+              <CardDescription>Baseado na análise automática dos últimos 3 dias do seu funil</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {(latestDailyReport.actions as any[]).map((item: any, index: number) => (
+                  <div key={index} className="bg-card rounded-lg p-4 border space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      {item.metric_label && item.metric_value ? (
+                        <Badge variant="secondary" className="text-xs font-medium">
+                          {item.metric_label}: {item.metric_value} {item.benchmark && `(meta: ${item.benchmark})`}
+                        </Badge>
+                      ) : (
+                        <div />
+                      )}
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          item.priority?.toLowerCase() === 'alta' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                          item.priority?.toLowerCase() === 'média' || item.priority?.toLowerCase() === 'media' ? 'bg-warning/10 text-warning border-warning/20' :
+                          'bg-muted text-muted-foreground border-muted'
+                        }
+                      >
+                        {item.priority}
+                      </Badge>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{item.action}</span>
+                    </div>
+                    {item.reason && (
+                      <p className="text-xs text-muted-foreground pl-6">{item.reason}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : !latestDailyReport && !salesLoading && !adSpendLoading ? (
+          <Card className="mb-6 sm:mb-8 border-dashed border-primary/30">
+            <CardContent className="py-6 text-center">
+              <Sparkles className="h-8 w-8 text-primary/40 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Sincronize os dados do projeto para gerar ações recomendadas pela IA.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <DeleteProjectDialog
           projectName={project?.name || ''}
