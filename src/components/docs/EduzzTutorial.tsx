@@ -27,15 +27,11 @@ export function EduzzTutorial() {
       {/* Introduction */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Introdução</h2>
-        <p className="text-muted-foreground leading-relaxed mb-4">
+        <p className="text-muted-foreground leading-relaxed">
           O MetrikaPRO utiliza a API da Eduzz para listar seus produtos e sincronizar vendas. 
           Para isso, você precisa de um <strong>Token Pessoal</strong> gerado no{' '}
           <strong>Console Eduzz</strong> (<code className="bg-muted px-1.5 py-0.5 rounded text-sm">console.eduzz.com</code>).
         </p>
-        <WarningCard>
-          <strong>Importante:</strong> A API Key do painel Órbita <strong>não funciona</strong> para 
-          a integração com o MetrikaPRO. Você precisa usar o <strong>Token Pessoal do Console Eduzz</strong>.
-        </WarningCard>
       </section>
 
       {/* Method: Personal Token */}
@@ -128,24 +124,6 @@ export function EduzzTutorial() {
         <div className="space-y-6">
           <Card>
             <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-3 text-destructive">Erro: "Token inválido ou expirado"</h3>
-              <p className="text-sm text-muted-foreground mb-3"><strong>Causa mais comum:</strong></p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Você está usando a <strong>API Key do Órbita</strong> em vez do <strong>Token Pessoal do Console</strong>. 
-                A API Key do Órbita não funciona com os endpoints utilizados pelo MetrikaPRO.
-              </p>
-              <p className="text-sm text-muted-foreground mb-3"><strong>Solução:</strong></p>
-              <ol className="list-decimal list-inside text-muted-foreground text-sm space-y-1">
-                <li>Acesse <a href="https://console.eduzz.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">console.eduzz.com</a></li>
-                <li>Crie um aplicativo com os escopos corretos (veja passo 2 acima)</li>
-                <li>Copie o <strong>Token Pessoal</strong></li>
-                <li>Atualize no MetrikaPRO</li>
-              </ol>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
               <h3 className="text-lg font-semibold mb-3 text-destructive">Erro: "Sem Produtos Encontrados"</h3>
               <p className="text-sm text-muted-foreground mb-3"><strong>Possíveis causas:</strong></p>
               <ul className="list-disc list-inside text-muted-foreground text-sm mb-4">
@@ -173,13 +151,6 @@ export function EduzzTutorial() {
             <p className="text-muted-foreground text-sm">
               Não, o Token Pessoal do Console Eduzz não expira. Ele permanece válido até 
               que você o revogue manualmente no Console.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold mb-2">Posso usar a API Key do Órbita?</h3>
-            <p className="text-muted-foreground text-sm">
-              <strong>Não.</strong> A API Key do painel Órbita não é compatível com os endpoints 
-              utilizados pelo MetrikaPRO. Você precisa usar o Token Pessoal do Console Eduzz.
             </p>
           </div>
           <div>
