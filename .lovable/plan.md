@@ -1,49 +1,38 @@
 
-## Corrigir metricas do Dashboard - filtrar por projetos do usuario
+
+## Corrigir erro "invalid input syntax for type uuid" no ProjectView
 
 ### Problema
-As queries de `sales` e `ad_spend` no Dashboard (linhas 163-166) nao filtram por `project_id`. Elas buscam TODOS os registros de TODOS os usuarios do sistema, inflando o faturamento e distorcendo o ROAS.
+Quando o usuario acessa um projeto pela URL com slug (ex: `/projects/emi-terapeuta`), o sistema usa o slug como se fosse UUID em queries de `sales`, `ad_spend`, `daily_reports`, etc. Isso gera dezenas de erros no banco a cada acesso.
 
-Dados reais do Bruno (ultimos 30 dias):
-- CA 01 Sexologo: 88 vendas x R$27 = R$ 2.376 / gasto R$ 1.933
-- Roberley: 1 venda x R$27 = R$ 27 / gasto R$ 464
-- CA 01 Adri: 1 venda x R$27 = R$ 27 / gasto R$ 711
-- Outros projetos: sem vendas/gastos
-- Total correto: ~R$ 2.430 de faturamento
+O mesmo problema existe no `ProjectEdit.tsx`.
 
-O Dashboard mostra R$ 62.628,41 porque esta somando vendas de outros usuarios.
+### Causa raiz
+- `ProjectView.tsx` recebe `id` da URL via `useParams` (que pode ser UUID ou slug)
+- A query de projeto resolve corretamente (busca por slug quando nao e UUID)
+- Porem, queries subsequentes usam `id` da URL diretamente como `project_id`, em vez de usar `project.id` (o UUID real)
 
 ### Correcao
 
-**Arquivo: `src/pages/Dashboard.tsx` (linhas 163-166)**
+**Arquivo: `src/pages/ProjectView.tsx`**
 
-Adicionar filtro `.in('project_id', projectIds)` nas duas queries:
-
+1. Criar variavel `projectId` derivada do projeto carregado:
 ```typescript
-const projectIds = projects.map(p => p.id);
-
-const [salesResult, spendResult] = await Promise.all([
-  supabase.from('sales')
-    .select('project_id, amount, gross_amount')
-    .eq('status', 'paid')
-    .in('project_id', projectIds)
-    .gte('sale_date', dateFilter),
-  supabase.from('ad_spend')
-    .select('project_id, spend')
-    .in('project_id', projectIds)
-    .gte('date', dateFilter)
-]);
+const projectId = project?.id;  // UUID real, nao o slug da URL
 ```
 
-### Sobre o email no Stripe
+2. Garantir que TODAS as queries que usam `project_id` utilizem `projectId` (o UUID real do projeto) em vez de `id` (parametro da URL que pode ser slug).
 
-O codigo de sincronizacao ja foi adicionado na ultima alteracao. Para corrigir o Bruno:
-1. Acessar o painel Admin
-2. Editar o usuario Bruno
-3. Salvar (pode ser sem alterar nada)
-4. A funcao vai detectar o email atual e atualizar no Stripe
+3. Verificar se queries de `integrations`, `sales`, `ad_spend`, `daily_reports` estao usando o `project.id` correto.
 
-Nenhuma alteracao de codigo adicional e necessaria para o Stripe.
+**Arquivo: `src/pages/ProjectEdit.tsx`**
+
+1. Mesma correcao: garantir que queries usem `project.id` em vez do `id` da URL.
+
+### Verificacao
+
+Apos a correcao, os erros `invalid input syntax for type uuid: "emi-terapeuta"` devem parar completamente no banco de dados.
 
 ### Arquivos alterados
-- `src/pages/Dashboard.tsx` - adicionar filtro `.in('project_id', projectIds)` nas queries de sales e ad_spend
+- `src/pages/ProjectView.tsx` - usar `project.id` em vez de `id` da URL nas queries
+- `src/pages/ProjectEdit.tsx` - mesma correcao
