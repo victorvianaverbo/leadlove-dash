@@ -450,7 +450,7 @@ export default function Dashboard() {
                 Seus Projetos
               </h2>
               
-              {!subscribed ? (
+              {!subscribed && (!projects || projects.length === 0) ? (
                 <EmptyState hasSubscription={false} />
               ) : projects?.length === 0 ? (
                 <EmptyState 

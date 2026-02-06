@@ -174,6 +174,35 @@ async function handlePut(
       updatePayload.password = password;
     }
 
+    // Sync email in Stripe before updating auth
+    if (email !== undefined) {
+      try {
+        // Get current email from profiles
+        const { data: currentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("email")
+          .eq("user_id", user_id)
+          .single();
+
+        const oldEmail = currentProfile?.email;
+        if (oldEmail && oldEmail !== email) {
+          const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+          if (stripeKey) {
+            const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+            const customers = await stripe.customers.list({ email: oldEmail, limit: 1 });
+            if (customers.data.length > 0) {
+              await stripe.customers.update(customers.data[0].id, { email });
+              logStep("Stripe customer email updated", { oldEmail, newEmail: email, customerId: customers.data[0].id });
+            } else {
+              logStep("No Stripe customer found for old email", { oldEmail });
+            }
+          }
+        }
+      } catch (stripeError) {
+        logStep("Stripe email sync error (non-fatal)", { error: String(stripeError) });
+      }
+    }
+
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(user_id, updatePayload);
     if (authError) throw new Error(`Failed to update auth user: ${authError.message}`);
 
