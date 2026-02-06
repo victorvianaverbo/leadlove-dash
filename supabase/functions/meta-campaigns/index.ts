@@ -47,13 +47,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify user owns the project before accessing integrations
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', project_id)
+    // Check if user is admin
+    const { data: adminRole } = await supabase
+      .from('user_roles')
+      .select('role')
       .eq('user_id', userId)
-      .single();
+      .eq('role', 'admin')
+      .maybeSingle();
+    const isAdmin = !!adminRole;
+
+    // Verify user owns the project (or is admin)
+    let projectQuery = supabase.from('projects').select('id').eq('id', project_id);
+    if (!isAdmin) {
+      projectQuery = projectQuery.eq('user_id', userId);
+    }
+    const { data: project, error: projectError } = await projectQuery.single();
 
     if (projectError || !project) {
       return new Response(
