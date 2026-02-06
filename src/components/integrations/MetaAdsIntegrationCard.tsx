@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, 
-  Search, ChevronDown, ChevronRight, BookOpen, Copy, Check 
+  Search, ChevronDown, ChevronRight, BookOpen, Copy, Check, Facebook
 } from "lucide-react";
 
 interface Integration {
@@ -43,10 +43,14 @@ export function MetaAdsIntegrationCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const OAUTH_TEST_USER = "ee3515c2-6a17-40b1-971f-34a788b7d2ec";
+  const isOAuthUser = user?.id === OAUTH_TEST_USER;
+
   const [accessToken, setAccessToken] = useState("");
   const [adAccountId, setAdAccountId] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [campaignSearch, setCampaignSearch] = useState("");
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   // Load non-sensitive credentials (strip act_ prefix for display)
   useEffect(() => {
@@ -56,6 +60,28 @@ export function MetaAdsIntegrationCard({
       setAdAccountId(storedId.replace(/^act_/, ""));
     }
   }, [integration]);
+
+  // Handle OAuth redirect result
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthStatus = params.get("meta_oauth");
+    if (oauthStatus === "success") {
+      toast({ title: "Meta Ads conectado via Facebook!" });
+      queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("meta_oauth");
+      window.history.replaceState({}, "", url.toString());
+    } else if (oauthStatus === "error") {
+      const errorMsg = params.get("meta_oauth_error") || "Erro desconhecido";
+      toast({ title: "Erro no OAuth", description: errorMsg, variant: "destructive" });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("meta_oauth");
+      url.searchParams.delete("meta_oauth_error");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
 
   // Fetch campaigns
   const { data: campaignsData, isLoading: campaignsLoading, refetch: refetchCampaigns, isFetching: campaignsRefetching } = useQuery({
@@ -183,6 +209,34 @@ export function MetaAdsIntegrationCard({
     onCampaignsChange([]);
   };
 
+  const handleFacebookLogin = () => {
+    const META_APP_ID = import.meta.env.VITE_SUPABASE_URL 
+      ? "" : ""; // App ID comes from edge function
+    
+    // We'll use the SUPABASE_URL to build the redirect URI
+    const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-oauth-callback`;
+    const state = `${projectId}|${user!.id}`;
+    const scope = "ads_read,ads_management,read_insights";
+    
+    // We need the META_APP_ID from the edge function. Let's fetch it.
+    setOauthLoading(true);
+    supabase.functions.invoke('meta-oauth-callback', {
+      method: 'POST',
+      body: { action: 'get_app_id' }
+    }).then(({ data, error }) => {
+      setOauthLoading(false);
+      // Fallback: open OAuth URL using the app ID from secrets
+      // Since we can't expose the app ID easily, we'll use a different approach
+      // The edge function will return the app ID
+      if (error || !data?.app_id) {
+        toast({ title: "Erro ao iniciar OAuth", description: "Não foi possível obter o App ID", variant: "destructive" });
+        return;
+      }
+      const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${data.app_id}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=${scope}`;
+      window.open(authUrl, "_blank", "width=600,height=700");
+    });
+  };
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'ACTIVE':
@@ -228,8 +282,32 @@ export function MetaAdsIntegrationCard({
 
         <CollapsibleContent>
           <div className="p-4 pt-0 space-y-4 border-t border-border">
-            {/* Helper Box */}
-            <MetaAdsHelperBox />
+            {/* Helper Box - only for manual flow users */}
+            {!isOAuthUser && <MetaAdsHelperBox />}
+            
+            {/* OAuth Flow - only for test user */}
+            {isOAuthUser && !isConnected && (
+              <div className="space-y-3">
+                <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
+                  <p className="text-sm font-medium">Conectar via Facebook Login</p>
+                  <p className="text-xs text-muted-foreground">
+                    Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads diretamente.
+                  </p>
+                  <Button
+                    onClick={handleFacebookLogin}
+                    disabled={oauthLoading}
+                    className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                  >
+                    {oauthLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Facebook className="h-4 w-4 mr-2" />
+                    )}
+                    Conectar com Facebook
+                  </Button>
+                </div>
+              </div>
+            )}
             {/* Connection Status */}
             {isConnected && (
               <div className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
@@ -248,63 +326,67 @@ export function MetaAdsIntegrationCard({
               </div>
             )}
 
-            {/* Credentials Form */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium">Access Token</label>
-                <div className="relative">
-                  <Input
-                    type={showToken ? 'text' : 'password'}
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    placeholder={isConnected ? '••••••••••••' : 'Seu Access Token do Meta'}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
-                    onClick={() => setShowToken(!showToken)}
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+            {/* Credentials Form - hidden for OAuth users when not connected */}
+            {(!isOAuthUser || isConnected) && (
+              <>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium">Access Token</label>
+                    <div className="relative">
+                      <Input
+                        type={showToken ? 'text' : 'password'}
+                        value={accessToken}
+                        onChange={(e) => setAccessToken(e.target.value)}
+                        placeholder={isConnected ? '••••••••••••' : 'Seu Access Token do Meta'}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                        onClick={() => setShowToken(!showToken)}
+                      >
+                        {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {isConnected && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Oculto por segurança. Digite novamente para atualizar.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Ad Account ID</label>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground">
+                        act_
+                      </span>
+                      <Input
+                        value={adAccountId}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/^act_/, '');
+                          setAdAccountId(value);
+                        }}
+                        placeholder="123456789"
+                        className={`rounded-l-none ${isConnected && adAccountId ? 'bg-muted/30' : ''}`}
+                      />
+                    </div>
+                    {isConnected && adAccountId && (
+                      <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
+                    )}
+                  </div>
                 </div>
-                {isConnected && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Oculto por segurança. Digite novamente para atualizar.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm font-medium">Ad Account ID</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-sm text-muted-foreground">
-                    act_
-                  </span>
-                  <Input
-                    value={adAccountId}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/^act_/, '');
-                      setAdAccountId(value);
-                    }}
-                    placeholder="123456789"
-                    className={`rounded-l-none ${isConnected && adAccountId ? 'bg-muted/30' : ''}`}
-                  />
-                </div>
-                {isConnected && adAccountId && (
-                  <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
-                )}
-              </div>
-            </div>
 
-            <Button 
-              onClick={() => saveIntegration.mutate()} 
-              disabled={saveIntegration.isPending}
-              className="w-full"
-            >
-              {saveIntegration.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              {isConnected ? 'Atualizar Meta Ads' : 'Conectar Meta Ads'}
-            </Button>
+                <Button 
+                  onClick={() => saveIntegration.mutate()} 
+                  disabled={saveIntegration.isPending}
+                  className="w-full"
+                >
+                  {saveIntegration.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isConnected ? 'Atualizar Meta Ads' : 'Conectar Meta Ads'}
+                </Button>
+              </>
+            )}
 
             {/* Campaigns Selection */}
             {isConnected && (
