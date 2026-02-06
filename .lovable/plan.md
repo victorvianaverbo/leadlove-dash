@@ -1,32 +1,32 @@
 
 
-## Corrigir campo de credencial Eduzz: "API Key" para "Token Pessoal"
+## Renomear "Client Secret" para "Access Token" na integracao Eduzz
 
 ### Problema
-Quando o usuario cria um app no Console Eduzz, ele recebe um **Client ID** e um **Token Pessoal**. Porem, o formulario do MetrikaPRO mostra apenas um campo chamado "API Key", o que confunde o usuario -- ele nao sabe qual dos dois colar.
+O Console Eduzz mostra dois botoes: **"Copiar Client ID"** e **"Copiar Access Token"**. O formulario do MetrikaPRO pede "Client Secret", que nao existe no Console -- causando confusao.
 
-### Solucao
-Renomear o campo no formulario de "API Key" para **"Token Pessoal"** e adicionar um placeholder explicativo. Nao e necessario adicionar o campo Client ID, pois a edge function usa apenas o token Bearer.
+### O que muda
+Apenas o **label visivel** do segundo campo. O `key` interno (`client_secret`) permanece igual para compatibilidade com credenciais ja salvas e com as edge functions.
 
-### Alteracao
+### Alteracoes
 
-**Arquivo: `src/components/integrations/SalesIntegrationCard.tsx`** (linhas 65-72)
+**1. `src/components/integrations/SalesIntegrationCard.tsx`** (linha 70)
+- Renomear label de `"Client Secret"` para `"Access Token"`
 
-Alterar a configuracao do Eduzz de:
-```
-fields: [
-  { key: 'api_key', label: 'API Key', type: 'password', sensitive: true },
-],
-```
+**2. `supabase/functions/eduzz-products/index.ts`** (linha 115)
+- Atualizar mensagem de erro 401 para mencionar "Access Token" ao inves de "Token Pessoal"
 
-Para:
-```
-fields: [
-  { key: 'api_key', label: 'Token Pessoal (Console Eduzz)', type: 'password', sensitive: true },
-],
-```
+**3. `src/components/docs/EduzzTutorial.tsx`**
+- Atualizar instrucoes para dizer "Access Token" ao inves de "Client Secret"
 
-O `key` permanece `api_key` para manter compatibilidade com credenciais ja salvas e com a edge function. Apenas o `label` visivel ao usuario muda.
+### O que voce precisa fazer
+No Console Eduzz (console.eduzz.com):
+1. Abra seu aplicativo
+2. Copie o **Client ID** e cole no primeiro campo
+3. Copie o **Access Token** e cole no segundo campo
 
-### Resultado
-O usuario vera "Token Pessoal (Console Eduzz)" no formulario, deixando claro que deve colar o token gerado no Console -- nao o Client ID.
+### Detalhes tecnicos
+- O `key: 'client_secret'` continua igual no banco de dados para nao quebrar credenciais existentes
+- A edge function ja usa esse valor como Bearer token (`Bearer ${bearerToken}`), entao o Access Token funciona direto
+- Compatibilidade mantida com formatos antigos: `creds.client_secret || creds.api_key`
+
