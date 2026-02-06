@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.guru-products]
 verify_jwt = false
 
+[functions.eduzz-products]
+verify_jwt = false
+
 [functions.meta-campaigns]
 verify_jwt = false
 
@@ -40,4 +43,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-email-change]
+verify_jwt = false
+
+[functions.admin-projects]
 verify_jwt = false
