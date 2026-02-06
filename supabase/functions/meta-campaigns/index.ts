@@ -13,10 +13,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Create a client with anon key for auth verification
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
     // Create a client with service role for database operations (bypasses RLS)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -28,19 +25,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use getClaims to verify the user token
+    // Validate user via getUser with service role client
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: authError } = await supabaseAuth.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !claimsData?.claims) {
-      console.error('Auth error:', authError?.message || 'No claims found');
+    if (authError || !user) {
+      console.error('Auth error:', authError?.message || 'No user found');
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
 
     const { project_id } = await req.json();
     if (!project_id) {
