@@ -4,7 +4,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -22,11 +22,8 @@ async function verifyAdmin(req: Request) {
 
   const token = authHeader.replace("Bearer ", "");
 
-  const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+  // Usar service role para validar o token (compativel com ES256 do Lovable Cloud)
+  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
   if (userError || !user) throw new Error("Unauthorized");
 
   logStep("Checking admin role", { userId: user.id });
