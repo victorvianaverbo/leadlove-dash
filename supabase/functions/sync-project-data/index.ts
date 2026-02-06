@@ -636,7 +636,7 @@ async function syncGuru(
  * Sync Eduzz - returns array of normalized sales for batch insert
  */
 async function syncEduzz(
-  credentials: { api_key: string },
+  credentials: { api_key?: string; client_secret?: string; client_id?: string },
   productIds: string[],
   projectId: string,
   userId: string,
@@ -662,9 +662,10 @@ async function syncEduzz(
       while (hasMore && page <= maxPages) {
         const salesUrl = `https://api.eduzz.com/myeduzz/v1/sales?page=${page}&itemsPerPage=100&startDate=${startDateStr}&endDate=${endDateStr}&productId=${productId}`;
         
+        const bearerToken = credentials.client_secret || credentials.api_key;
         const salesResponse = await fetch(salesUrl, {
           headers: {
-            'Authorization': `Bearer ${credentials.api_key}`,
+            'Authorization': `Bearer ${bearerToken}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
