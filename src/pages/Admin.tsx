@@ -39,6 +39,11 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  const getFreshToken = async () => {
+    const { data } = await supabase.auth.refreshSession();
+    return data?.session?.access_token || session?.access_token;
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -66,9 +71,10 @@ export default function Admin() {
 
         setIsAdmin(true);
 
-        // Fetch users from admin endpoint
+        // Fetch users from admin endpoint with fresh token
+        const freshToken = await getFreshToken();
         const { data, error } = await supabase.functions.invoke("admin-users", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: { Authorization: `Bearer ${freshToken}` },
         });
 
         if (error) throw error;
@@ -92,8 +98,9 @@ export default function Admin() {
 
     setLoading(true);
     try {
+      const freshToken = await getFreshToken();
       const { data, error } = await supabase.functions.invoke("admin-users", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${freshToken}` },
       });
 
       if (error) throw error;
@@ -124,8 +131,9 @@ export default function Admin() {
     if (!session?.access_token) return;
 
     try {
+      const freshToken = await getFreshToken();
       const { error } = await supabase.functions.invoke("admin-users", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${freshToken}` },
         body: {
           user_id: data.userId,
           email: data.email,
