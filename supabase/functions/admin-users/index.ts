@@ -15,16 +15,36 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
 async function verifyAdmin(req: Request) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) throw new Error("No authorization header");
 
   const token = authHeader.replace("Bearer ", "");
 
-  // Usar service role para validar o token (compativel com ES256 do Lovable Cloud)
-  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-  if (userError || !user) throw new Error("Unauthorized");
+  // Validate token via GoTrue API directly (compatible with ES256 tokens)
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: supabaseAnonKey,
+    },
+  });
+
+  if (!userResponse.ok) {
+    const errBody = await userResponse.text();
+    logStep("Token validation failed", { status: userResponse.status, body: errBody });
+    throw new Error("Unauthorized");
+  }
+
+  const user = await userResponse.json();
+  if (!user?.id) throw new Error("Unauthorized");
+
+  logStep("User validated", { userId: user.id });
+
+  // Service role client for admin operations
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
   logStep("Checking admin role", { userId: user.id });
 
