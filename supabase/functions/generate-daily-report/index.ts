@@ -104,6 +104,26 @@ serve(async (req) => {
       throw new Error('Invalid project_id format');
     }
 
+    // Rate limit: check if a report was already generated for this project today
+    const todayDate = getBrasiliaDate(0);
+    const { data: existingReport } = await supabase
+      .from('daily_reports')
+      .select('id, created_at')
+      .eq('project_id', project_id)
+      .eq('report_date', todayDate)
+      .maybeSingle();
+
+    if (existingReport) {
+      console.log(`Report already exists for project ${project_id} on ${todayDate}, skipping AI call`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Relatório de hoje já foi gerado. Tente novamente amanhã.`,
+          existing_report_id: existingReport.id
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const result = await generateReportForProject(supabase, project_id, lovableApiKey);
 
     return new Response(JSON.stringify(result), {
