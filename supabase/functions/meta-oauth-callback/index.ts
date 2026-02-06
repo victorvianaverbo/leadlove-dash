@@ -42,7 +42,8 @@ Deno.serve(async (req) => {
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
-  console.log("[meta-oauth-callback] Received callback", { code: !!code, state, error });
+  console.log("[meta-oauth-callback] Received callback - URL:", req.url);
+  console.log("[meta-oauth-callback] Params:", { code: !!code, state, error });
 
   if (error) {
     console.error("[meta-oauth-callback] Facebook returned error:", error);
@@ -54,11 +55,18 @@ Deno.serve(async (req) => {
     return redirectWithError(state, "Missing code or state");
   }
 
-  const [projectId, userId] = state.split("|");
+  // State format: projectId|userId|originUrl
+  const stateParts = state.split("|");
+  const projectId = stateParts[0];
+  const userId = stateParts[1];
+  const originUrl = stateParts[2] || "https://metrikapro.com.br";
+
   if (!projectId || !userId) {
     console.error("[meta-oauth-callback] Invalid state format");
     return redirectWithError(state, "Invalid state");
   }
+
+  console.log("[meta-oauth-callback] Parsed state:", { projectId, userId, originUrl });
 
   try {
     const META_APP_ID = Deno.env.get("META_APP_ID");
@@ -71,6 +79,7 @@ Deno.serve(async (req) => {
     }
 
     const redirectUri = `${SUPABASE_URL}/functions/v1/meta-oauth-callback`;
+    console.log("[meta-oauth-callback] redirect_uri used for token exchange:", redirectUri);
 
     // Step 1: Exchange code for short-lived token
     console.log("[meta-oauth-callback] Exchanging code for short-lived token...");
@@ -165,8 +174,8 @@ Deno.serve(async (req) => {
       console.log("[meta-oauth-callback] Created new integration");
     }
 
-    // Step 5: Redirect back to project edit page
-    const appUrl = getAppRedirectUrl(state, "success");
+    // Step 5: Redirect back to project edit page using origin from state
+    const appUrl = getAppRedirectUrl(projectId, originUrl, "success");
     console.log("[meta-oauth-callback] Redirecting to:", appUrl);
     return new Response(null, {
       status: 302,
@@ -174,20 +183,21 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[meta-oauth-callback] Error:", err);
-    return redirectWithError(state, (err as Error).message);
+    const stateParts = state.split("|");
+    const pId = stateParts[0] || "";
+    const origin = stateParts[2] || "https://metrikapro.com.br";
+    return redirectWithError(pId, origin, (err as Error).message);
   }
 });
 
-function getAppRedirectUrl(state: string | null, status: string, message?: string): string {
-  const projectId = state?.split("|")[0] || "";
-  const baseUrl = "https://metrikapro.com.br";
+function getAppRedirectUrl(projectId: string, origin: string, status: string, message?: string): string {
   const params = new URLSearchParams({ meta_oauth: status });
   if (message) params.set("meta_oauth_error", message);
-  return `${baseUrl}/projeto/${projectId}/editar?${params.toString()}`;
+  return `${origin}/projeto/${projectId}/editar?${params.toString()}`;
 }
 
-function redirectWithError(state: string | null, message: string): Response {
-  const url = getAppRedirectUrl(state, "error", message);
+function redirectWithError(projectId: string, origin: string, message: string): Response {
+  const url = getAppRedirectUrl(projectId, origin, "error", message);
   return new Response(null, {
     status: 302,
     headers: { Location: url },
