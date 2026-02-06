@@ -1113,6 +1113,25 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Enforce cooldown between syncs (5 minutes minimum)
+    if (project.last_sync_at && !isAdmin) {
+      const lastSync = new Date(project.last_sync_at);
+      const minutesSinceSync = (Date.now() - lastSync.getTime()) / 60000;
+      const COOLDOWN_MINUTES = 5;
+      
+      if (minutesSinceSync < COOLDOWN_MINUTES) {
+        console.log(`Sync cooldown active: ${minutesSinceSync.toFixed(1)} min since last sync (min: ${COOLDOWN_MINUTES})`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Aguarde ${Math.ceil(COOLDOWN_MINUTES - minutesSinceSync)} minuto(s) entre sincronizações`,
+            retry_after: Math.ceil(COOLDOWN_MINUTES - minutesSinceSync),
+            last_sync_at: project.last_sync_at
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Fetch integrations
     const { data: integrations } = await supabase
       .from('integrations')
