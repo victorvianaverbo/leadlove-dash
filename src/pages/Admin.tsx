@@ -18,6 +18,7 @@ interface UserData {
   full_name: string | null;
   created_at: string;
   project_count: number;
+  is_admin: boolean;
   override: { extra_projects: number; notes: string | null } | null;
   subscription: {
     subscribed: boolean;
@@ -112,14 +113,28 @@ export default function Admin() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveUser = async (userId: string, email: string, extraProjects: number, notes: string) => {
+  const handleSaveUser = async (data: {
+    userId: string;
+    email: string;
+    password?: string;
+    isAdmin: boolean;
+    extraProjects: number;
+    notes: string;
+  }) => {
     if (!session?.access_token) return;
 
     try {
       const { error } = await supabase.functions.invoke("admin-users", {
         method: "PUT",
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: { user_id: userId, email, extra_projects: extraProjects, notes },
+        body: {
+          user_id: data.userId,
+          email: data.email,
+          password: data.password,
+          is_admin: data.isAdmin,
+          extra_projects: data.extraProjects,
+          notes: data.notes,
+        },
       });
 
       if (error) throw error;
@@ -153,13 +168,13 @@ export default function Admin() {
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-green-500">Ativo</Badge>;
+        return <Badge className="bg-primary text-primary-foreground">Ativo</Badge>;
       case "trialing":
-        return <Badge className="bg-blue-500">Trial</Badge>;
+        return <Badge variant="secondary">Trial</Badge>;
       case "canceled":
         return <Badge variant="destructive">Cancelado</Badge>;
       case "past_due":
-        return <Badge className="bg-yellow-500">Atrasado</Badge>;
+        return <Badge variant="outline" className="border-destructive text-destructive">Atrasado</Badge>;
       default:
         return <Badge variant="secondary">Inativo</Badge>;
     }
@@ -251,6 +266,8 @@ export default function Admin() {
                     <th className="text-left py-3 px-4 font-medium">Usuário</th>
                     <th className="text-left py-3 px-4 font-medium">Plano</th>
                     <th className="text-left py-3 px-4 font-medium">Status</th>
+                    <th className="text-left py-3 px-4 font-medium">Admin</th>
+                    <th className="text-left py-3 px-4 font-medium">Projetos</th>
                     <th className="text-left py-3 px-4 font-medium">Projetos</th>
                     <th className="text-left py-3 px-4 font-medium">Override</th>
                     <th className="text-left py-3 px-4 font-medium">Ações</th>
@@ -270,6 +287,13 @@ export default function Admin() {
                       </td>
                       <td className="py-3 px-4">
                         {getStatusBadge(userData.subscription.status)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {userData.is_admin ? (
+                          <Badge className="bg-primary text-primary-foreground">Admin</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span className={userData.project_count >= getProjectLimit(userData) ? "text-destructive font-medium" : ""}>
@@ -314,6 +338,7 @@ export default function Admin() {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSave={handleSaveUser}
+        currentAdminId={user?.id}
       />
     </div>
   );
