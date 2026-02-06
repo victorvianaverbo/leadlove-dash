@@ -160,9 +160,11 @@ export default function Dashboard() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const dateFilter = thirtyDaysAgo.toISOString().split('T')[0];
 
+      const projectIds = projects.map(p => p.id);
+
       const [salesResult, spendResult] = await Promise.all([
-        supabase.from('sales').select('project_id, amount, gross_amount').eq('status', 'paid').gte('sale_date', dateFilter),
-        supabase.from('ad_spend').select('project_id, spend').gte('date', dateFilter)
+        supabase.from('sales').select('project_id, amount, gross_amount').eq('status', 'paid').in('project_id', projectIds).gte('sale_date', dateFilter),
+        supabase.from('ad_spend').select('project_id, spend').in('project_id', projectIds).gte('date', dateFilter)
       ]);
 
       const metrics: Record<string, { revenue: number; spend: number }> = {};
