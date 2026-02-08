@@ -47,12 +47,12 @@ Deno.serve(async (req) => {
 
   if (error) {
     console.error("[meta-oauth-callback] Facebook returned error:", error);
-    return popupResponse("error", `Facebook error: ${error}`);
+    return redirectToApp("https://metrikapro.com.br", "error", `Facebook error: ${error}`);
   }
 
   if (!code || !state) {
     console.error("[meta-oauth-callback] Missing code or state");
-    return popupResponse("error", "Missing code or state");
+    return redirectToApp("https://metrikapro.com.br", "error", "Missing code or state");
   }
 
   // State format: projectId|userId|originUrl
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
   if (!projectId || !userId) {
     console.error("[meta-oauth-callback] Invalid state format");
-    return redirectWithError(state, "Invalid state");
+    return redirectToApp(originUrl, "error", "Invalid state");
   }
 
   console.log("[meta-oauth-callback] Parsed state:", { projectId, userId, originUrl });
@@ -174,50 +174,25 @@ Deno.serve(async (req) => {
       console.log("[meta-oauth-callback] Created new integration");
     }
 
-    // Step 5: Return HTML that sends postMessage to opener and closes popup
-    console.log("[meta-oauth-callback] Returning success HTML to close popup");
-    return popupResponse("success");
+    // Step 5: Redirect to app page that handles postMessage and closing
+    console.log("[meta-oauth-callback] Redirecting to success page");
+    return redirectToApp(originUrl, "success");
   } catch (err) {
     console.error("[meta-oauth-callback] Error:", err);
-    return popupResponse("error", (err as Error).message);
+    return redirectToApp(originUrl, "error", (err as Error).message);
   }
 });
 
-function popupResponse(type: "success" | "error", message?: string): Response {
-  const msgType = type === "success" ? "meta-oauth-success" : "meta-oauth-error";
-  const msgJson = JSON.stringify({ type: msgType, ...(message ? { message } : {}) });
-
-  const isSuccess = type === "success";
-  const icon = isSuccess
-    ? `<div style="width:64px;height:64px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-       </div>`
-    : `<div style="width:64px;height:64px;border-radius:50%;background:#ef4444;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-       </div>`;
-
-  const title = isSuccess ? "Conta conectada com sucesso!" : "Erro na conexão";
-  const subtitle = isSuccess
-    ? "Pode fechar esta janela e atualizar com F5."
-    : `${message || "Ocorreu um erro."} Tente novamente.`;
-
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetrikaPRO OAuth</title></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;">
-<div style="text-align:center;padding:32px;max-width:400px;">
-  ${icon}
-  <h2 style="margin:0 0 8px;font-size:20px;color:#1e293b;">${title}</h2>
-  <p style="margin:0 0 24px;font-size:14px;color:#64748b;">${subtitle}</p>
-  <button onclick="window.close()" style="padding:10px 24px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">Fechar janela</button>
-</div>
-<script>
-  if (window.opener) { window.opener.postMessage(${msgJson}, '*'); }
-  setTimeout(function(){ window.close(); }, 100);
-</script>
-</body></html>`;
-
-  return new Response(html, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+function redirectToApp(originUrl: string, status: "success" | "error", message?: string): Response {
+  const base = originUrl || "https://metrikapro.com.br";
+  const params = new URLSearchParams({ status });
+  if (message) params.set("message", message);
+  const redirectUrl = `${base}/oauth/callback?${params.toString()}`;
+  
+  console.log("[meta-oauth-callback] Redirecting to:", redirectUrl);
+  
+  return new Response(null, {
+    status: 302,
+    headers: { Location: redirectUrl },
   });
 }

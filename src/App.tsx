@@ -23,6 +23,7 @@ import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
+import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/checkout/cancel" element={<CheckoutCancel />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/projects" element={<AdminProjects />} />
+            <Route path="/oauth/callback" element={<OAuthCallback />} />
             {/* Public dashboard route - must be last to avoid conflicts */}
             <Route path="/:slug" element={<PublicDashboard />} />
             <Route path="*" element={<NotFound />} />
