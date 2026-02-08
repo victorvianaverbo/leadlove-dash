@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, 
-  Search, ChevronDown, ChevronRight, BookOpen, Copy, Check, Facebook
+  Search, ChevronDown, ChevronRight, Copy, Check, Facebook, AlertCircle
 } from "lucide-react";
 
 interface AdAccount {
@@ -50,9 +50,6 @@ export function MetaAdsIntegrationCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const OAUTH_TEST_USER = "ee3515c2-6a17-40b1-971f-34a788b7d2ec";
-  const isOAuthUser = user?.id === OAUTH_TEST_USER;
-
   const [accessToken, setAccessToken] = useState("");
   const [adAccountId, setAdAccountId] = useState("");
   const [showToken, setShowToken] = useState(false);
@@ -61,6 +58,7 @@ export function MetaAdsIntegrationCard({
   const [availableAdAccounts, setAvailableAdAccounts] = useState<AdAccount[]>([]);
   const [isOAuthConnected, setIsOAuthConnected] = useState(false);
   const [changingAccount, setChangingAccount] = useState(false);
+  const [justOAuthConnected, setJustOAuthConnected] = useState(false);
 
   // Load credentials
   useEffect(() => {
@@ -81,7 +79,12 @@ export function MetaAdsIntegrationCard({
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'meta-oauth-success') {
-        toast({ title: "Meta Ads conectado via Facebook!" });
+        setJustOAuthConnected(true);
+        toast({ 
+          title: "✅ Meta Ads conectado com sucesso!", 
+          description: "Agora selecione sua conta de anúncios no dropdown abaixo para continuar.",
+          duration: 8000,
+        });
         queryClient.refetchQueries({ queryKey: ['project-integrations', projectId], type: 'all' });
         queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
         onOpenChange(true);
@@ -110,7 +113,7 @@ export function MetaAdsIntegrationCard({
 
   const campaigns = campaignsData?.campaigns || [];
 
-  // Save integration mutation
+  // Save integration mutation (manual token flow)
   const saveIntegration = useMutation({
     mutationFn: async () => {
       if (integration) {
@@ -143,7 +146,6 @@ export function MetaAdsIntegrationCard({
           .maybeSingle();
         
         if (existingIntegration.data) {
-          // Integration exists but was not passed (edge case) - update it
           const { error } = await supabase
             .from('integrations')
             .update({ 
@@ -192,6 +194,7 @@ export function MetaAdsIntegrationCard({
       queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
       toast({ title: "Meta Ads desconectado!" });
       onCampaignsChange([]);
+      setJustOAuthConnected(false);
     },
   });
 
@@ -209,6 +212,7 @@ export function MetaAdsIntegrationCard({
         .eq('id', integration.id);
       if (error) throw error;
       setAdAccountId(newAccountId.replace(/^act_/, ""));
+      setJustOAuthConnected(false);
       queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
       queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
       toast({ title: "Conta de anúncios atualizada!" });
@@ -220,6 +224,8 @@ export function MetaAdsIntegrationCard({
   };
 
   const isConnected = integration?.is_active;
+  const isManualLegacy = isConnected && !isOAuthConnected;
+  const needsAccountSelection = isOAuthConnected && isConnected && !adAccountId;
 
   // Filter campaigns by search
   const filteredCampaigns = campaigns.filter((c: { name: string }) =>
@@ -244,25 +250,17 @@ export function MetaAdsIntegrationCard({
   };
 
   const handleFacebookLogin = () => {
-    const META_APP_ID = import.meta.env.VITE_SUPABASE_URL 
-      ? "" : ""; // App ID comes from edge function
-    
-    // We'll use the SUPABASE_URL to build the redirect URI
     const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
     const redirectUri = `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const state = `${projectId}|${user!.id}|${window.location.origin}`;
     const scope = "ads_read,ads_management,read_insights";
     
-    // We need the META_APP_ID from the edge function. Let's fetch it.
     setOauthLoading(true);
     supabase.functions.invoke('meta-oauth-callback', {
       method: 'POST',
       body: { action: 'get_app_id' }
     }).then(({ data, error }) => {
       setOauthLoading(false);
-      // Fallback: open OAuth URL using the app ID from secrets
-      // Since we can't expose the app ID easily, we'll use a different approach
-      // The edge function will return the app ID
       if (error || !data?.app_id) {
         toast({ title: "Erro ao iniciar OAuth", description: "Não foi possível obter o App ID", variant: "destructive" });
         return;
@@ -296,10 +294,17 @@ export function MetaAdsIntegrationCard({
               )}
               <span className="font-medium">Meta Ads</span>
               {isConnected ? (
-                <Badge variant="default" className="bg-success text-success-foreground">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Conectado
-                </Badge>
+                needsAccountSelection ? (
+                  <Badge variant="outline" className="border-amber-500 text-amber-600">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Ação necessária
+                  </Badge>
+                ) : (
+                  <Badge variant="default" className="bg-success text-success-foreground">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Conectado
+                  </Badge>
+                )
               ) : (
                 <Badge variant="outline">
                   <XCircle className="h-3 w-3 mr-1" />
@@ -307,7 +312,7 @@ export function MetaAdsIntegrationCard({
                 </Badge>
               )}
             </div>
-            {isConnected && (
+            {isConnected && !needsAccountSelection && (
               <span className="text-xs text-muted-foreground">
                 {selectedCampaigns.length} campanha(s)
               </span>
@@ -317,11 +322,8 @@ export function MetaAdsIntegrationCard({
 
         <CollapsibleContent>
           <div className="p-4 pt-0 space-y-4 border-t border-border">
-            {/* Helper Box - only for manual flow users */}
-            {!isOAuthUser && <MetaAdsHelperBox />}
-            
-            {/* OAuth Flow - for test user (connect or reconnect) */}
-            {isOAuthUser && (
+            {/* OAuth Flow - for ALL users (new connections or reconnect) */}
+            {(!isConnected || isOAuthConnected) && (
               <div className="space-y-3">
                 <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
                   <p className="text-sm font-medium">
@@ -330,7 +332,7 @@ export function MetaAdsIntegrationCard({
                   <p className="text-xs text-muted-foreground">
                     {isConnected 
                       ? 'Reconecte para atualizar permissões ou trocar de conta.'
-                      : 'Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads diretamente.'}
+                      : 'Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads. O processo leva menos de 2 minutos.'}
                   </p>
                   <Button
                     onClick={handleFacebookLogin}
@@ -347,6 +349,7 @@ export function MetaAdsIntegrationCard({
                 </div>
               </div>
             )}
+
             {/* Connection Status */}
             {isConnected && (
               <div className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
@@ -365,17 +368,29 @@ export function MetaAdsIntegrationCard({
               </div>
             )}
 
-            {/* Ad Account Selector - for OAuth users */}
+            {/* Ad Account Selector - for OAuth users with highlight when no account selected */}
             {isConnected && isOAuthConnected && availableAdAccounts.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Conta de Anúncios</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  Conta de Anúncios
+                  {needsAccountSelection && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-600 text-xs animate-pulse">
+                      ⚠ Selecione abaixo
+                    </Badge>
+                  )}
+                </label>
+                {needsAccountSelection && (
+                  <p className="text-xs text-amber-600">
+                    Sua conexão com o Facebook foi feita com sucesso! Agora escolha qual conta de anúncios deseja monitorar:
+                  </p>
+                )}
                 <Select
                   value={adAccountId ? `act_${adAccountId}` : ""}
                   onValueChange={handleAdAccountChange}
                   disabled={changingAccount}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma conta" />
+                  <SelectTrigger className={needsAccountSelection || justOAuthConnected ? "border-amber-500 ring-2 ring-amber-500/30" : ""}>
+                    <SelectValue placeholder="Selecione uma conta de anúncios" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableAdAccounts.map((account) => (
@@ -399,8 +414,8 @@ export function MetaAdsIntegrationCard({
               </div>
             )}
 
-            {/* Credentials Form - hidden for OAuth connected users */}
-            {!isOAuthConnected && (
+            {/* Manual Credentials Form - ONLY for existing legacy manual integrations */}
+            {isManualLegacy && (
               <>
                 <div className="space-y-3">
                   <div>
@@ -410,7 +425,7 @@ export function MetaAdsIntegrationCard({
                         type={showToken ? 'text' : 'password'}
                         value={accessToken}
                         onChange={(e) => setAccessToken(e.target.value)}
-                        placeholder={isConnected ? '••••••••••••' : 'Seu Access Token do Meta'}
+                        placeholder="••••••••••••"
                       />
                       <Button
                         type="button"
@@ -422,11 +437,9 @@ export function MetaAdsIntegrationCard({
                         {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
-                    {isConnected && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Oculto por segurança. Digite novamente para atualizar.
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Oculto por segurança. Digite novamente para atualizar.
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Ad Account ID</label>
@@ -441,10 +454,10 @@ export function MetaAdsIntegrationCard({
                           setAdAccountId(value);
                         }}
                         placeholder="123456789"
-                        className={`rounded-l-none ${isConnected && adAccountId ? 'bg-muted/30' : ''}`}
+                        className={`rounded-l-none ${adAccountId ? 'bg-muted/30' : ''}`}
                       />
                     </div>
-                    {isConnected && adAccountId && (
+                    {adAccountId && (
                       <p className="text-xs text-muted-foreground mt-1">ID configurado</p>
                     )}
                   </div>
@@ -456,7 +469,7 @@ export function MetaAdsIntegrationCard({
                   className="w-full"
                 >
                   {saveIntegration.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {isConnected ? 'Atualizar Meta Ads' : 'Conectar Meta Ads'}
+                  Atualizar Meta Ads
                 </Button>
               </>
             )}
@@ -551,65 +564,5 @@ export function MetaAdsIntegrationCard({
         </CollapsibleContent>
       </div>
     </Collapsible>
-  );
-}
-
-function MetaAdsHelperBox() {
-  const [copiedPrivacy, setCopiedPrivacy] = useState(false);
-  const [copiedTerms, setCopiedTerms] = useState(false);
-
-  const handleCopy = (url: string, type: 'privacy' | 'terms') => {
-    navigator.clipboard.writeText(url);
-    if (type === 'privacy') {
-      setCopiedPrivacy(true);
-      setTimeout(() => setCopiedPrivacy(false), 2000);
-    } else {
-      setCopiedTerms(true);
-      setTimeout(() => setCopiedTerms(false), 2000);
-    }
-  };
-
-  return (
-    <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Precisa de ajuda para conectar?</p>
-        <Link to="/documentacao?tutorial=meta-ads">
-          <Button variant="outline" size="sm">
-            <BookOpen className="h-4 w-4 mr-1" />
-            Ver Tutorial
-          </Button>
-        </Link>
-      </div>
-      
-      <div className="pt-2 border-t border-border">
-        <p className="text-xs text-muted-foreground mb-2">URLs para configurar seu App Meta:</p>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground min-w-[50px]">Privacy:</span>
-            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">metrikapro.com.br/privacy</code>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 w-6 p-0"
-              onClick={() => handleCopy('https://metrikapro.com.br/privacy', 'privacy')}
-            >
-              {copiedPrivacy ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
-            </Button>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground min-w-[50px]">Terms:</span>
-            <code className="bg-background px-1.5 py-0.5 rounded border truncate flex-1">metrikapro.com.br/terms</code>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 w-6 p-0"
-              onClick={() => handleCopy('https://metrikapro.com.br/terms', 'terms')}
-            >
-              {copiedTerms ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
