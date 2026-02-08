@@ -1,36 +1,65 @@
 
 
-## Corrigir Seletor de Conta de Anuncios nao aparecendo
+## Popup OAuth: fechar janela ao finalizar conexao
 
-### Diagnostico
-Os dados estao corretos no banco: `oauth_connected: true` e `available_ad_accounts` com 25 contas. O codigo do dropdown tambem esta correto na condicao `isConnected && isOAuthConnected && availableAdAccounts.length > 0`.
+### Problema atual
+O `window.open` ja abre o Facebook numa janela popup, mas a edge function redireciona de volta para a URL do app, abrindo uma segunda aba com a pagina do projeto. O usuario fica com duas abas abertas.
 
-O problema tem dois aspectos:
+### Solucao
+Mudar a edge function para, ao inves de redirecionar (302), retornar uma pagina HTML que envia uma mensagem para a janela pai (`window.opener.postMessage`) e fecha a si mesma (`window.close()`). O frontend escuta essa mensagem e atualiza os dados.
 
-1. **Apos reconectar via OAuth**, a pagina pode nao estar recarregando os dados da integracao corretamente. O `useEffect` depende de `integration?.credentials`, mas se a query estiver cacheada, os novos dados (com `oauth_connected` e `available_ad_accounts`) nao sao refletidos.
+### Mudancas
 
-2. **Falta botao de "Reconectar"** quando ja conectado. O botao do Facebook so aparece quando `!isConnected`, entao apos conexao, o usuario nao tem como reconectar sem desconectar primeiro.
+**1. Edge Function (`supabase/functions/meta-oauth-callback/index.ts`)**
 
-3. **O collapsible pode estar fechado** por padrao apos redirect, escondendo o dropdown.
+Substituir o redirect final (status 302) por uma resposta HTML que:
+- Envia `postMessage` para a janela pai com `{ type: 'meta-oauth-success' }` (ou `meta-oauth-error` com mensagem)
+- Fecha a popup automaticamente com `window.close()`
+- Mostra um fallback "Voce pode fechar esta janela" caso o `window.close()` falhe
 
-### Correcoes
+Mesma logica para o caso de erro: ao inves de redirecionar, retorna HTML com `postMessage` de erro e fecha.
 
-**Arquivo: `src/components/integrations/MetaAdsIntegrationCard.tsx`**
+**2. Frontend (`src/components/integrations/MetaAdsIntegrationCard.tsx`)**
 
-1. Adicionar botao "Reconectar com Facebook" visivel mesmo quando ja conectado (para usuarios OAuth), ao lado do botao "Desconectar"
-
-2. Garantir que apos o redirect OAuth (`meta_oauth=success`), o collapsible abra automaticamente e a query de integracoes seja invalidada com `refetchType: 'all'` para forcar recarregamento
-
-3. Forcar o collapsible a abrir quando `isOAuthConnected && availableAdAccounts.length > 0` para o usuario ver o dropdown imediatamente
+- Remover o `useEffect` que le `meta_oauth` da URL (nao sera mais necessario)
+- Adicionar um `useEffect` com `window.addEventListener('message', handler)` que:
+  - Valida a origem da mensagem
+  - Se `type === 'meta-oauth-success'`: mostra toast, refetch queries, abre o card
+  - Se `type === 'meta-oauth-error'`: mostra toast de erro
+- Limpar o listener no cleanup do useEffect
 
 ### Detalhes tecnicos
 
-**Mudanca 1 - Botao de reconectar quando ja conectado (OAuth):**
-No bloco de "Connection Status" (quando `isConnected`), adicionar o botao do Facebook para reconectar ao lado de "Desconectar", somente para o usuario OAuth.
+**HTML retornado pela edge function (sucesso):**
+```html
+<html><body><script>
+  window.opener.postMessage({ type: 'meta-oauth-success' }, '*');
+  window.close();
+</script><p>Conectado! Pode fechar esta janela.</p></body></html>
+```
 
-**Mudanca 2 - Auto-abrir collapsible apos OAuth redirect:**
-No `useEffect` que trata o redirect (linhas 81-100), chamar `onOpenChange(true)` apos sucesso para garantir que o card fica aberto e o dropdown visivel.
+**HTML retornado pela edge function (erro):**
+```html
+<html><body><script>
+  window.opener.postMessage({ type: 'meta-oauth-error', message: '...' }, '*');
+  window.close();
+</script><p>Erro na conexao. Pode fechar esta janela.</p></body></html>
+```
 
-**Mudanca 3 - Invalidacao forcada:**
-Trocar `invalidateQueries` por `refetchQueries` no handler do OAuth redirect para garantir dados frescos.
-
+**Listener no frontend:**
+```typescript
+useEffect(() => {
+  const handler = (event: MessageEvent) => {
+    if (event.data?.type === 'meta-oauth-success') {
+      toast({ title: "Meta Ads conectado via Facebook!" });
+      queryClient.refetchQueries({ queryKey: ['project-integrations', projectId], type: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
+      onOpenChange(true);
+    } else if (event.data?.type === 'meta-oauth-error') {
+      toast({ title: "Erro no OAuth", description: event.data.message, variant: "destructive" });
+    }
+  };
+  window.addEventListener('message', handler);
+  return () => window.removeEventListener('message', handler);
+}, [projectId]);
+```
