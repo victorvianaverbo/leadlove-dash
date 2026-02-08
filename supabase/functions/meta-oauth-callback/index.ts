@@ -186,19 +186,33 @@ Deno.serve(async (req) => {
 function popupResponse(type: "success" | "error", message?: string): Response {
   const msgType = type === "success" ? "meta-oauth-success" : "meta-oauth-error";
   const msgJson = JSON.stringify({ type: msgType, ...(message ? { message } : {}) });
-  const fallbackText = type === "success"
-    ? "Conectado! Você pode fechar esta janela."
-    : "Erro na conexão. Você pode fechar esta janela.";
+
+  const isSuccess = type === "success";
+  const icon = isSuccess
+    ? `<div style="width:64px;height:64px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+       </div>`
+    : `<div style="width:64px;height:64px;border-radius:50%;background:#ef4444;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+       </div>`;
+
+  const title = isSuccess ? "Conta conectada com sucesso!" : "Erro na conexão";
+  const subtitle = isSuccess
+    ? "Pode fechar esta janela e atualizar com F5."
+    : `${message || "Ocorreu um erro."} Tente novamente.`;
 
   const html = `<!DOCTYPE html>
-<html><head><title>MetrikaPRO OAuth</title></head>
-<body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#333;">
-<p>${fallbackText}</p>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MetrikaPRO OAuth</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc;">
+<div style="text-align:center;padding:32px;max-width:400px;">
+  ${icon}
+  <h2 style="margin:0 0 8px;font-size:20px;color:#1e293b;">${title}</h2>
+  <p style="margin:0 0 24px;font-size:14px;color:#64748b;">${subtitle}</p>
+  <button onclick="window.close()" style="padding:10px 24px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;">Fechar janela</button>
+</div>
 <script>
-  if (window.opener) {
-    window.opener.postMessage(${msgJson}, '*');
-  }
-  window.close();
+  if (window.opener) { window.opener.postMessage(${msgJson}, '*'); }
+  setTimeout(function(){ window.close(); }, 100);
 </script>
 </body></html>`;
 
