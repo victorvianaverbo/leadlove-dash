@@ -268,7 +268,7 @@ export function MetaAdsIntegrationCard({
         return;
       }
       const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${data.app_id}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}&scope=${scope}`;
-      window.open(authUrl, "_blank", "width=600,height=700");
+      window.open(authUrl, "metaOAuthPopup", "width=600,height=700,left=200,top=100");
     });
   };
 
