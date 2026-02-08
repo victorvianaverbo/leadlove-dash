@@ -116,12 +116,6 @@ export default function ProjectEdit() {
     }
   }, [project]);
 
-  // Set initial open state - all integrations collapsed by default
-  useEffect(() => {
-    if (integrations) {
-      setOpenIntegrations([]);
-    }
-  }, [integrations]);
 
   const toggleIntegration = (type: string) => {
     setOpenIntegrations(prev => 
@@ -172,6 +166,7 @@ export default function ProjectEdit() {
         title: "Configurações salvas!", 
         description: "Use o botão Atualizar no Dashboard para sincronizar os dados."
       });
+      navigate(`/projects/${project?.slug || id}`);
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
