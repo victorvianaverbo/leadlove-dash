@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate, Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,8 @@ export default function ProjectView() {
   const [projectSlug, setProjectSlug] = useState<string>('');
   const [copied, setCopied] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoSyncTriggered = useRef(false);
 
   // Custom domain - use your published domain
   const PUBLIC_DOMAIN = 'https://metrikapro.com.br';
@@ -431,6 +433,16 @@ const parseCurrencyInput = (value: string): number => {
       });
     },
   });
+
+  // Auto-sync when coming from project edit with ?sync=true
+  useEffect(() => {
+    if (searchParams.get('sync') === 'true' && projectId && !syncData.isPending && !autoSyncTriggered.current) {
+      autoSyncTriggered.current = true;
+      searchParams.delete('sync');
+      setSearchParams(searchParams, { replace: true });
+      syncData.mutate();
+    }
+  }, [projectId, searchParams]);
 
 
   const getPublicUrl = () => {
