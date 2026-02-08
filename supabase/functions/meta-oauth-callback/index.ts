@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 function getAppRedirectUrl(projectId: string, origin: string, status: string, message?: string): string {
   const params = new URLSearchParams({ meta_oauth: status });
   if (message) params.set("meta_oauth_error", message);
-  return `${origin}/projeto/${projectId}/editar?${params.toString()}`;
+  return `${origin}/projects/${projectId}/edit?${params.toString()}`;
 }
 
 function redirectWithError(projectId: string, origin: string, message: string): Response {
