@@ -83,8 +83,11 @@ export function MetaAdsIntegrationCard({
     const oauthStatus = params.get("meta_oauth");
     if (oauthStatus === "success") {
       toast({ title: "Meta Ads conectado via Facebook!" });
-      queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
+      // Force refetch to get fresh credentials with available_ad_accounts
+      queryClient.refetchQueries({ queryKey: ['project-integrations', projectId], type: 'all' });
       queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
+      // Auto-open the card so the user sees the account selector
+      onOpenChange(true);
       // Clean URL
       const url = new URL(window.location.href);
       url.searchParams.delete("meta_oauth");
@@ -326,13 +329,17 @@ export function MetaAdsIntegrationCard({
             {/* Helper Box - only for manual flow users */}
             {!isOAuthUser && <MetaAdsHelperBox />}
             
-            {/* OAuth Flow - only for test user */}
-            {isOAuthUser && !isConnected && (
+            {/* OAuth Flow - for test user (connect or reconnect) */}
+            {isOAuthUser && (
               <div className="space-y-3">
                 <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
-                  <p className="text-sm font-medium">Conectar via Facebook Login</p>
+                  <p className="text-sm font-medium">
+                    {isConnected ? 'Reconectar via Facebook Login' : 'Conectar via Facebook Login'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads diretamente.
+                    {isConnected 
+                      ? 'Reconecte para atualizar permissões ou trocar de conta.'
+                      : 'Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads diretamente.'}
                   </p>
                   <Button
                     onClick={handleFacebookLogin}
@@ -344,7 +351,7 @@ export function MetaAdsIntegrationCard({
                     ) : (
                       <Facebook className="h-4 w-4 mr-2" />
                     )}
-                    Conectar com Facebook
+                    {isConnected ? 'Reconectar com Facebook' : 'Conectar com Facebook'}
                   </Button>
                 </div>
               </div>
