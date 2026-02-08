@@ -253,7 +253,7 @@ export function MetaAdsIntegrationCard({
     const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
     const redirectUri = `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const state = `${projectId}|${user!.id}|${window.location.origin}`;
-    const scope = "ads_read,ads_management,read_insights";
+    const scope = "ads_read,read_insights";
     
     setOauthLoading(true);
     supabase.functions.invoke('meta-oauth-callback', {
