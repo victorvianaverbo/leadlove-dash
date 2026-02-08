@@ -1,46 +1,32 @@
 
 
-## Corrigir OAuth do Facebook - Meta Ads
+## Corrigir OAuth do Facebook - Dois Problemas
 
-### Problema
-A edge function `meta-oauth-callback` esta recebendo chamadas GET sem os parametros `code` e `state` do Facebook. Isso indica que o `redirect_uri` usado na chamada OAuth nao corresponde exatamente ao configurado no Meta App, ou o Facebook esta rejeitando a autorizacao.
+### Problema 1: Pagina 404 apos redirect
+A edge function redireciona para `/projeto/{id}/editar`, mas a rota configurada no React Router e `/projects/{id}/edit`. Por isso aparece 404.
 
-### Causas identificadas
+**Correcao**: Alterar a funcao `getAppRedirectUrl` na edge function para usar o caminho correto.
 
-1. **redirect_uri inconsistente**: O frontend monta o redirect_uri usando `VITE_SUPABASE_URL`, mas a URL pode ter diferenca de formato (barra final, protocolo) comparado ao que foi cadastrado no Meta App
-2. **Redirect de volta hardcoded**: A funcao redireciona para `metrikapro.com.br` apos sucesso, mas durante testes no Lovable preview isso nao funciona
-3. **Popup pode estar sendo bloqueado**: `window.open` com popup pode ser bloqueado pelo navegador
+### Problema 2: "Error validating client secret"
+Este erro vem do Facebook durante a troca do codigo por token. Significa que o `META_APP_SECRET` configurado esta incorreto ou foi alterado no painel do Meta.
 
-### Solucao
+**Verificacao necessaria**: Confirme que o App Secret no Meta Developers (Configuracoes > Basico > Chave Secreta do Aplicativo) corresponde ao valor salvo no backend.
 
-**1. Edge Function (`meta-oauth-callback/index.ts`)**
-- Adicionar log do redirect_uri usado, para diagnostico
-- Usar a URL de origem (origin) passada no state para redirecionar de volta, em vez de URL hardcoded
-- Mudar o formato do state para: `projectId|userId|originUrl`
+---
 
-**2. Frontend (`MetaAdsIntegrationCard.tsx`)**
-- Incluir `window.location.origin` no state para que o redirect volte para o ambiente correto (preview ou producao)
-- Garantir que o redirect_uri seja construido de forma consistente
+### Alteracoes tecnicas
 
-**3. Verificacao de redirect_uri**
-- A URI cadastrada no Meta App deve ser EXATAMENTE: `https://ohwaygqxelyaytljbcsb.supabase.co/functions/v1/meta-oauth-callback`
-- Sem barra no final
-- O frontend deve usar essa mesma string
+**Arquivo: `supabase/functions/meta-oauth-callback/index.ts`**
 
-### Detalhes tecnicos
+Alterar a funcao `getAppRedirectUrl` para usar o caminho correto:
 
-**Arquivos alterados:**
+```text
+// DE:
+return `${origin}/projeto/${projectId}/editar?${params.toString()}`;
 
-1. `supabase/functions/meta-oauth-callback/index.ts`
-   - Log do redirect_uri para debug
-   - Extrair origin do state (terceiro parametro)
-   - Usar origin dinamico no `getAppRedirectUrl` em vez de `metrikapro.com.br` fixo
+// PARA:
+return `${origin}/projects/${projectId}/edit?${params.toString()}`;
+```
 
-2. `src/components/integrations/MetaAdsIntegrationCard.tsx`
-   - Mudar state para incluir origin: `${projectId}|${user.id}|${window.location.origin}`
-   - Garantir redirect_uri consistente sem barra final
+**Secret `META_APP_SECRET`**: Solicitar ao usuario que verifique e atualize o valor caso esteja incorreto.
 
-### Resultado esperado
-- O Facebook redireciona corretamente com `code` e `state`
-- A edge function troca o codigo por token e salva
-- O usuario e redirecionado de volta para a pagina correta (funciona tanto no preview quanto em producao)
