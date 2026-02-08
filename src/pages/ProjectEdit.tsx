@@ -164,9 +164,9 @@ export default function ProjectEdit() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast({ 
         title: "Configurações salvas!", 
-        description: "Use o botão Atualizar no Dashboard para sincronizar os dados."
+        description: "Sincronizando dados do projeto..."
       });
-      navigate(`/projects/${project?.slug || id}`);
+      navigate(`/projects/${project?.slug || id}?sync=true`);
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
