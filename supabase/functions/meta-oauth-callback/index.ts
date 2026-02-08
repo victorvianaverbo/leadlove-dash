@@ -47,12 +47,12 @@ Deno.serve(async (req) => {
 
   if (error) {
     console.error("[meta-oauth-callback] Facebook returned error:", error);
-    return redirectWithError(state, `Facebook error: ${error}`);
+    return popupResponse("error", `Facebook error: ${error}`);
   }
 
   if (!code || !state) {
     console.error("[meta-oauth-callback] Missing code or state");
-    return redirectWithError(state, "Missing code or state");
+    return popupResponse("error", "Missing code or state");
   }
 
   // State format: projectId|userId|originUrl
@@ -174,32 +174,36 @@ Deno.serve(async (req) => {
       console.log("[meta-oauth-callback] Created new integration");
     }
 
-    // Step 5: Redirect back to project edit page using origin from state
-    const appUrl = getAppRedirectUrl(projectId, originUrl, "success");
-    console.log("[meta-oauth-callback] Redirecting to:", appUrl);
-    return new Response(null, {
-      status: 302,
-      headers: { Location: appUrl },
-    });
+    // Step 5: Return HTML that sends postMessage to opener and closes popup
+    console.log("[meta-oauth-callback] Returning success HTML to close popup");
+    return popupResponse("success");
   } catch (err) {
     console.error("[meta-oauth-callback] Error:", err);
-    const stateParts = state.split("|");
-    const pId = stateParts[0] || "";
-    const origin = stateParts[2] || "https://metrikapro.com.br";
-    return redirectWithError(pId, origin, (err as Error).message);
+    return popupResponse("error", (err as Error).message);
   }
 });
 
-function getAppRedirectUrl(projectId: string, origin: string, status: string, message?: string): string {
-  const params = new URLSearchParams({ meta_oauth: status });
-  if (message) params.set("meta_oauth_error", message);
-  return `${origin}/projects/${projectId}/edit?${params.toString()}`;
-}
+function popupResponse(type: "success" | "error", message?: string): Response {
+  const msgType = type === "success" ? "meta-oauth-success" : "meta-oauth-error";
+  const msgJson = JSON.stringify({ type: msgType, ...(message ? { message } : {}) });
+  const fallbackText = type === "success"
+    ? "Conectado! Você pode fechar esta janela."
+    : "Erro na conexão. Você pode fechar esta janela.";
 
-function redirectWithError(projectId: string, origin: string, message: string): Response {
-  const url = getAppRedirectUrl(projectId, origin, "error", message);
-  return new Response(null, {
-    status: 302,
-    headers: { Location: url },
+  const html = `<!DOCTYPE html>
+<html><head><title>MetrikaPRO OAuth</title></head>
+<body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#333;">
+<p>${fallbackText}</p>
+<script>
+  if (window.opener) {
+    window.opener.postMessage(${msgJson}, '*');
+  }
+  window.close();
+</script>
+</body></html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }

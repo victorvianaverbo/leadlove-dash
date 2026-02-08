@@ -77,30 +77,21 @@ export function MetaAdsIntegrationCard({
     }
   }, [integration]);
 
-  // Handle OAuth redirect result
+  // Listen for postMessage from OAuth popup
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const oauthStatus = params.get("meta_oauth");
-    if (oauthStatus === "success") {
-      toast({ title: "Meta Ads conectado via Facebook!" });
-      // Force refetch to get fresh credentials with available_ad_accounts
-      queryClient.refetchQueries({ queryKey: ['project-integrations', projectId], type: 'all' });
-      queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
-      // Auto-open the card so the user sees the account selector
-      onOpenChange(true);
-      // Clean URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete("meta_oauth");
-      window.history.replaceState({}, "", url.toString());
-    } else if (oauthStatus === "error") {
-      const errorMsg = params.get("meta_oauth_error") || "Erro desconhecido";
-      toast({ title: "Erro no OAuth", description: errorMsg, variant: "destructive" });
-      const url = new URL(window.location.href);
-      url.searchParams.delete("meta_oauth");
-      url.searchParams.delete("meta_oauth_error");
-      window.history.replaceState({}, "", url.toString());
-    }
-  }, []);
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'meta-oauth-success') {
+        toast({ title: "Meta Ads conectado via Facebook!" });
+        queryClient.refetchQueries({ queryKey: ['project-integrations', projectId], type: 'all' });
+        queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
+        onOpenChange(true);
+      } else if (event.data?.type === 'meta-oauth-error') {
+        toast({ title: "Erro no OAuth", description: event.data.message || "Erro desconhecido", variant: "destructive" });
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [projectId]);
 
   // Fetch campaigns
   const { data: campaignsData, isLoading: campaignsLoading, refetch: refetchCampaigns, isFetching: campaignsRefetching } = useQuery({
