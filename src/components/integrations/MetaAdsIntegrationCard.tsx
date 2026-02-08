@@ -8,12 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Loader2, Eye, EyeOff, CheckCircle, XCircle, RefreshCw, 
   Search, ChevronDown, ChevronRight, BookOpen, Copy, Check, Facebook
 } from "lucide-react";
+
+interface AdAccount {
+  id: string;
+  name: string;
+  account_status: number;
+}
 
 interface Integration {
   id: string;
@@ -51,13 +58,22 @@ export function MetaAdsIntegrationCard({
   const [showToken, setShowToken] = useState(false);
   const [campaignSearch, setCampaignSearch] = useState("");
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [availableAdAccounts, setAvailableAdAccounts] = useState<AdAccount[]>([]);
+  const [isOAuthConnected, setIsOAuthConnected] = useState(false);
+  const [changingAccount, setChangingAccount] = useState(false);
 
-  // Load non-sensitive credentials (strip act_ prefix for display)
+  // Load credentials
   useEffect(() => {
     if (integration?.credentials) {
-      const creds = integration.credentials as { ad_account_id?: string };
+      const creds = integration.credentials as { 
+        ad_account_id?: string; 
+        oauth_connected?: boolean;
+        available_ad_accounts?: AdAccount[];
+      };
       const storedId = creds.ad_account_id || "";
       setAdAccountId(storedId.replace(/^act_/, ""));
+      setIsOAuthConnected(!!creds.oauth_connected);
+      setAvailableAdAccounts(creds.available_ad_accounts || []);
     }
   }, [integration]);
 
@@ -184,6 +200,30 @@ export function MetaAdsIntegrationCard({
       onCampaignsChange([]);
     },
   });
+
+  // Handle ad account change for OAuth users
+  const handleAdAccountChange = async (newAccountId: string) => {
+    if (!integration) return;
+    setChangingAccount(true);
+    try {
+      const creds = integration.credentials as Record<string, unknown>;
+      const { error } = await supabase
+        .from('integrations')
+        .update({
+          credentials: { ...creds, ad_account_id: newAccountId } as unknown as import("@/integrations/supabase/types").Json,
+        })
+        .eq('id', integration.id);
+      if (error) throw error;
+      setAdAccountId(newAccountId.replace(/^act_/, ""));
+      queryClient.invalidateQueries({ queryKey: ['project-integrations', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['meta-campaigns', projectId] });
+      toast({ title: "Conta de anúncios atualizada!" });
+    } catch (err: any) {
+      toast({ title: "Erro ao trocar conta", description: err.message, variant: "destructive" });
+    } finally {
+      setChangingAccount(false);
+    }
+  };
 
   const isConnected = integration?.is_active;
 
@@ -327,8 +367,42 @@ export function MetaAdsIntegrationCard({
               </div>
             )}
 
-            {/* Credentials Form - hidden for OAuth users when not connected */}
-            {(!isOAuthUser || isConnected) && (
+            {/* Ad Account Selector - for OAuth users */}
+            {isConnected && isOAuthConnected && availableAdAccounts.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Conta de Anúncios</label>
+                <Select
+                  value={adAccountId ? `act_${adAccountId}` : ""}
+                  onValueChange={handleAdAccountChange}
+                  disabled={changingAccount}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableAdAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <span className="flex items-center gap-2">
+                          {account.name} ({account.id})
+                          {account.account_status !== 1 && (
+                            <Badge variant="secondary" className="text-xs ml-1">Inativa</Badge>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {changingAccount && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Salvando...
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Credentials Form - hidden for OAuth connected users */}
+            {!isOAuthConnected && (
               <>
                 <div className="space-y-3">
                   <div>
