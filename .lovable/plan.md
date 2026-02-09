@@ -1,59 +1,83 @@
 
-# Script de Rastreamento UTM para WordPress + Hotmart
+
+# Tabela de Vendas por UTM nos Dashboards
 
 ## O que sera feito
 
-Criar uma Edge Function que serve um script JavaScript leve. O cliente (Charles) cola uma unica linha no WordPress e todos os links da Hotmart na pagina de vendas passam a receber os UTMs automaticamente.
+Adicionar uma tabela de vendas agrupadas por UTM Source e UTM Campaign abaixo dos dashboards privado (ProjectView) e publico (PublicDashboard). A tabela mostra de onde vieram as vendas, permitindo ao usuario entender quais fontes de trafego estao performando melhor.
 
-## Como funciona
+## Como vai funcionar
 
-1. Visitante clica no anuncio do Facebook/Google com UTMs na URL
-2. Chega na pagina de vendas (WordPress)
-3. O script captura os UTMs e salva em cookie (30 dias)
-4. Quando clica no botao de compra (link Hotmart), o script anexa os UTMs ao link
-5. Hotmart registra os UTMs no tracking da compra
-6. MetrikaPRO captura via API normalmente na sincronizacao
+A tabela agrupa as vendas ja carregadas (filtradas por periodo e status "paid") por `utm_source` e `utm_campaign`, mostrando:
 
-## Resultado para o cliente
+| UTM Source | UTM Campaign | Vendas | Receita | % do Total |
+|------------|-------------|--------|---------|------------|
+| ig         | campanha-x  | 38     | R$ 419  | 82%        |
+| facebook   | black-friday| 5      | R$ 160  | 14%        |
+| (direto)   | -           | 2      | R$ 64   | 4%         |
 
-Colar isso no WordPress (Aparencia > Editor de Tema > footer.php, ou via plugin "Insert Headers and Footers"):
+- Os dados vem das vendas ja carregadas na pagina (sem queries adicionais ao banco)
+- Responde ao filtro de periodo selecionado (7d, 30d, etc.)
+- Vendas sem UTM aparecem como "(direto)" ou "(sem UTM)"
+- Usa o componente `PaginatedTable` ja existente no projeto
+- Ordenado por numero de vendas (maior primeiro)
 
-```html
-<script src="https://ohwaygqxelyaytljbcsb.supabase.co/functions/v1/tracking-script" defer></script>
-```
+## Plano tecnico
 
-Uma linha. Pronto.
+### 1. Criar componente `SalesByUtmTable`
 
-## Implementacao tecnica
+**Arquivo:** `src/components/tables/SalesByUtmTable.tsx`
 
-### 1. Criar Edge Function `tracking-script`
+Componente que recebe um array de vendas e calcula o agrupamento por UTM. Props:
+- `sales`: array de vendas (ja filtradas por periodo e status)
+- `formatCurrency`: funcao de formatacao monetaria
+- `ticketPrice`: preco fixo do ticket (se configurado)
+- `useGrossForRoas`: flag para usar valor bruto
 
-**Arquivo:** `supabase/functions/tracking-script/index.ts`
+Logica interna:
+- Agrupa vendas por `utm_source + utm_campaign`
+- Calcula receita usando a mesma logica de prioridade existente (ticket price > gross > net)
+- Calcula percentual sobre o total
+- Ordena por quantidade de vendas (decrescente)
+- Renderiza usando `PaginatedTable` com paginacao
 
-Serve um arquivo JavaScript puro (Content-Type: application/javascript) que:
-- Captura `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` da URL
-- Salva em cookie `_mk_utm` com validade de 30 dias
-- Encontra todos os links `<a>` que apontam para dominios da Hotmart (`hotmart.com`, `pay.hotmart.com`, `go.hotmart.com`)
-- Anexa os UTMs como `src`, `sck` e query params nesses links (a Hotmart usa `src` para source tracking)
-- Usa MutationObserver para links adicionados dinamicamente (SPAs, pop-ups)
-- Peso estimado: ~1.5KB minificado, sem dependencias
+### 2. Inserir no Dashboard Privado (ProjectView)
 
-### 2. Registrar no config.toml
+**Arquivo:** `src/pages/ProjectView.tsx`
 
-Adicionar entrada `[functions.tracking-script]` com `verify_jwt = false` (precisa ser publico).
+Inserir o componente `SalesByUtmTable` logo apos a secao de "Acoes Recomendadas da IA" (apos a linha ~1116), passando `filteredSales`, `formatCurrency`, `ticketPrice` e `useGrossForRoas`.
 
-### 3. Adicionar secao na pagina de edicao do projeto
+Envolver em um Card com titulo "Vendas por Origem (UTM)" e um icone de filtro.
 
-**Arquivo:** `src/pages/ProjectEdit.tsx`
+### 3. Inserir no Dashboard Publico (PublicDashboard)
 
-Novo Card "Script de Rastreamento" com:
-- Snippet copiavel pronto para uso
-- Botao "Copiar" com feedback visual
-- Instrucoes simples: "Cole antes do `</body>` no seu site"
-- Icone de codigo para identificacao visual
+**Arquivo:** `src/pages/PublicDashboard.tsx`
+
+Inserir o mesmo componente antes do "Powered by" badge (antes da linha ~681), usando `filteredAllSales` (vendas totais do periodo). No dashboard publico, utilizar a mesma logica de `getSaleValue` para calculo de receita.
+
+### 4. Resumo de arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| `supabase/functions/tracking-script/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar config (automatico) |
-| `src/pages/ProjectEdit.tsx` | Adicionar Card com snippet copiavel |
+| `src/components/tables/SalesByUtmTable.tsx` | Criar - componente da tabela UTM |
+| `src/pages/ProjectView.tsx` | Editar - inserir tabela apos secao de IA |
+| `src/pages/PublicDashboard.tsx` | Editar - inserir tabela antes do "Powered by" |
+
+### 5. Colunas da tabela
+
+| Coluna | Descricao |
+|--------|-----------|
+| Origem (Source) | `utm_source` ou "(direto)" se vazio |
+| Campanha | `utm_campaign` ou "-" se vazio |
+| Vendas | Contagem de vendas pagas |
+| Receita | Valor total (respeitando logica de prioridade) |
+| % do Total | Percentual da receita sobre o total |
+
+### 6. Consideracoes
+
+- Nenhuma query adicional ao banco - usa dados ja carregados
+- Componente reutilizavel entre ambos dashboards
+- Respeita a logica existente de revenue calculation priority (ticket price > gross > net)
+- Paginacao com `PaginatedTable` para projetos com muitas origens
+- No dashboard publico, usa a view `sales_public` que ja inclui campos UTM sem expor PII
+
