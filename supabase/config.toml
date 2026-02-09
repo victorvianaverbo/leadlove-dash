@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.meta-oauth-callback]
 verify_jwt = false
+
+[functions.tracking-script]
+verify_jwt = false
