@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, DollarSign, TrendingUp, ShoppingCart, Target, CheckCircle, Lock, BarChart3, ArrowUp, ArrowDown, Minus, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { SalesByUtmTable } from '@/components/tables/SalesByUtmTable';
 
 // Type for the public project view (excludes user_id for privacy)
 interface ProjectPublic {
@@ -677,6 +678,14 @@ export default function PublicDashboard() {
             </CardContent>
           </Card>
         )}
+
+        {/* Tabela de Vendas por UTM */}
+        <SalesByUtmTable
+          sales={filteredAllSales}
+          formatCurrency={formatCurrency}
+          ticketPrice={ticketPrice}
+          useGrossForRoas={useGrossForRoas}
+        />
 
         {/* Powered by badge */}
         <div className="text-center pt-4">
