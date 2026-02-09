@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, Loader2, BookOpen, Target, ShoppingCart, BarChart3, Info, TrendingUp } from "lucide-react";
+import { TrackingScriptCard } from "@/components/tracking/TrackingScriptCard";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
@@ -357,6 +358,9 @@ export default function ProjectEdit() {
             />
           </CardContent>
         </Card>
+
+        {/* Tracking Script */}
+        <TrackingScriptCard />
 
         {/* Last Sync Info */}
         {project?.last_sync_at && (
