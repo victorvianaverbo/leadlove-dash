@@ -19,6 +19,7 @@ import { KpiGridSkeleton, FunnelSectionSkeleton, SettingsCardSkeleton } from '@/
 import { Loader2, ArrowLeft, RefreshCw, Settings, DollarSign, TrendingUp, ShoppingCart, Target, Eye, Users, Repeat, BarChart3, MousePointer, FileText, Percent, Wallet, Play, Video, CheckCircle, CalendarIcon, Save, Share2, Link2, Copy, Check, Trash2, Shield, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DeleteProjectDialog } from '@/components/DeleteProjectDialog';
+import { SalesByUtmTable } from '@/components/tables/SalesByUtmTable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, generateSlug, isUUID } from '@/lib/utils';
@@ -1114,6 +1115,14 @@ const parseCurrencyInput = (value: string): number => {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Tabela de Vendas por UTM */}
+        <SalesByUtmTable
+          sales={filteredSales || []}
+          formatCurrency={formatCurrency}
+          ticketPrice={ticketPrice}
+          useGrossForRoas={useGrossForRoas}
+        />
 
         <DeleteProjectDialog
           projectName={project?.name || ''}
