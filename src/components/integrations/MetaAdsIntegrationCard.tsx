@@ -414,9 +414,18 @@ export function MetaAdsIntegrationCard({
               </div>
             )}
 
-            {/* Manual Credentials Form - ONLY for existing legacy manual integrations */}
-            {isManualLegacy && (
+            {/* Manual Credentials Form - for legacy manual integrations OR new connections */}
+            {(isManualLegacy || !isConnected) && (
               <>
+                {/* Separator when both OAuth and manual are visible */}
+                {!isConnected && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">ou conecte manualmente</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium">Access Token</label>
@@ -438,7 +447,7 @@ export function MetaAdsIntegrationCard({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Oculto por segurança. Digite novamente para atualizar.
+                      {isManualLegacy ? 'Oculto por segurança. Digite novamente para atualizar.' : 'Cole aqui o token gerado no Graph API Explorer.'}
                     </p>
                   </div>
                   <div>
@@ -469,7 +478,7 @@ export function MetaAdsIntegrationCard({
                   className="w-full"
                 >
                   {saveIntegration.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Atualizar Meta Ads
+                  {isManualLegacy ? 'Atualizar Meta Ads' : 'Salvar Meta Ads'}
                 </Button>
               </>
             )}
