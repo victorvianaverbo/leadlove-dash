@@ -1,51 +1,19 @@
 
-
-# Duas Formas de Conexao Meta Ads para Todos
-
-## Problema atual
-
-O componente MetaAdsIntegrationCard so mostra o formulario manual (Access Token + Ad Account ID) para integracoes legadas (`isManualLegacy`). Novas conexoes so veem o botao de OAuth, que depende da aprovacao do `ads_read` pela Meta.
+# Adicionar Instrucoes do Elementor Pro ao TrackingScriptCard
 
 ## O que sera feito
 
-Mostrar **ambas as opcoes** (OAuth e manual) para todos os usuarios, independente do estado da integracao:
+Adicionar instrucoes detalhadas de instalacao via Elementor Pro no componente `TrackingScriptCard`, junto com as instrucoes ja existentes de WordPress.
 
-1. **Botao "Conectar com Facebook"** (OAuth) - sempre visivel
-2. **Formulario manual** (Access Token + Ad Account ID) - sempre visivel, com separador "ou conecte manualmente"
+## Mudanca tecnica
 
-## Mudancas tecnicas
+**Arquivo:** `src/components/tracking/TrackingScriptCard.tsx`
 
-**Arquivo:** `src/components/integrations/MetaAdsIntegrationCard.tsx`
+Adicionar um novo paragrafo na secao de instrucoes (linha 54-57) com o passo a passo do Elementor Pro:
 
-| Trecho atual | Mudanca |
-|-------------|---------|
-| Linha 326: `{(!isConnected \|\| isOAuthConnected) && (` | Mostrar OAuth sempre (remover condicao) |
-| Linha 418: `{isManualLegacy && (` | Mostrar formulario manual sempre que nao conectado OU para legados, com label "ou conecte manualmente" |
-| Formulario manual | Permitir tambem para novas conexoes (sem integracao existente) |
-
-Fluxo resultante:
-
-```text
-+------------------------------------------+
-|  Meta Ads                                |
-|                                          |
-|  [Conectar com Facebook]    (OAuth)      |
-|                                          |
-|  --------- ou ---------                 |
-|                                          |
-|  Access Token: [__________]  (manual)    |
-|  Ad Account ID: act_[______]             |
-|  [Salvar Meta Ads]                       |
-|                                          |
-|  Quando conectado:                       |
-|  [Desconectar]                           |
-|  + Seletor de campanhas                  |
-+------------------------------------------+
+```
+📌 Elementor Pro: Va em Elementor > Codigo Personalizado > Adicionar Novo, cole o script.
+   Localizacao: </body> - End | Prioridade: padrao (10) | Publicar normalmente.
 ```
 
-Quando ja conectado (por qualquer metodo), mostra:
-- Status de conectado + botao desconectar
-- Se OAuth: seletor de conta + opcao de reconectar
-- Se manual: formulario para atualizar token
-- Campanhas em ambos os casos
-
+A instrucao sera inserida entre a instrucao do WordPress e a descricao do funcionamento do script, mantendo o mesmo estilo visual (texto pequeno com emoji e negrito).
