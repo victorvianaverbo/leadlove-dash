@@ -481,6 +481,29 @@ export function MetaAdsIntegrationCard({
               </>
             )}
 
+            {/* WhatsApp Help Card */}
+            <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg">
+              <div className="flex items-start gap-3">
+                <span className="text-xl flex-shrink-0">💬</span>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Teve dificuldade para configurar o Meta Ads?
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    Chama no WhatsApp que te ajudo a configurar!
+                  </p>
+                  <a
+                    href="https://wa.me/5531991618745"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    📱 Chamar no WhatsApp
+                  </a>
+                </div>
+              </div>
+            </div>
+
             {/* Campaigns Selection */}
             {isConnected && (
               <div className="pt-4 border-t space-y-4">
