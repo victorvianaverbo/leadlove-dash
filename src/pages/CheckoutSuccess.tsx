@@ -1,17 +1,46 @@
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, ArrowRight, BarChart3 } from 'lucide-react';
+import { trackEvent, generateEventId } from '@/lib/meta-pixel';
+import { supabase } from '@/integrations/supabase/client';
+import { STRIPE_PLANS } from '@/lib/stripe-plans';
 
 export default function CheckoutSuccess() {
-  const { checkSubscription } = useAuth();
+  const { checkSubscription, subscriptionTier } = useAuth();
+  const [searchParams] = useSearchParams();
+  const trackedRef = useRef(false);
 
   useEffect(() => {
-    // Refresh subscription status after successful checkout
     checkSubscription();
   }, [checkSubscription]);
+
+  useEffect(() => {
+    if (trackedRef.current) return;
+    trackedRef.current = true;
+
+    const tier = subscriptionTier || searchParams.get('plan');
+    const plan = tier && STRIPE_PLANS[tier as keyof typeof STRIPE_PLANS];
+    const value = plan ? plan.price : 97;
+    const eventId = generateEventId();
+
+    // Browser-side pixel event
+    trackEvent('Purchase', { value, currency: 'BRL' }, eventId);
+
+    // Server-side CAPI event (deduplication via same event_id)
+    supabase.functions.invoke('meta-capi', {
+      body: {
+        event_name: 'Purchase',
+        event_id: eventId,
+        value,
+        currency: 'BRL',
+        user_agent: navigator.userAgent,
+        source_url: window.location.href,
+      },
+    }).catch(console.error);
+  }, [subscriptionTier, searchParams]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
