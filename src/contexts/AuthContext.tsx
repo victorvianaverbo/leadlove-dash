@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError || !currentSession?.access_token || !currentSession?.user) {
-      console.log('No valid session for subscription check');
+      
       setSubscribed(false);
       setSubscriptionTier(null);
       setSubscriptionEnd(null);
@@ -49,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Verify token is not expired
     const tokenExpiry = currentSession.expires_at;
     if (tokenExpiry && tokenExpiry * 1000 < Date.now()) {
-      console.log('Token expired, attempting refresh');
+      
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError || !refreshData.session) {
-        console.log('Failed to refresh session');
+        
         setSubscribed(false);
         setSubscriptionTier(null);
         setSubscriptionEnd(null);
@@ -109,10 +109,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth event:', event);
+        
         
         if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed successfully');
+          
           setSession(session);
           setUser(session?.user ?? null);
         }
@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const interval = setInterval(() => {
       checkSubscription();
-    }, 60000);
+    }, 300000); // 5 minutes
 
     return () => clearInterval(interval);
   }, [session?.access_token, checkSubscription]);
@@ -184,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.warn('Failed to refresh session:', error);
         } else if (data.session) {
-          console.log('Session refreshed proactively');
+          
         }
       } catch (e) {
         console.warn('Session refresh error:', e);

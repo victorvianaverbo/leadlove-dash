@@ -26,8 +26,6 @@ import { cn, generateSlug, isUUID } from '@/lib/utils';
 
 type DateRange = 'today' | 'yesterday' | '7d' | '30d' | '90d' | 'all' | 'custom';
 
-// ID do usuário autorizado a ver o card de Configurações do Projeto
-const SETTINGS_CARD_USER_ID = '3ce82838-0c77-48ed-9530-9788e885778f';
 
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
@@ -54,8 +52,8 @@ export default function ProjectView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const autoSyncTriggered = useRef(false);
 
-  // Custom domain - use your published domain
-  const PUBLIC_DOMAIN = 'https://metrikapro.com.br';
+  // Custom domain - configurable via environment variable
+  const PUBLIC_DOMAIN = import.meta.env.VITE_PUBLIC_DOMAIN || 'https://metrikapro.com.br';
 
 
   // Currency formatting helpers
@@ -797,8 +795,8 @@ const parseCurrencyInput = (value: string): number => {
           </Alert>
         )}
 
-        {/* Project Settings - Editable Fields - Visible only for specific user */}
-        {user?.id === SETTINGS_CARD_USER_ID && (
+        {/* Project Settings - Editable Fields - Visible only for admins */}
+        {isAdmin && (
         <Card className="mb-6">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Configurações do Projeto</CardTitle>
