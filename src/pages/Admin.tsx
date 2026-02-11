@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, ArrowLeft, Shield, Users } from "lucide-react";
 import { toast } from "sonner";
 import { EditUserModal } from "@/components/admin/EditUserModal";
+import { AdminFilters } from "@/components/admin/AdminFilters";
+import { UserTagsManager } from "@/components/admin/UserTagsManager";
 import { STRIPE_PLANS, getPlanByProductId, PlanKey } from "@/lib/stripe-plans";
 
 interface UserData {
@@ -27,6 +29,7 @@ interface UserData {
     status: string | null;
     subscription_end: string | null;
   };
+  tags: string[];
 }
 
 export default function Admin() {
@@ -39,6 +42,20 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Filters
+  const [planFilter, setPlanFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
+
+  const hasActiveFilters = planFilter !== "all" || statusFilter !== "all" || tagFilter !== "all";
+
+  // All unique tags across users
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    users.forEach((u) => u.tags?.forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [users]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -50,7 +67,6 @@ export default function Admin() {
       if (!session?.access_token) return;
 
       try {
-        // Check if user is admin
         const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")
@@ -66,7 +82,6 @@ export default function Admin() {
 
         setIsAdmin(true);
 
-        // Fetch users from admin endpoint with fresh token
         const { data, error } = await supabase.functions.invoke("admin-users", {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
@@ -89,15 +104,12 @@ export default function Admin() {
 
   const handleRefresh = async () => {
     if (!session?.access_token) return;
-
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-users", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
-
       if (error) throw error;
-
       setUsers(data.users || []);
       toast.success("Dados atualizados");
     } catch (error) {
@@ -122,7 +134,6 @@ export default function Admin() {
     notes: string;
   }) => {
     if (!session?.access_token) return;
-
     try {
       const { error } = await supabase.functions.invoke("admin-users", {
         headers: { Authorization: `Bearer ${session?.access_token}` },
@@ -135,9 +146,7 @@ export default function Admin() {
           notes: data.notes,
         },
       });
-
       if (error) throw error;
-
       toast.success("Usuário atualizado com sucesso");
       setIsEditModalOpen(false);
       handleRefresh();
@@ -147,6 +156,12 @@ export default function Admin() {
     }
   };
 
+  const handleTagsChange = useCallback((userId: string, newTags: string[]) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.user_id === userId ? { ...u, tags: newTags } : u))
+    );
+  }, []);
+
   const getPlanName = (productId: string | null): string => {
     if (!productId) return "Sem plano";
     const planKey = getPlanByProductId(productId);
@@ -154,11 +169,15 @@ export default function Admin() {
     return STRIPE_PLANS[planKey].name;
   };
 
+  const getPlanKey = (productId: string | null): string | null => {
+    if (!productId) return null;
+    return getPlanByProductId(productId);
+  };
+
   const getProjectLimit = (userData: UserData): number => {
     const productId = userData.subscription.product_id;
     const planKey = productId ? getPlanByProductId(productId) : null;
     const baseLimit = planKey ? STRIPE_PLANS[planKey].projects : 0;
-    // -1 means unlimited
     if (baseLimit === -1) return 999;
     const extraProjects = userData.override?.extra_projects || 0;
     return baseLimit + extraProjects;
@@ -169,7 +188,7 @@ export default function Admin() {
       case "active":
         return <Badge className="bg-primary text-primary-foreground">Ativo</Badge>;
       case "trialing":
-        return <Badge variant="secondary">Trial</Badge>;
+        return <Badge className="bg-purple-500/20 text-purple-700 border-purple-500/30" variant="outline">Trial</Badge>;
       case "canceled":
         return <Badge variant="destructive">Cancelado</Badge>;
       case "past_due":
@@ -179,13 +198,30 @@ export default function Admin() {
     }
   };
 
-  const filteredUsers = users.filter((u) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      u.email?.toLowerCase().includes(term) ||
-      u.full_name?.toLowerCase().includes(term)
-    );
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        !term ||
+        u.email?.toLowerCase().includes(term) ||
+        u.full_name?.toLowerCase().includes(term);
+
+      const matchesPlan =
+        planFilter === "all" ||
+        (planFilter === "none" && !u.subscription.product_id) ||
+        getPlanKey(u.subscription.product_id) === planFilter;
+
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "inactive" && !u.subscription.status) ||
+        u.subscription.status === statusFilter;
+
+      const matchesTag =
+        tagFilter === "all" || u.tags?.includes(tagFilter);
+
+      return matchesSearch && matchesPlan && matchesStatus && matchesTag;
+    });
+  }, [users, searchTerm, planFilter, statusFilter, tagFilter]);
 
   if (authLoading || loading) {
     return (
@@ -246,7 +282,7 @@ export default function Admin() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
+            <div className="mb-4 space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -256,6 +292,21 @@ export default function Admin() {
                   className="pl-10"
                 />
               </div>
+              <AdminFilters
+                planFilter={planFilter}
+                statusFilter={statusFilter}
+                tagFilter={tagFilter}
+                allTags={allTags}
+                onPlanChange={setPlanFilter}
+                onStatusChange={setStatusFilter}
+                onTagChange={setTagFilter}
+                onClear={() => {
+                  setPlanFilter("all");
+                  setStatusFilter("all");
+                  setTagFilter("all");
+                }}
+                hasActiveFilters={hasActiveFilters}
+              />
             </div>
 
             <div className="overflow-x-auto">
@@ -265,8 +316,7 @@ export default function Admin() {
                     <th className="text-left py-3 px-4 font-medium">Usuário</th>
                     <th className="text-left py-3 px-4 font-medium">Plano</th>
                     <th className="text-left py-3 px-4 font-medium">Status</th>
-                    <th className="text-left py-3 px-4 font-medium">Admin</th>
-                    <th className="text-left py-3 px-4 font-medium">Projetos</th>
+                    <th className="text-left py-3 px-4 font-medium">Tags</th>
                     <th className="text-left py-3 px-4 font-medium">Projetos</th>
                     <th className="text-left py-3 px-4 font-medium">Override</th>
                     <th className="text-left py-3 px-4 font-medium">Ações</th>
@@ -277,22 +327,29 @@ export default function Admin() {
                     <tr key={userData.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-4">
                         <div>
-                          <p className="font-medium">{userData.full_name || "Sem nome"}</p>
+                          <p className="font-medium flex items-center gap-2">
+                            {userData.full_name || "Sem nome"}
+                            {userData.is_admin && (
+                              <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0">Admin</Badge>
+                            )}
+                          </p>
                           <p className="text-sm text-muted-foreground">{userData.email}</p>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 text-sm">
                         {getPlanName(userData.subscription.product_id)}
                       </td>
                       <td className="py-3 px-4">
                         {getStatusBadge(userData.subscription.status)}
                       </td>
-                      <td className="py-3 px-4">
-                        {userData.is_admin ? (
-                          <Badge className="bg-primary text-primary-foreground">Admin</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                      <td className="py-3 px-4 max-w-[200px]">
+                        <UserTagsManager
+                          userId={userData.user_id}
+                          tags={userData.tags || []}
+                          allTags={allTags}
+                          accessToken={session?.access_token || ""}
+                          onTagsChange={handleTagsChange}
+                        />
                       </td>
                       <td className="py-3 px-4">
                         <span className={userData.project_count >= getProjectLimit(userData) ? "text-destructive font-medium" : ""}>

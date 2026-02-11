@@ -22,7 +22,6 @@ async function verifyAdmin(req: Request) {
 
   const token = authHeader.replace("Bearer ", "");
 
-  // Validate token via GoTrue API directly (compatible with ES256 tokens)
   const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -41,7 +40,6 @@ async function verifyAdmin(req: Request) {
 
   logStep("User validated", { userId: user.id });
 
-  // Service role client for admin operations
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -67,11 +65,12 @@ async function verifyAdmin(req: Request) {
 async function handleGet(supabaseAdmin: ReturnType<typeof createClient>) {
   logStep("Fetching all users");
 
-  const [profilesRes, projectsRes, overridesRes, rolesRes] = await Promise.all([
+  const [profilesRes, projectsRes, overridesRes, rolesRes, tagsRes] = await Promise.all([
     supabaseAdmin.from("profiles").select("*").order("created_at", { ascending: false }),
     supabaseAdmin.from("projects").select("user_id"),
     supabaseAdmin.from("user_overrides").select("*"),
     supabaseAdmin.from("user_roles").select("user_id, role").eq("role", "admin"),
+    supabaseAdmin.from("user_tags").select("*"),
   ]);
 
   if (profilesRes.error) throw new Error(`Failed to fetch profiles: ${profilesRes.error.message}`);
@@ -90,6 +89,13 @@ async function handleGet(supabaseAdmin: ReturnType<typeof createClient>) {
 
   const adminSet = new Set<string>();
   rolesRes.data?.forEach((r) => adminSet.add(r.user_id));
+
+  // Build tags map: user_id -> string[]
+  const tagsMap: Record<string, string[]> = {};
+  tagsRes.data?.forEach((t: any) => {
+    if (!tagsMap[t.user_id]) tagsMap[t.user_id] = [];
+    tagsMap[t.user_id].push(t.tag);
+  });
 
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   let stripe: Stripe | null = null;
@@ -139,12 +145,55 @@ async function handleGet(supabaseAdmin: ReturnType<typeof createClient>) {
         override: overrideMap[profile.user_id] || null,
         is_admin: adminSet.has(profile.user_id),
         subscription: subscriptionData,
+        tags: tagsMap[profile.user_id] || [],
       };
     })
   );
 
   logStep("Returning users", { count: usersWithData.length });
   return usersWithData;
+}
+
+async function handleTagAction(
+  body: Record<string, unknown>,
+  supabaseAdmin: ReturnType<typeof createClient>,
+  adminUserId: string
+) {
+  const { action, user_id, tag } = body as {
+    action: string;
+    user_id: string;
+    tag: string;
+  };
+
+  if (!user_id || !tag) throw new Error("user_id and tag are required");
+
+  if (action === "add_tag") {
+    const { error } = await supabaseAdmin
+      .from("user_tags")
+      .insert({ user_id, tag, created_by: adminUserId });
+    if (error) {
+      if (error.code === "23505") {
+        logStep("Tag already exists", { user_id, tag });
+        return { success: true, message: "Tag already exists" };
+      }
+      throw new Error(`Failed to add tag: ${error.message}`);
+    }
+    logStep("Tag added", { user_id, tag });
+    return { success: true };
+  }
+
+  if (action === "remove_tag") {
+    const { error } = await supabaseAdmin
+      .from("user_tags")
+      .delete()
+      .eq("user_id", user_id)
+      .eq("tag", tag);
+    if (error) throw new Error(`Failed to remove tag: ${error.message}`);
+    logStep("Tag removed", { user_id, tag });
+    return { success: true };
+  }
+
+  throw new Error(`Unknown action: ${action}`);
 }
 
 async function handlePut(
@@ -165,7 +214,6 @@ async function handlePut(
 
   logStep("Updating user", { user_id, email, hasPassword: !!password, is_admin });
 
-  // Update email and/or password via auth admin
   if (email !== undefined || password) {
     const updatePayload: Record<string, string> = {};
     if (email !== undefined) updatePayload.email = email;
@@ -174,10 +222,8 @@ async function handlePut(
       updatePayload.password = password;
     }
 
-    // Sync email in Stripe before updating auth
     if (email !== undefined) {
       try {
-        // Get current email from profiles
         const { data: currentProfile } = await supabaseAdmin
           .from("profiles")
           .select("email")
@@ -213,7 +259,6 @@ async function handlePut(
         .eq("user_id", user_id);
       if (profileUpdateError) throw new Error(`Failed to update profile email: ${profileUpdateError.message}`);
 
-      // Remove OAuth identities (Google, etc.) to prevent login with old provider
       try {
         const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
         if (!userError && userData?.user?.identities) {
@@ -238,7 +283,6 @@ async function handlePut(
     logStep("Auth user updated", { user_id });
   }
 
-  // Toggle admin role
   if (is_admin !== undefined) {
     if (!is_admin && user_id === adminUserId) {
       throw new Error("Cannot remove your own admin role");
@@ -261,7 +305,6 @@ async function handlePut(
     }
   }
 
-  // Update overrides
   if (extra_projects !== undefined) {
     const { data: existingOverride } = await supabaseAdmin
       .from("user_overrides")
@@ -295,9 +338,7 @@ serve(async (req) => {
   try {
     const { supabaseAdmin, adminUser } = await verifyAdmin(req);
 
-    // GET or POST without body = list users
     if (req.method === "GET" || req.method === "POST") {
-      // Check if it's a PUT-like operation (has body with user_id)
       let body = null;
       if (req.method === "POST") {
         try {
@@ -308,6 +349,14 @@ serve(async (req) => {
         } catch {
           // No body or invalid JSON, treat as list request
         }
+      }
+
+      // Handle tag actions
+      if (body?.action && (body.action === "add_tag" || body.action === "remove_tag")) {
+        const result = await handleTagAction(body, supabaseAdmin, adminUser.id);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // If POST has user_id in body, treat as update operation
