@@ -56,3 +56,9 @@ verify_jwt = false
 
 [functions.delete-project]
 verify_jwt = false
+
+[functions.meta-capi]
+verify_jwt = false
+
+[functions.meta-pixel-config]
+verify_jwt = false
