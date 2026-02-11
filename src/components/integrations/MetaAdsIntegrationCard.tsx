@@ -326,25 +326,23 @@ export function MetaAdsIntegrationCard({
             {(!isConnected || isOAuthConnected) && (
               <div className="space-y-3">
                 <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
-                  <p className="text-sm font-medium">
-                    {isConnected ? 'Reconectar via Facebook Login' : 'Conectar via Facebook Login'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">
+                      Conectar via Facebook Login
+                    </p>
+                    <Badge variant="secondary" className="text-xs">
+                      Em breve
+                    </Badge>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {isConnected 
-                      ? 'Reconecte para atualizar permissões ou trocar de conta.'
-                      : 'Clique no botão abaixo para autorizar o acesso às suas campanhas do Meta Ads. O processo leva menos de 2 minutos.'}
+                    A conexão direta com o Facebook estará disponível em breve. Por enquanto, use o método manual abaixo com seu próprio Token e Ad Account ID.
                   </p>
                   <Button
-                    onClick={handleFacebookLogin}
-                    disabled={oauthLoading}
-                    className="w-full bg-[#1877F2] hover:bg-[#166FE5] text-white"
+                    disabled
+                    className="w-full bg-[#1877F2]/50 text-white cursor-not-allowed"
                   >
-                    {oauthLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Facebook className="h-4 w-4 mr-2" />
-                    )}
-                    {isConnected ? 'Reconectar com Facebook' : 'Conectar com Facebook'}
+                    <Facebook className="h-4 w-4 mr-2" />
+                    Conectar com Facebook
                   </Button>
                 </div>
               </div>
@@ -421,7 +419,7 @@ export function MetaAdsIntegrationCard({
                 {!isConnected && (
                   <div className="flex items-center gap-3">
                     <div className="flex-1 h-px bg-border" />
-                    <span className="text-xs text-muted-foreground">ou conecte manualmente</span>
+                    <span className="text-xs text-muted-foreground">conecte manualmente</span>
                     <div className="flex-1 h-px bg-border" />
                   </div>
                 )}
