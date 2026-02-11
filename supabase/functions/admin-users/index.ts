@@ -212,6 +212,27 @@ async function handlePut(
         .update({ email })
         .eq("user_id", user_id);
       if (profileUpdateError) throw new Error(`Failed to update profile email: ${profileUpdateError.message}`);
+
+      // Remove OAuth identities (Google, etc.) to prevent login with old provider
+      try {
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(user_id);
+        if (!userError && userData?.user?.identities) {
+          const oauthIdentities = userData.user.identities.filter((id: any) => id.provider !== "email");
+          for (const identity of oauthIdentities) {
+            const { error: delError } = await supabaseAdmin.auth.admin.deleteIdentity(identity.id);
+            if (delError) {
+              logStep("Failed to delete identity", { provider: identity.provider, error: delError.message });
+            } else {
+              logStep("OAuth identity removed", { provider: identity.provider, providerEmail: identity.identity_data?.email });
+            }
+          }
+          if (oauthIdentities.length === 0) {
+            logStep("No OAuth identities to remove", { user_id });
+          }
+        }
+      } catch (identityError) {
+        logStep("Identity cleanup error (non-fatal)", { error: String(identityError) });
+      }
     }
 
     logStep("Auth user updated", { user_id });
