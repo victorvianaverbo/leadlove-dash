@@ -9,6 +9,27 @@ const corsHeaders = {
 const FIRST_SYNC_DAYS = 90;
 const INCREMENTAL_MARGIN_DAYS = 7;
 
+// Rate limiting: max 1 sync per project every 5 minutes
+const RATE_LIMIT_MS = 5 * 60 * 1000;
+const rateLimitMap = new Map<string, number>();
+
+function isRateLimited(projectId: string): boolean {
+  const now = Date.now();
+  const lastSync = rateLimitMap.get(projectId);
+  if (lastSync && now - lastSync < RATE_LIMIT_MS) {
+    return true;
+  }
+  rateLimitMap.set(projectId, now);
+  // Clean old entries to prevent memory leak
+  if (rateLimitMap.size > 1000) {
+    const cutoff = now - RATE_LIMIT_MS;
+    for (const [key, ts] of rateLimitMap) {
+      if (ts < cutoff) rateLimitMap.delete(key);
+    }
+  }
+  return false;
+}
+
 // Helper to get date in Brasília timezone (UTC-3)
 function getBrasiliaDate(daysAgo = 0): Date {
   const now = new Date();
@@ -66,6 +87,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Invalid project_id format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limit: max 1 sync per project every 5 minutes
+    if (isRateLimited(project_id)) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limited. Try again in a few minutes.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
