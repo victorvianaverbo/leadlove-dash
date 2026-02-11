@@ -1,65 +1,53 @@
 
 
-# 4 Tabelas UTM: Source, Campaign, Medium e Content
+# Desvincular identidades OAuth ao alterar email pelo Admin
 
-## O que sera feito
+## Problema
 
-Substituir a tabela unica atual por 4 tabelas separadas, cada uma agrupando vendas por um parametro UTM diferente:
+Quando o admin altera o email de um usuario, a identidade Google (OAuth) antiga permanece vinculada na tabela `auth.identities`. Isso permite que o usuario continue logando com o Google antigo, ignorando a troca de email.
 
-1. **Vendas por Source** - agrupa por `utm_source`
-2. **Vendas por Campaign** - agrupa por `utm_campaign`
-3. **Vendas por Medium** - agrupa por `utm_medium`
-4. **Vendas por Content** - agrupa por `utm_content`
+## Solucao
 
-Cada tabela tera 3 colunas: o valor UTM, quantidade de vendas, receita e percentual do total.
+Adicionar logica na edge function `admin-users` para, ao detectar mudanca de email, listar e remover todas as identidades OAuth (Google, etc.) do usuario via `supabase.auth.admin.deleteIdentity()`.
 
-## Layout
+## Mudanca tecnica
 
-As 4 tabelas serao organizadas em abas (Tabs) dentro de um unico Card para manter a interface limpa:
+**Arquivo:** `supabase/functions/admin-users/index.ts`
+
+Na funcao `handlePut`, apos atualizar o email no auth e no profile, adicionar:
+
+1. Listar identidades do usuario via `supabase.auth.admin.getUserById(user_id)`
+2. Filtrar identidades cujo provider seja diferente de `"email"` (ex: `"google"`)
+3. Para cada identidade OAuth encontrada, chamar `supabase.auth.admin.deleteIdentity(identity.id)` (identificador no campo `identity_id` do objeto)
+4. Logar quais identidades foram removidas
 
 ```text
-+--------------------------------------------------+
-|  Vendas por UTM                                  |
-|  [Source] [Campaign] [Medium] [Content]          |
-|                                                  |
-|  Origem      | Vendas | Receita  | % Total      |
-|  ig          | 38     | R$ 419   | 82%          |
-|  facebook    | 5      | R$ 160   | 14%          |
-|  (direto)    | 2      | R$ 64    | 4%           |
-|                                                  |
-|  Mostrando [10] de 3 registros                   |
-+--------------------------------------------------+
+Fluxo atualizado:
+
+  Admin altera email
+       |
+       v
+  Atualiza Stripe (ja existe)
+       |
+       v
+  Atualiza auth.users (ja existe)
+       |
+       v
+  Atualiza profiles (ja existe)
+       |
+       v
+  [NOVO] Lista identidades do usuario
+       |
+       v
+  [NOVO] Remove identidades OAuth (google, etc.)
+       |
+       v
+  Log de identidades removidas
 ```
 
-## Mudancas tecnicas
-
-### 1. Refatorar `SalesByUtmTable.tsx`
-
-**Arquivo:** `src/components/tables/SalesByUtmTable.tsx`
-
-- Atualizar a interface `Sale` para incluir `utm_medium` e `utm_content`
-- Criar uma funcao generica de agrupamento que recebe o campo UTM como parametro
-- Usar o componente `Tabs` (ja existente no projeto) com 4 abas
-- Cada aba renderiza um `PaginatedTable` com dados agrupados pelo respectivo campo UTM
-- Colunas de cada aba: Nome do parametro, Vendas, Receita, % do Total
-
-### 2. Atualizar ProjectView.tsx
-
-**Arquivo:** `src/pages/ProjectView.tsx`
-
-- Nenhuma mudanca nas props passadas ao componente (ja passa `sales` com todos os campos UTM)
-
-### 3. Atualizar PublicDashboard.tsx
-
-**Arquivo:** `src/pages/PublicDashboard.tsx`
-
-- Nenhuma mudanca nas props (a view `sales_public` ja inclui `utm_medium` e `utm_content`)
-
-### Resumo de arquivos
+A mudanca fica contida no bloco `if (email !== undefined)` ja existente, logo apos a atualizacao do profile. Nenhum outro arquivo precisa ser alterado.
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/tables/SalesByUtmTable.tsx` | Refatorar - 4 abas com agrupamento generico |
-
-Apenas 1 arquivo precisa ser alterado, pois a logica fica toda no componente e os dados ja estao disponiveis.
+| `supabase/functions/admin-users/index.ts` | Adicionar remocao de identidades OAuth apos troca de email |
 
