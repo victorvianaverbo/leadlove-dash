@@ -39,6 +39,26 @@ export function trackEvent(eventName: string, params?: Record<string, unknown>, 
   }
 }
 
+function waitForPixel(timeout = 5000): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && window.fbq) { resolve(); return; }
+    const interval = 200;
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      elapsed += interval;
+      if ((typeof window !== 'undefined' && window.fbq) || elapsed >= timeout) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, interval);
+  });
+}
+
+export async function trackEventWithRetry(eventName: string, params?: Record<string, unknown>, eventId?: string) {
+  await waitForPixel();
+  trackEvent(eventName, params, eventId);
+}
+
 export function generateEventId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
