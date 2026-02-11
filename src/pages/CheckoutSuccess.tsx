@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle, ArrowRight, BarChart3 } from 'lucide-react';
-import { trackEvent, generateEventId } from '@/lib/meta-pixel';
+import { trackEventWithRetry, generateEventId } from '@/lib/meta-pixel';
 import { supabase } from '@/integrations/supabase/client';
 import { STRIPE_PLANS } from '@/lib/stripe-plans';
 
@@ -26,8 +26,8 @@ export default function CheckoutSuccess() {
     const value = plan ? plan.price : 97;
     const eventId = generateEventId();
 
-    // Browser-side pixel event
-    trackEvent('Purchase', { value, currency: 'BRL' }, eventId);
+    // Browser-side pixel event (aguarda pixel carregar)
+    trackEventWithRetry('Purchase', { value, currency: 'BRL' }, eventId);
 
     // Server-side CAPI event (deduplication via same event_id)
     supabase.functions.invoke('meta-capi', {
