@@ -36,9 +36,17 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    supabase.functions.invoke('meta-pixel-config').then(({ data }) => {
-      if (data?.pixelId) initMetaPixel(data.pixelId);
-    });
+    // Defer meta pixel init to after page is interactive (improves TTI)
+    const loadPixel = () => {
+      supabase.functions.invoke('meta-pixel-config').then(({ data }) => {
+        if (data?.pixelId) initMetaPixel(data.pixelId);
+      });
+    };
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(loadPixel, { timeout: 3000 });
+    } else {
+      setTimeout(loadPixel, 2000);
+    }
   }, []);
 
   return (
