@@ -1,41 +1,59 @@
 
 
-## Plano: Adicionar telefone de suporte, aviso de ajuda no Meta Ads e restaurar tutorial
+## Plano: Meta Pixel + Conversions API (CAPI)
 
-### 1. Telefone de suporte na pagina de vendas (Index.tsx)
-- Adicionar no footer da landing page o numero de WhatsApp formatado: (31) 99161-8745
-- Link clicavel para `https://wa.me/5531991618745`
+### O que sera feito
 
-### 2. Telefone de suporte dentro do app (Dashboard.tsx)
-- Adicionar um link de suporte via WhatsApp no header ou footer do dashboard, visivel para usuarios logados
-- Mesmo link: `https://wa.me/5531991618745`
+1. **Salvar os secrets** (META_PIXEL_ID e META_PIXEL_ACCESS_TOKEN) de forma segura no backend
+2. **Meta Pixel no frontend** - Carregar o script do Pixel em todas as paginas e disparar eventos:
+   - `PageView` em todas as paginas
+   - `ViewContent` na landing page
+   - `InitiateCheckout` ao abrir o modal de checkout
+   - `Purchase` na pagina `/checkout/success`
+3. **CAPI via Edge Function** - Criar uma edge function `meta-capi` que envia o evento `Purchase` server-side para o Meta, garantindo maior precisao na atribuicao (nao depende de bloqueadores de anuncios)
+4. **Deduplicacao** - Usar um `event_id` compartilhado entre Pixel (browser) e CAPI (server) para evitar contagem duplicada
 
-### 3. Aviso de ajuda na configuracao do Meta Ads
-- No componente `MetaAdsIntegrationCard.tsx`, adicionar um alerta/card visivel com mensagem do tipo:
-  - "Teve dificuldade para configurar o Meta Ads? Chama no WhatsApp que te ajudo!"
-  - Com botao/link direto para o WhatsApp: `https://wa.me/5531991618745`
-- Tambem adicionar esse aviso no tutorial `MetaAdsTutorial.tsx` na secao de solucao de problemas
+### Fluxo
 
-### 4. Restaurar tutorial do Meta Ads para fluxo "Criar App"
-- Reverter o `MetaAdsTutorial.tsx` para incluir novamente as instrucoes de criacao de app no Facebook Developers / Graph API Explorer / geracao manual de token
-- Manter o fluxo OAuth como opcao principal mas re-adicionar a secao legada como alternativa para quem precisar
-
----
+```text
+Usuario compra no Stripe
+        |
+        v
+  /checkout/success
+        |
+   +---------+---------+
+   |                   |
+   v                   v
+Meta Pixel          Edge Function
+(browser)           meta-capi (server)
+fbq('track',        POST /meta-capi
+'Purchase')         { event: 'Purchase',
+event_id: X           event_id: X }
+   |                   |
+   +--------+----------+
+            |
+            v
+     Meta deduplica
+     pelo event_id
+```
 
 ### Detalhes tecnicos
 
+**Secrets necessarios (2 novos):**
+- `META_PIXEL_ID` - ID do Pixel do Meta (encontrado em Gerenciador de Eventos do Facebook)
+- `META_PIXEL_ACCESS_TOKEN` - Token de acesso do CAPI (gerado em Gerenciador de Eventos > Configuracoes > API de Conversoes > Gerar token)
+
+**Arquivos a criar:**
+- `supabase/functions/meta-capi/index.ts` - Edge function que envia eventos server-side para `graph.facebook.com/v21.0/{pixel_id}/events`
+
 **Arquivos a modificar:**
+- `index.html` - Adicionar script base do Meta Pixel (usando o PIXEL_ID como variavel de ambiente VITE)
+- `src/pages/CheckoutSuccess.tsx` - Disparar `fbq('track', 'Purchase', {value, currency})` com event_id e chamar a edge function `meta-capi` com o mesmo event_id
+- `src/pages/Index.tsx` - Disparar `fbq('track', 'ViewContent')` na landing page
+- `src/components/CheckoutModal.tsx` - Disparar `fbq('track', 'InitiateCheckout')` ao abrir o modal
+- `supabase/config.toml` - Registrar a nova edge function `meta-capi`
 
-1. **`src/pages/Index.tsx`** (footer, ~linha 448-468)
-   - Adicionar linha com icone de WhatsApp e numero formatado com link
-
-2. **`src/pages/Dashboard.tsx`** (header area)
-   - Adicionar link de suporte WhatsApp no cabecalho do dashboard
-
-3. **`src/components/integrations/MetaAdsIntegrationCard.tsx`**
-   - Adicionar card de aviso com link WhatsApp para ajuda na configuracao
-
-4. **`src/components/docs/MetaAdsTutorial.tsx`**
-   - Adicionar aviso de suporte WhatsApp na secao de solucao de problemas
-   - Re-adicionar secoes sobre criacao de app e geracao manual de token como metodo alternativo
+**Valor do Purchase:**
+- Sera extraido do plano assinado (R$97, R$197, R$397 ou R$997) usando os dados do `stripe-plans.ts`
+- Currency: `BRL`
 
