@@ -459,6 +459,14 @@ export default function Index() {
               <Link to="/documentacao" className="hover:text-foreground transition-colors">Documentação</Link>
               <Link to="/terms" className="hover:text-foreground transition-colors">Termos de Uso</Link>
               <Link to="/privacy" className="hover:text-foreground transition-colors">Privacidade</Link>
+              <a 
+                href="https://wa.me/5531991618745" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:text-foreground transition-colors flex items-center gap-1.5"
+              >
+                📱 Suporte WhatsApp
+              </a>
             </div>
             <p className="text-sm text-muted-foreground font-light">
               © 2026 MetrikaPRO
