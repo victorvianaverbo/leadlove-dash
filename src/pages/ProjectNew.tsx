@@ -42,11 +42,12 @@ export default function ProjectNew() {
 
   // Fetch current project count
   const { data: projectCount = 0, isLoading: countLoading } = useQuery({
-    queryKey: ['project-count'],
+    queryKey: ['project-count', user?.id],
     queryFn: async () => {
       const { count, error } = await supabase
         .from('projects')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id);
       if (error) throw error;
       return count ?? 0;
     },
