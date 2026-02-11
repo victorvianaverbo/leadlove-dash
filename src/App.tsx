@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,26 +7,30 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { initMetaPixel } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
+
+// Eagerly load the landing page for fast LCP
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import ProjectNew from "./pages/ProjectNew";
-import ProjectEdit from "./pages/ProjectEdit";
-import ProjectView from "./pages/ProjectView";
-import PublicDashboard from "./pages/PublicDashboard";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import Documentation from "./pages/Documentation";
-import CheckoutSuccess from "./pages/CheckoutSuccess";
-import CheckoutCancel from "./pages/CheckoutCancel";
-import Admin from "./pages/Admin";
-import AdminProjects from "./pages/AdminProjects";
-import Pricing from "./pages/Pricing";
-import NotFound from "./pages/NotFound";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Settings from "./pages/Settings";
-import OAuthCallback from "./pages/OAuthCallback";
+
+// Lazy load all other routes to reduce initial bundle size
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ProjectNew = lazy(() => import("./pages/ProjectNew"));
+const ProjectEdit = lazy(() => import("./pages/ProjectEdit"));
+const ProjectView = lazy(() => import("./pages/ProjectView"));
+const PublicDashboard = lazy(() => import("./pages/PublicDashboard"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
+const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminProjects = lazy(() => import("./pages/AdminProjects"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Settings = lazy(() => import("./pages/Settings"));
+const OAuthCallback = lazy(() => import("./pages/OAuthCallback"));
 
 const queryClient = new QueryClient();
 
@@ -44,29 +48,31 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/projects/new" element={<ProjectNew />} />
-            <Route path="/projects/:id" element={<ProjectView />} />
-            <Route path="/projects/:id/edit" element={<ProjectEdit />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/documentacao" element={<Documentation />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/checkout/success" element={<CheckoutSuccess />} />
-            <Route path="/checkout/cancel" element={<CheckoutCancel />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/projects" element={<AdminProjects />} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
-            {/* Public dashboard route - must be last to avoid conflicts */}
-            <Route path="/:slug" element={<PublicDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<div className="min-h-screen bg-background" />}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/projects/new" element={<ProjectNew />} />
+              <Route path="/projects/:id" element={<ProjectView />} />
+              <Route path="/projects/:id/edit" element={<ProjectEdit />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/documentacao" element={<Documentation />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/checkout/success" element={<CheckoutSuccess />} />
+              <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/admin/projects" element={<AdminProjects />} />
+              <Route path="/oauth/callback" element={<OAuthCallback />} />
+              {/* Public dashboard route - must be last to avoid conflicts */}
+              <Route path="/:slug" element={<PublicDashboard />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
