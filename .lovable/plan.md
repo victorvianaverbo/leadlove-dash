@@ -1,21 +1,92 @@
 
 
-## Correção: Contagem de Projetos sem Filtro de Usuário
+## CRM no Painel Admin: Tags + Filtro de Trial/Onboarding
 
-### Problema
-Na página de criar projeto (`ProjectNew.tsx`), a query que conta quantos projetos o usuário tem **não filtra por usuário**. Isso faz com que ela conte todos os projetos da plataforma inteira, mostrando "10 de 1" para o Victor quando deveria mostrar "0 de 1".
+### Objetivo
+Evoluir o painel admin existente (`/admin`) com funcionalidades de CRM: sistema de tags por usuario e filtros avancados para identificar usuarios em trial, por plano, status, etc.
 
-### O que será alterado
+### O que sera feito
 
-**`src/pages/ProjectNew.tsx`** (2 mudanças pequenas):
+**1. Nova tabela `user_tags` no banco de dados**
+- Armazena tags por usuario (ex: "VIP", "Risco de churn", "Onboarding", "Trial")
+- Colunas: `id`, `user_id`, `tag` (texto), `created_at`, `created_by` (quem adicionou)
+- RLS: apenas admins podem ler/criar/deletar
+- Permite multiplas tags por usuario
 
-1. Adicionar `.eq('user_id', user!.id)` na query de contagem de projetos (linha 49)
-2. Incluir `user?.id` na `queryKey` para que o cache seja por usuário: `['project-count', user?.id]`
+**2. Atualizar a Edge Function `admin-users`**
+- Buscar tags de cada usuario na query GET
+- Novo endpoint para adicionar/remover tags (POST com `action: 'add_tag'` ou `action: 'remove_tag'`)
 
-### Resultado
-- Victor (e todos os outros usuários) verão a contagem correta dos **seus** projetos
-- O limite do plano será respeitado individualmente por conta
+**3. Evoluir a pagina `/admin` com:**
 
-### Verificação
-As demais queries de projetos no Dashboard, ProjectView e ProjectEdit já filtram corretamente por `user_id` ou por slug/UUID com RLS -- não precisam de ajuste.
+- **Barra de filtros avancados** abaixo da busca:
+  - Filtro por plano (Starter, Pro, Business, Agencia, Sem plano)
+  - Filtro por status (Ativo, Trial, Cancelado, Inativo)
+  - Filtro por tag (selecao multipla)
+  - Botao para limpar filtros
 
+- **Coluna de Tags na tabela**:
+  - Exibir badges coloridas com as tags do usuario
+  - Botao "+" para adicionar tag (popover com input)
+  - Clique na tag para remover
+
+- **Destaque visual para usuarios em Trial**:
+  - Badge especial "Trial" visivel na tabela
+  - Filtro rapido "Em Trial" para listar quem precisa de onboarding
+
+**4. Componente `UserTagsManager`**
+- Componente reutilizavel para gerenciar tags de um usuario
+- Permite adicionar tags digitando ou selecionando de tags ja existentes
+- Permite remover tags com um clique
+
+### Detalhes tecnicos
+
+**Tabela `user_tags`:**
+```text
+user_tags
+  id          uuid (PK, default gen_random_uuid())
+  user_id     uuid (NOT NULL, ref auth.users ON DELETE CASCADE)
+  tag         text (NOT NULL)
+  created_at  timestamptz (default now())
+  created_by  uuid (NOT NULL)
+  UNIQUE(user_id, tag)
+```
+
+**RLS:**
+- SELECT, INSERT, DELETE: apenas `has_role(auth.uid(), 'admin')`
+
+**Fluxo de dados:**
+```text
+Admin abre /admin
+  |
+  v
+Edge Function busca profiles + projects + overrides + roles + tags
+  |
+  v
+Frontend recebe lista com tags por usuario
+  |
+  v
+Admin filtra por plano/status/tag
+  |
+  v
+Admin adiciona/remove tags via popover
+  |
+  v
+Edge Function persiste no user_tags
+```
+
+**Arquivos a criar:**
+- `src/components/admin/UserTagsManager.tsx` -- componente de tags
+- `src/components/admin/AdminFilters.tsx` -- barra de filtros
+
+**Arquivos a modificar:**
+- `supabase/functions/admin-users/index.ts` -- buscar e gerenciar tags
+- `src/pages/Admin.tsx` -- integrar filtros, tags e nova coluna
+- Migracaoo SQL para criar tabela `user_tags`
+
+### Resultado final
+O painel admin tera uma visao CRM completa onde voce podera:
+- Ver rapidamente quem esta em trial e precisa de onboarding
+- Tagear usuarios como "VIP", "Risco de churn", etc.
+- Filtrar por qualquer combinacao de plano + status + tag
+- Tudo integrado na mesma pagina que ja existe
