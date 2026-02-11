@@ -71,13 +71,21 @@ Deno.serve(async (req) => {
     // Create a client with service role for all operations (no user auth required)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { project_id } = await req.json();
+    const { project_id, share_token } = await req.json();
     
     // Validate project_id is provided
     if (!project_id) {
       return new Response(
         JSON.stringify({ error: 'project_id is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate share_token is provided (authentication for public sync)
+    if (!share_token || typeof share_token !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'share_token is required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
@@ -116,6 +124,14 @@ Deno.serve(async (req) => {
     if (!project.is_public) {
       return new Response(
         JSON.stringify({ error: 'Project is not public' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Security check: validate share_token matches project
+    if (project.share_token !== share_token) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid share_token' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -426,7 +426,7 @@ export default function PublicDashboard() {
     try {
       // Step 1: Sync data from Kiwify + Meta Ads
       const { error: syncError, data: syncData } = await supabase.functions.invoke('sync-public-project', {
-        body: { project_id: project.id }
+        body: { project_id: project.id, share_token: project.share_token }
       });
 
       if (syncError) throw syncError;
