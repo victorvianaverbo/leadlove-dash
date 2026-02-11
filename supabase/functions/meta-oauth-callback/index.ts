@@ -59,7 +59,27 @@ Deno.serve(async (req) => {
   const stateParts = state.split("|");
   const projectId = stateParts[0];
   const userId = stateParts[1];
-  const originUrl = stateParts[2] || "https://metrikapro.com.br";
+  const rawOriginUrl = stateParts[2] || "https://metrikapro.com.br";
+
+  // Allowlist de domínios permitidos para redirect
+  const ALLOWED_DOMAINS = [
+    "metrikapro.com.br",
+    "www.metrikapro.com.br",
+    "leadlove-dash.lovable.app",
+  ];
+  // Aceitar qualquer subdomínio .lovable.app (previews)
+  let originUrl = "https://metrikapro.com.br";
+  try {
+    const parsedUrl = new URL(rawOriginUrl);
+    const hostname = parsedUrl.hostname;
+    if (ALLOWED_DOMAINS.includes(hostname) || hostname.endsWith(".lovable.app")) {
+      originUrl = parsedUrl.origin;
+    } else {
+      console.warn("[meta-oauth-callback] Blocked redirect to:", hostname);
+    }
+  } catch {
+    console.warn("[meta-oauth-callback] Invalid origin URL:", rawOriginUrl);
+  }
 
   if (!projectId || !userId) {
     console.error("[meta-oauth-callback] Invalid state format");
@@ -77,6 +97,22 @@ Deno.serve(async (req) => {
     if (!META_APP_ID || !META_APP_SECRET) {
       throw new Error("META_APP_ID or META_APP_SECRET not configured");
     }
+
+    // Step 0: Validate ownership - userId must own projectId
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const { data: projectData, error: projectError } = await supabaseAdmin
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (projectError || !projectData) {
+      console.error("[meta-oauth-callback] Ownership validation failed:", { projectId, userId, projectError });
+      return redirectToApp(originUrl, "error", "Você não tem permissão para este projeto");
+    }
+
+    console.log("[meta-oauth-callback] Ownership validated");
 
     const redirectUri = `${SUPABASE_URL}/functions/v1/meta-oauth-callback`;
     console.log("[meta-oauth-callback] redirect_uri used for token exchange:", redirectUri);
@@ -131,7 +167,7 @@ Deno.serve(async (req) => {
     console.log("[meta-oauth-callback] Selected ad account:", adAccountId);
 
     // Step 4: Save to integrations table
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    // Reuse supabaseAdmin created earlier
 
     const credentials = {
       access_token: accessToken,
@@ -146,7 +182,7 @@ Deno.serve(async (req) => {
     };
 
     // Check if integration already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from("integrations")
       .select("id")
       .eq("project_id", projectId)
@@ -154,14 +190,14 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from("integrations")
         .update({ credentials, is_active: true })
         .eq("id", existing.id);
       if (updateError) throw updateError;
       console.log("[meta-oauth-callback] Updated existing integration");
     } else {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from("integrations")
         .insert({
           user_id: userId,
