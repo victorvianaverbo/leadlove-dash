@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { trackEvent } from '@/lib/meta-pixel';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,10 @@ export default function Index() {
       navigate('/dashboard');
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    trackEvent('ViewContent', { content_name: 'Landing Page' });
+  }, []);
 
   const handleSubscribe = async (planKey: PlanKey) => {
     if (!user || !session) {

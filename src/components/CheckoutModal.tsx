@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { trackEvent } from '@/lib/meta-pixel';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   EmbeddedCheckoutProvider,
@@ -24,6 +25,11 @@ interface CheckoutModalProps {
 }
 
 export function CheckoutModal({ isOpen, onClose, priceId, planName }: CheckoutModalProps) {
+  useEffect(() => {
+    if (isOpen && priceId) {
+      trackEvent('InitiateCheckout', { content_name: planName || 'Unknown' });
+    }
+  }, [isOpen, priceId, planName]);
   const fetchClientSecret = useCallback(async () => {
     if (!priceId) throw new Error('No price ID provided');
     
