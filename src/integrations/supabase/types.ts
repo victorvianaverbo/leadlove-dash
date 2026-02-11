@@ -521,6 +521,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_tags: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          tag: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          tag: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          tag?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       projects_public: {
