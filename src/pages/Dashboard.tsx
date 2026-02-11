@@ -254,12 +254,11 @@ export default function Dashboard() {
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
-      await supabase.from('daily_reports').delete().eq('project_id', projectId);
-      await supabase.from('integrations').delete().eq('project_id', projectId);
-      await supabase.from('ad_spend').delete().eq('project_id', projectId);
-      await supabase.from('sales').delete().eq('project_id', projectId);
-      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      const { data, error } = await supabase.functions.invoke('delete-project', {
+        body: { project_id: projectId },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });

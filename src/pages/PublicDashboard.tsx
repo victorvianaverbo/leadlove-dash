@@ -39,7 +39,7 @@ interface ProjectPublic {
 interface SalesPublic {
   id: string;
   project_id: string;
-  user_id: string;
+  
   external_sale_id: string;
   product_id: string;
   product_name: string | null;
@@ -432,7 +432,7 @@ export default function PublicDashboard() {
       if (syncError) throw syncError;
       if (syncData?.error) throw new Error(syncData.error);
 
-      console.log(`Synced ${syncData?.salesSynced || 0} sales, ${syncData?.adSpendSynced || 0} ad records`);
+      
 
       // Step 2: Generate updated AI report
       const { error: reportError } = await supabase.functions.invoke('generate-daily-report', {
