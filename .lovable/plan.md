@@ -1,93 +1,41 @@
 
 
-# Correcoes Prioritarias para Escala - MetrikaPRO
+## Plano: Adicionar telefone de suporte, aviso de ajuda no Meta Ads e restaurar tutorial
 
-## Resumo
+### 1. Telefone de suporte na pagina de vendas (Index.tsx)
+- Adicionar no footer da landing page o numero de WhatsApp formatado: (31) 99161-8745
+- Link clicavel para `https://wa.me/5531991618745`
 
-Seis correcoes em uma sessao para preparar o sistema para venda em escala, cobrindo seguranca, performance e limpeza de codigo.
+### 2. Telefone de suporte dentro do app (Dashboard.tsx)
+- Adicionar um link de suporte via WhatsApp no header ou footer do dashboard, visivel para usuarios logados
+- Mesmo link: `https://wa.me/5531991618745`
 
----
+### 3. Aviso de ajuda na configuracao do Meta Ads
+- No componente `MetaAdsIntegrationCard.tsx`, adicionar um alerta/card visivel com mensagem do tipo:
+  - "Teve dificuldade para configurar o Meta Ads? Chama no WhatsApp que te ajudo!"
+  - Com botao/link direto para o WhatsApp: `https://wa.me/5531991618745`
+- Tambem adicionar esse aviso no tutorial `MetaAdsTutorial.tsx` na secao de solucao de problemas
 
-## 1. Trocar SETTINGS_CARD_USER_ID hardcoded por isAdmin
-
-**Arquivo:** `src/pages/ProjectView.tsx`
-
-- Remover a constante `SETTINGS_CARD_USER_ID` (linha 30)
-- Substituir `user?.id === SETTINGS_CARD_USER_ID` por `isAdmin` (linha 801)
-- `isAdmin` ja vem do `useAuth()` (linha 34)
-
----
-
-## 2. Mover PUBLIC_DOMAIN para variavel de ambiente
-
-**Arquivo:** `src/pages/ProjectView.tsx`
-
-- Remover `const PUBLIC_DOMAIN = 'https://metrikapro.com.br'` (linha 58)
-- Usar `const PUBLIC_DOMAIN = import.meta.env.VITE_PUBLIC_DOMAIN || 'https://metrikapro.com.br'`
-- Adicionar `VITE_PUBLIC_DOMAIN` no `.env` (nota: este arquivo eh gerenciado automaticamente, entao sera apenas uma referencia no codigo com fallback)
+### 4. Restaurar tutorial do Meta Ads para fluxo "Criar App"
+- Reverter o `MetaAdsTutorial.tsx` para incluir novamente as instrucoes de criacao de app no Facebook Developers / Graph API Explorer / geracao manual de token
+- Manter o fluxo OAuth como opcao principal mas re-adicionar a secao legada como alternativa para quem precisar
 
 ---
 
-## 3. Reduzir polling de subscription de 60s para 5 minutos
+### Detalhes tecnicos
 
-**Arquivo:** `src/contexts/AuthContext.tsx`
+**Arquivos a modificar:**
 
-- Alterar o intervalo de `60000` (60s) para `300000` (5 min) na linha do `setInterval`
-- Isso reduz 5x as chamadas a edge function `check-subscription` em escala
+1. **`src/pages/Index.tsx`** (footer, ~linha 448-468)
+   - Adicionar linha com icone de WhatsApp e numero formatado com link
 
----
+2. **`src/pages/Dashboard.tsx`** (header area)
+   - Adicionar link de suporte WhatsApp no cabecalho do dashboard
 
-## 4. Mover delete de projeto para Edge Function com transacao
+3. **`src/components/integrations/MetaAdsIntegrationCard.tsx`**
+   - Adicionar card de aviso com link WhatsApp para ajuda na configuracao
 
-**Novo arquivo:** `supabase/functions/delete-project/index.ts`
-
-- Recebe `project_id` no body
-- Valida autenticacao (token JWT)
-- Valida ownership: verifica que o `user_id` do projeto corresponde ao usuario autenticado (ou que eh admin)
-- Executa deletes em cascata usando o service role client:
-  1. `metrics_cache` (por project_id)
-  2. `daily_reports` (por project_id)
-  3. `integrations` (por project_id)
-  4. `ad_spend` (por project_id)
-  5. `sales` (por project_id)
-  6. `projects` (por id)
-- Se qualquer delete falhar, retorna erro
-
-**Arquivo modificado:** `src/pages/Dashboard.tsx`
-
-- Substituir o `deleteProject` mutation que faz 5 deletes sequenciais no frontend por uma unica chamada `supabase.functions.invoke('delete-project', { body: { project_id } })`
-
----
-
-## 5. Limpar console.logs de producao
-
-**Arquivos:**
-- `src/contexts/AuthContext.tsx`: remover `console.log` de auth events, token refresh, session refresh (manter `console.error` e `console.warn`)
-- `src/pages/PublicDashboard.tsx`: remover `console.log` do sync (linha 435)
-
----
-
-## 6. Remover user_id do tipo SalesPublic no PublicDashboard
-
-**Arquivo:** `src/pages/PublicDashboard.tsx`
-
-- Remover `user_id: string` da interface `SalesPublic` (linha 42), ja que esse campo nao existe mais na view `sales_public` apos a migracao de PII
-
----
-
-## Detalhes Tecnicos
-
-### Arquivos criados:
-| Arquivo | Descricao |
-|---------|-----------|
-| `supabase/functions/delete-project/index.ts` | Edge function para delete seguro em cascata |
-
-### Arquivos modificados:
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/pages/ProjectView.tsx` | Trocar hardcode por isAdmin + PUBLIC_DOMAIN por env |
-| `src/contexts/AuthContext.tsx` | Polling 5min + limpar console.logs |
-| `src/pages/Dashboard.tsx` | Delete via edge function |
-| `src/pages/PublicDashboard.tsx` | Remover user_id do tipo + limpar console.log |
-| `supabase/config.toml` | Adicionar config `verify_jwt = false` para delete-project |
+4. **`src/components/docs/MetaAdsTutorial.tsx`**
+   - Adicionar aviso de suporte WhatsApp na secao de solucao de problemas
+   - Re-adicionar secoes sobre criacao de app e geracao manual de token como metodo alternativo
 
