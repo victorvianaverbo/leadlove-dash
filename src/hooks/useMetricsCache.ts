@@ -33,7 +33,7 @@ const CACHE_TTL_MINUTES = 5;
 export function useMetricsCache(projectId: string | undefined, dateRange: string) {
   const queryClient = useQueryClient();
   const today = new Date().toISOString().split('T')[0];
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
