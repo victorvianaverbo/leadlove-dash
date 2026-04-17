@@ -70,12 +70,8 @@ export default function Index() {
   const [checkoutLoading, setCheckoutLoading] = useState<PlanKey | null>(null);
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        navigate('/dashboard');
-      } else {
-        window.location.replace('https://metrikapro.netlify.app/');
-      }
+    if (!loading && user) {
+      navigate('/dashboard');
     }
   }, [user, loading, navigate]);
 
