@@ -56,55 +56,60 @@ export default function Auth() {
 
   useEffect(() => {
     const handleAuthenticatedUser = async () => {
-      if (loading || subscriptionLoading) return;
+      if (loading) return;
       if (!user || !session) return;
       if (awaitingPayment) return;
+      if (isCheckoutRedirecting) return;
 
-      if (subscribed) {
-        if (validPlan) {
-          setIsCheckoutRedirecting(true);
-          try {
-            const { data, error } = await supabase.functions.invoke('customer-portal');
-            if (error) throw error;
-            if (data?.url) {
-              window.open(data.url, '_blank');
-              toast({ title: 'Portal aberto em nova aba', description: 'Gerencie seu plano na nova aba.' });
-              setIsCheckoutRedirecting(false);
-              navigate('/dashboard');
-              return;
-            }
-          } catch (error) {
-            console.error('Portal error:', error);
-            toast({ title: 'Você já tem um plano ativo', description: 'Use o portal de assinatura para gerenciar seu plano.' });
-          }
-          setIsCheckoutRedirecting(false);
-        }
+      // No plan in URL → go straight to dashboard, don't wait for subscription
+      if (!validPlan) {
         navigate('/dashboard');
         return;
       }
 
-      if (validPlan && !isCheckoutRedirecting) {
+      // Plan in URL but still loading subscription → wait
+      if (subscriptionLoading) return;
+
+      if (subscribed) {
         setIsCheckoutRedirecting(true);
         try {
-          const { data, error } = await supabase.functions.invoke('create-checkout', {
-            body: { priceId: STRIPE_PLANS[validPlan].priceId },
-          });
+          const { data, error } = await supabase.functions.invoke('customer-portal');
           if (error) throw error;
           if (data?.url) {
             window.open(data.url, '_blank');
-            setAwaitingPayment(true);
+            toast({ title: 'Portal aberto em nova aba', description: 'Gerencie seu plano na nova aba.' });
             setIsCheckoutRedirecting(false);
+            navigate('/dashboard');
             return;
           }
         } catch (error) {
-          console.error('Checkout error:', error);
-          toast({ title: 'Erro ao iniciar checkout', description: 'Redirecionando para o dashboard...', variant: 'destructive' });
-          navigate('/dashboard');
+          console.error('Portal error:', error);
+          toast({ title: 'Você já tem um plano ativo', description: 'Use o portal de assinatura para gerenciar seu plano.' });
         }
         setIsCheckoutRedirecting(false);
-      } else if (!validPlan) {
+        navigate('/dashboard');
+        return;
+      }
+
+      // Has plan in URL and not subscribed → start checkout
+      setIsCheckoutRedirecting(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('create-checkout', {
+          body: { priceId: STRIPE_PLANS[validPlan].priceId },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          window.open(data.url, '_blank');
+          setAwaitingPayment(true);
+          setIsCheckoutRedirecting(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Checkout error:', error);
+        toast({ title: 'Erro ao iniciar checkout', description: 'Redirecionando para o dashboard...', variant: 'destructive' });
         navigate('/dashboard');
       }
+      setIsCheckoutRedirecting(false);
     };
 
     handleAuthenticatedUser();
