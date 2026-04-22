@@ -1,6 +1,12 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { checkSupabaseEnv } from "./lib/env-guard";
+
+// Abort boot with friendly error screen if Supabase env vars missing from bundle
+if (!checkSupabaseEnv()) {
+  throw new Error("Supabase env missing — friendly error rendered");
+}
 
 // Global recovery for stale chunks after a new deploy.
 // If a dynamic import fails (404 on old hashed chunk), reload once
