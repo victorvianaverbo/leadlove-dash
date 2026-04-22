@@ -5,24 +5,12 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-export function checkSupabaseEnv(): boolean {
-  const missing: string[] = [];
-  if (!SUPABASE_URL) missing.push("VITE_SUPABASE_URL");
-  if (!SUPABASE_PUBLISHABLE_KEY) missing.push("VITE_SUPABASE_PUBLISHABLE_KEY");
-
-  if (missing.length === 0) return true;
-
-  // Log with clear context for debugging
-  console.error(
-    "[MetrikaPRO] Configuração do backend ausente no bundle. Variáveis faltando:",
-    missing,
-  );
-
-  // Render friendly error screen directly into #root
-  if (typeof document !== "undefined") {
-    const root = document.getElementById("root");
-    if (root) {
-      root.innerHTML = `
+export function renderConfigErrorScreen(reason: string) {
+  console.error("[MetrikaPRO] Configuração do backend indisponível:", reason);
+  if (typeof document === "undefined") return;
+  const root = document.getElementById("root");
+  if (!root) return;
+  root.innerHTML = `
         <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0F172A;color:#F1F5F9;font-family:Inter,system-ui,sans-serif;padding:24px;">
           <div style="max-width:480px;text-align:center;background:#1E293B;border:1px solid #334155;border-radius:12px;padding:40px;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
             <div style="width:56px;height:56px;border-radius:50%;background:#8B5CF6;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:28px;">⚙️</div>
