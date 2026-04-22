@@ -1,4 +1,5 @@
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense, ComponentType } from "react";
+import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,28 +12,61 @@ import { supabase } from "@/integrations/supabase/client";
 // Eagerly load the landing page for fast LCP
 import Index from "./pages/Index";
 
-// Lazy load all other routes to reduce initial bundle size
-const Auth = lazy(() => import("./pages/Auth"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const ProjectNew = lazy(() => import("./pages/ProjectNew"));
-const ProjectEdit = lazy(() => import("./pages/ProjectEdit"));
-const ProjectView = lazy(() => import("./pages/ProjectView"));
-const PublicDashboard = lazy(() => import("./pages/PublicDashboard"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Terms = lazy(() => import("./pages/Terms"));
-const Documentation = lazy(() => import("./pages/Documentation"));
-const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
-const CheckoutCancel = lazy(() => import("./pages/CheckoutCancel"));
-const Admin = lazy(() => import("./pages/Admin"));
-const AdminProjects = lazy(() => import("./pages/AdminProjects"));
-const Pricing = lazy(() => import("./pages/Pricing"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Settings = lazy(() => import("./pages/Settings"));
-const OAuthCallback = lazy(() => import("./pages/OAuthCallback"));
+// Lazy with auto-retry on chunk load failure (stale deploy recovery)
+function lazyWithRetry<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  key: string,
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      const isChunkErr =
+        /Failed to fetch dynamically imported module|Loading chunk|ChunkLoadError|Importing a module script failed/i.test(
+          msg,
+        );
+      const reloadKey = `chunk-retry:${key}`;
+      if (isChunkErr && typeof window !== "undefined") {
+        if (!sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, "1");
+          window.location.reload();
+          // Return a never-resolving promise while the reload happens
+          return new Promise(() => {}) as any;
+        }
+      }
+      throw err;
+    }
+  });
+}
+
+const Auth = lazyWithRetry(() => import("./pages/Auth"), "Auth");
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"), "Dashboard");
+const ProjectNew = lazyWithRetry(() => import("./pages/ProjectNew"), "ProjectNew");
+const ProjectEdit = lazyWithRetry(() => import("./pages/ProjectEdit"), "ProjectEdit");
+const ProjectView = lazyWithRetry(() => import("./pages/ProjectView"), "ProjectView");
+const PublicDashboard = lazyWithRetry(() => import("./pages/PublicDashboard"), "PublicDashboard");
+const Privacy = lazyWithRetry(() => import("./pages/Privacy"), "Privacy");
+const Terms = lazyWithRetry(() => import("./pages/Terms"), "Terms");
+const Documentation = lazyWithRetry(() => import("./pages/Documentation"), "Documentation");
+const CheckoutSuccess = lazyWithRetry(() => import("./pages/CheckoutSuccess"), "CheckoutSuccess");
+const CheckoutCancel = lazyWithRetry(() => import("./pages/CheckoutCancel"), "CheckoutCancel");
+const Admin = lazyWithRetry(() => import("./pages/Admin"), "Admin");
+const AdminProjects = lazyWithRetry(() => import("./pages/AdminProjects"), "AdminProjects");
+const Pricing = lazyWithRetry(() => import("./pages/Pricing"), "Pricing");
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"), "NotFound");
+const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"), "ForgotPassword");
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"), "ResetPassword");
+const Settings = lazyWithRetry(() => import("./pages/Settings"), "Settings");
+const OAuthCallback = lazyWithRetry(() => import("./pages/OAuthCallback"), "OAuthCallback");
 
 const queryClient = new QueryClient();
+
+const RouteFallback = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 const App = () => {
   useEffect(() => {
@@ -56,7 +90,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
