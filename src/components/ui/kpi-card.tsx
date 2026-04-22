@@ -13,6 +13,7 @@ interface KpiCardProps {
   variant?: KpiVariant
   className?: string
   showAccentBar?: boolean
+  premium?: boolean
 }
 
 const variantStyles: Record<KpiVariant, {
@@ -24,41 +25,41 @@ const variantStyles: Record<KpiVariant, {
 }> = {
   default: {
     border: "border-border",
-    accent: "bg-muted-foreground",
+    accent: "bg-muted-foreground/40",
     iconBg: "bg-muted",
     iconColor: "text-muted-foreground",
     valueColor: "text-foreground",
   },
   success: {
-    border: "border-success",
+    border: "border-border",
     accent: "bg-success",
-    iconBg: "bg-success/10",
+    iconBg: "bg-success-soft",
     iconColor: "text-success",
-    valueColor: "text-success",
+    valueColor: "text-foreground",
   },
   destructive: {
-    border: "border-destructive",
+    border: "border-border",
     accent: "bg-destructive",
-    iconBg: "bg-destructive/10",
+    iconBg: "bg-destructive-soft",
     iconColor: "text-destructive",
-    valueColor: "text-destructive",
+    valueColor: "text-foreground",
   },
   info: {
-    border: "border-info",
+    border: "border-border",
     accent: "bg-info",
-    iconBg: "bg-info/10",
+    iconBg: "bg-info-soft",
     iconColor: "text-info",
-    valueColor: "text-info",
+    valueColor: "text-foreground",
   },
   warning: {
-    border: "border-warning",
+    border: "border-border",
     accent: "bg-warning",
-    iconBg: "bg-warning/10",
+    iconBg: "bg-warning-soft",
     iconColor: "text-warning",
-    valueColor: "text-warning",
+    valueColor: "text-foreground",
   },
   primary: {
-    border: "border-primary-color",
+    border: "border-border",
     accent: "bg-primary",
     iconBg: "bg-primary-soft",
     iconColor: "text-primary",
@@ -73,59 +74,65 @@ export function KpiCard({
   icon: Icon,
   variant = "default",
   className,
-  showAccentBar = true,
+  showAccentBar = false,
+  premium = false,
 }: KpiCardProps) {
   const styles = variantStyles[variant]
 
   return (
     <Card
+      data-kpi
       className={cn(
-        // Base styles
-        "relative overflow-hidden border",
+        "group relative overflow-hidden border",
         styles.border,
-        // Micro-interactions: hover elevation + shadow
-        "transition-all duration-300 ease-out",
-        "hover:-translate-y-1 hover:shadow-lg",
+        premium && "gradient-kpi-premium shadow-purple-sm border-primary/20",
+        "transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-md",
         className
       )}
     >
-      {/* Accent bar no topo */}
       {showAccentBar && (
-        <div 
+        <div
           className={cn(
-            "absolute top-0 left-0 right-0 h-1",
+            "absolute top-0 left-0 right-0 h-0.5",
             styles.accent
-          )} 
+          )}
         />
       )}
-      
-      <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-        <CardTitle className="text-xs sm:text-sm font-medium">{title}</CardTitle>
+
+      <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 sm:p-5 sm:pb-2">
+        <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {title}
+        </CardTitle>
         {Icon && (
           <div className={cn(
-            "w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center",
-            "transition-transform duration-300",
-            "group-hover:scale-110",
+            "flex items-center justify-center rounded-lg p-2 sm:p-2.5",
+            "transition-transform duration-200",
+            "group-hover:scale-105",
             styles.iconBg
           )}>
-            <Icon className={cn("h-3 w-3 sm:h-4 sm:w-4", styles.iconColor)} />
+            <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", styles.iconColor)} strokeWidth={1.75} />
           </div>
         )}
       </CardHeader>
-      
-      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-        <div className={cn("text-lg sm:text-2xl font-bold", styles.valueColor)}>
+
+      <CardContent className="p-4 pt-0 sm:p-5 sm:pt-0">
+        <div className={cn(
+          "font-display font-semibold tabular-nums tracking-tight",
+          premium ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl",
+          styles.valueColor
+        )}>
           {value}
         </div>
         {subtitle && (
-          <p className="text-[10px] sm:text-xs text-muted-foreground">{subtitle}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">{subtitle}</p>
         )}
       </CardContent>
     </Card>
   )
 }
 
-// Versão para cards do funil (sem borda colorida, apenas accent bar)
+// Funnel card variant
 interface FunnelCardProps {
   title: string
   value: string | number
@@ -143,26 +150,32 @@ export function FunnelCard({
 }: FunnelCardProps) {
   return (
     <Card
+      data-kpi
       className={cn(
-        // Base styles
-        "relative overflow-hidden",
-        // Micro-interactions: hover elevation + shadow
-        "transition-all duration-300 ease-out",
-        "hover:-translate-y-1 hover:shadow-md",
+        "group relative overflow-hidden",
+        "transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-sm",
         className
       )}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-6 sm:pb-2">
-        <CardTitle className="text-xs sm:text-sm font-medium">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between pb-1.5 p-4 sm:p-4 sm:pb-1.5">
+        <CardTitle className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {title}
+        </CardTitle>
         {Icon && (
-          <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground transition-transform duration-300 group-hover:scale-110" />
+          <Icon
+            className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground transition-transform duration-200 group-hover:scale-105"
+            strokeWidth={1.75}
+          />
         )}
       </CardHeader>
-      
-      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-        <div className="text-lg sm:text-2xl font-bold">{value}</div>
+
+      <CardContent className="p-4 pt-0 sm:p-4 sm:pt-0">
+        <div className="font-display text-lg sm:text-xl font-semibold tabular-nums tracking-tight">
+          {value}
+        </div>
         {subtitle && (
-          <p className="text-[10px] sm:text-xs text-muted-foreground">{subtitle}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">{subtitle}</p>
         )}
       </CardContent>
     </Card>

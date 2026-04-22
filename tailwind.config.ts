@@ -9,13 +9,13 @@ export default {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1280px",
       },
     },
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Poppins', 'system-ui', 'sans-serif'],
+        display: ['Inter Tight', 'Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -23,13 +23,20 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        surface: "hsl(var(--surface))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
           dark: "hsl(var(--primary-dark))",
           light: "hsl(var(--primary-light))",
           muted: "hsl(var(--primary-muted))",
           soft: "hsl(var(--primary-soft))",
+        },
+        midnight: {
+          DEFAULT: "hsl(var(--midnight))",
+          foreground: "hsl(var(--midnight-foreground))",
+          soft: "hsl(var(--midnight-soft))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -38,18 +45,22 @@ export default {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          soft: "hsl(var(--destructive-soft))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+          soft: "hsl(var(--success-soft))",
         },
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
+          soft: "hsl(var(--warning-soft))",
         },
         info: {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
+          soft: "hsl(var(--info-soft))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -87,47 +98,30 @@ export default {
         "3xl": "1.5rem",
       },
       boxShadow: {
-        'sm': '0 1px 2px rgba(0, 0, 0, 0.05)',
-        'md': '0 2px 8px rgba(0, 0, 0, 0.08)',
-        'lg': '0 4px 16px rgba(0, 0, 0, 0.1)',
-        'xl': '0 8px 24px rgba(0, 0, 0, 0.12)',
+        'xs': '0 1px 2px hsl(230 20% 20% / 0.04)',
+        'sm': '0 2px 8px hsl(230 20% 20% / 0.06), 0 1px 2px hsl(230 20% 20% / 0.04)',
+        'md': '0 8px 24px hsl(230 20% 20% / 0.08), 0 2px 6px hsl(230 20% 20% / 0.05)',
+        'lg': '0 16px 40px hsl(230 20% 20% / 0.10), 0 4px 12px hsl(230 20% 20% / 0.06)',
+        'xl': '0 24px 60px hsl(230 20% 20% / 0.12), 0 8px 20px hsl(230 20% 20% / 0.08)',
+        'purple': '0 10px 30px -10px hsl(262 83% 58% / 0.3)',
+        'purple-sm': '0 4px 12px -4px hsl(262 83% 58% / 0.2)',
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
         "fade-in": {
-          from: {
-            opacity: "0",
-            transform: "translateY(8px)",
-          },
-          to: {
-            opacity: "1",
-            transform: "translateY(0)",
-          },
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
         "slide-up": {
-          from: {
-            opacity: "0",
-            transform: "translateY(16px)",
-          },
-          to: {
-            opacity: "1",
-            transform: "translateY(0)",
-          },
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {

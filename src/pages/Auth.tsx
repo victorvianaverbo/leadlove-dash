@@ -175,16 +175,16 @@ export default function Auth() {
   // ── Loading / checkout redirecting ───────────────────────────────────
   if (loading || isCheckoutRedirecting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gradient-hero gap-4">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-[#2563eb] rounded-xl">
-            <BarChart3 className="h-5 w-5 text-white" />
+          <div className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/15">
+            <BarChart3 className="h-5 w-5 text-white" strokeWidth={1.75} />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">MetrikaPRO</span>
+          <span className="text-white font-display font-semibold text-lg tracking-tight">MetrikaPRO</span>
         </div>
-        <Loader2 className="h-8 w-8 animate-spin text-[#2563eb]" />
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
         {isCheckoutRedirecting && (
-          <p className="text-slate-400 text-sm">Preparando checkout...</p>
+          <p className="text-white/70 text-sm">Preparando checkout...</p>
         )}
       </div>
     );
@@ -193,33 +193,30 @@ export default function Auth() {
   // ── Awaiting payment ─────────────────────────────────────────────────
   if (awaitingPayment) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4">
-        <div className="w-full max-w-md bg-[#1e293b] border border-[#334155] rounded-2xl p-8 text-center shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center gradient-hero p-4">
+        <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 text-center shadow-lg">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-[#2563eb]/20 rounded-2xl border border-[#2563eb]/30">
-              <ExternalLink className="h-10 w-10 text-[#2563eb]" />
+            <div className="p-4 bg-primary-soft rounded-2xl">
+              <ExternalLink className="h-10 w-10 text-primary" strokeWidth={1.5} />
             </div>
           </div>
-          <h2 className="text-white text-2xl font-bold mb-2">Complete o pagamento</h2>
-          <p className="text-slate-400 mb-8">
+          <h2 className="font-display text-2xl font-semibold tracking-tight mb-2">Complete o pagamento</h2>
+          <p className="text-muted-foreground mb-8">
             Uma nova aba foi aberta para você finalizar o pagamento no Stripe.
           </p>
-          <div className="flex items-center justify-center gap-2 text-slate-400 mb-6">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground mb-6">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Aguardando confirmação automática...</span>
           </div>
           <div className="flex flex-col gap-3">
-            <Button
-              onClick={handleCheckPayment}
-              className="w-full h-11 bg-[#2563eb] hover:bg-[#1d4ed8] text-white"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
+            <Button onClick={handleCheckPayment} className="w-full h-11">
+              <RefreshCw className="mr-2 h-4 w-4" strokeWidth={1.75} />
               Já finalizei o pagamento
             </Button>
             <Button
               variant="ghost"
               onClick={() => { setAwaitingPayment(false); navigate('/dashboard'); }}
-              className="w-full text-slate-400 hover:text-slate-200 hover:bg-white/5"
+              className="w-full"
             >
               Continuar sem assinar
             </Button>
@@ -229,7 +226,6 @@ export default function Auth() {
     );
   }
 
-  // ── Main form ─────────────────────────────────────────────────────────
   const features = validPlan ? planFeatures[validPlan] : null;
   const planData = validPlan ? STRIPE_PLANS[validPlan] : null;
 
@@ -237,42 +233,46 @@ export default function Auth() {
     <div className="min-h-screen flex flex-col md:flex-row">
 
       {/* ── LEFT PANEL ── */}
-      <div className="hidden md:flex md:w-1/2 bg-[#0f172a] flex-col justify-between p-10 xl:p-14">
+      <div className="hidden md:flex md:w-1/2 gradient-hero relative flex-col justify-between p-10 xl:p-14 overflow-hidden">
+        {/* Decorative glows */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#2563eb] rounded-xl">
-            <BarChart3 className="h-5 w-5 text-white" />
+        <div className="relative flex items-center gap-3 z-10">
+          <div className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/15">
+            <BarChart3 className="h-5 w-5 text-white" strokeWidth={1.75} />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">MetrikaPRO</span>
+          <span className="text-white font-display font-semibold text-lg tracking-tight">MetrikaPRO</span>
         </div>
 
         {/* Middle content */}
-        <div className="space-y-8">
+        <div className="relative space-y-8 z-10">
           {planData ? (
             <>
-              <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-6">
+              <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <span className="text-slate-400 text-xs uppercase tracking-wider font-medium">Plano selecionado</span>
-                    <h2 className="text-white text-2xl font-bold mt-1">{planData.name}</h2>
+                    <span className="text-white/60 text-[11px] uppercase tracking-wider font-medium">Plano selecionado</span>
+                    <h2 className="text-white font-display text-2xl font-semibold tracking-tight mt-1">{planData.name}</h2>
                   </div>
-                  <span className="bg-emerald-500/20 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-500/30">
+                  <span className="bg-success/20 text-white text-xs font-semibold px-3 py-1 rounded-full border border-success/30">
                     7 dias grátis
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#2563eb] text-3xl font-bold">R$ {planData.price}</span>
-                  <span className="text-slate-400 text-sm">/mês após o trial</span>
+                  <span className="text-white font-display text-3xl font-semibold tabular-nums">R$ {planData.price}</span>
+                  <span className="text-white/60 text-sm">/mês após o trial</span>
                 </div>
               </div>
 
               <ul className="space-y-3">
                 {features?.map((f) => (
                   <li key={f} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-[#2563eb]/20 border border-[#2563eb]/40 flex items-center justify-center flex-shrink-0">
-                      <Check className="h-3 w-3 text-[#2563eb]" />
+                    <div className="w-5 h-5 rounded-full bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="h-3 w-3 text-white" strokeWidth={2.5} />
                     </div>
-                    <span className="text-slate-300 text-sm">{f}</span>
+                    <span className="text-white/85 text-sm">{f}</span>
                   </li>
                 ))}
               </ul>
@@ -280,11 +280,11 @@ export default function Auth() {
           ) : (
             <>
               <div>
-                <h2 className="text-white text-3xl font-bold leading-tight mb-3">
+                <h2 className="text-white font-display text-3xl xl:text-4xl font-semibold leading-tight tracking-tight mb-3">
                   O analista de marketing que trabalha{' '}
-                  <span className="text-[#2563eb]">enquanto você dorme</span>
+                  <span className="text-white/70">enquanto você dorme</span>
                 </h2>
-                <p className="text-slate-400 text-base leading-relaxed">
+                <p className="text-white/70 text-base leading-relaxed">
                   IA que escaneia 100% do seu funil, compara com benchmarks e entrega as 3 ações prioritárias para aumentar seu ROAS.
                 </p>
               </div>
@@ -297,10 +297,10 @@ export default function Auth() {
                   'Kiwify, Hotmart, Guru, Eduzz + Meta Ads',
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-[#2563eb]/20 border border-[#2563eb]/40 flex items-center justify-center flex-shrink-0">
-                      <Check className="h-3 w-3 text-[#2563eb]" />
+                    <div className="w-5 h-5 rounded-full bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="h-3 w-3 text-white" strokeWidth={2.5} />
                     </div>
-                    <span className="text-slate-300 text-sm">{f}</span>
+                    <span className="text-white/85 text-sm">{f}</span>
                   </li>
                 ))}
               </ul>
@@ -309,8 +309,8 @@ export default function Auth() {
         </div>
 
         {/* Footer trust */}
-        <div className="flex items-center gap-2 text-slate-500 text-sm">
-          <Shield className="h-4 w-4" />
+        <div className="relative flex items-center gap-2 text-white/60 text-sm z-10">
+          <Shield className="h-4 w-4" strokeWidth={1.75} />
           <span>Sem cartão de crédito para o trial · Cancele a qualquer momento</span>
         </div>
       </div>
