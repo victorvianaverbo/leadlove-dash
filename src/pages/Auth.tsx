@@ -175,16 +175,16 @@ export default function Auth() {
   // ── Loading / checkout redirecting ───────────────────────────────────
   if (loading || isCheckoutRedirecting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center gradient-hero gap-4">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-[#2563eb] rounded-xl">
-            <BarChart3 className="h-5 w-5 text-white" />
+          <div className="p-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/15">
+            <BarChart3 className="h-5 w-5 text-white" strokeWidth={1.75} />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">MetrikaPRO</span>
+          <span className="text-white font-display font-semibold text-lg tracking-tight">MetrikaPRO</span>
         </div>
-        <Loader2 className="h-8 w-8 animate-spin text-[#2563eb]" />
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
         {isCheckoutRedirecting && (
-          <p className="text-slate-400 text-sm">Preparando checkout...</p>
+          <p className="text-white/70 text-sm">Preparando checkout...</p>
         )}
       </div>
     );
@@ -193,33 +193,30 @@ export default function Auth() {
   // ── Awaiting payment ─────────────────────────────────────────────────
   if (awaitingPayment) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4">
-        <div className="w-full max-w-md bg-[#1e293b] border border-[#334155] rounded-2xl p-8 text-center shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center gradient-hero p-4">
+        <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 text-center shadow-lg">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-[#2563eb]/20 rounded-2xl border border-[#2563eb]/30">
-              <ExternalLink className="h-10 w-10 text-[#2563eb]" />
+            <div className="p-4 bg-primary-soft rounded-2xl">
+              <ExternalLink className="h-10 w-10 text-primary" strokeWidth={1.5} />
             </div>
           </div>
-          <h2 className="text-white text-2xl font-bold mb-2">Complete o pagamento</h2>
-          <p className="text-slate-400 mb-8">
+          <h2 className="font-display text-2xl font-semibold tracking-tight mb-2">Complete o pagamento</h2>
+          <p className="text-muted-foreground mb-8">
             Uma nova aba foi aberta para você finalizar o pagamento no Stripe.
           </p>
-          <div className="flex items-center justify-center gap-2 text-slate-400 mb-6">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground mb-6">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm">Aguardando confirmação automática...</span>
           </div>
           <div className="flex flex-col gap-3">
-            <Button
-              onClick={handleCheckPayment}
-              className="w-full h-11 bg-[#2563eb] hover:bg-[#1d4ed8] text-white"
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
+            <Button onClick={handleCheckPayment} className="w-full h-11">
+              <RefreshCw className="mr-2 h-4 w-4" strokeWidth={1.75} />
               Já finalizei o pagamento
             </Button>
             <Button
               variant="ghost"
               onClick={() => { setAwaitingPayment(false); navigate('/dashboard'); }}
-              className="w-full text-slate-400 hover:text-slate-200 hover:bg-white/5"
+              className="w-full"
             >
               Continuar sem assinar
             </Button>
@@ -229,7 +226,6 @@ export default function Auth() {
     );
   }
 
-  // ── Main form ─────────────────────────────────────────────────────────
   const features = validPlan ? planFeatures[validPlan] : null;
   const planData = validPlan ? STRIPE_PLANS[validPlan] : null;
 
