@@ -107,16 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
+    // 1) Restore session from storage FIRST and only then unblock the app.
+    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+      if (!mounted) return;
+      if (error) {
+        console.error('Session error:', error);
+      }
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      setLoading(false);
+    });
+
+    // 2) Subsequent auth changes only update state — never re-block the UI.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        
-        
-        if (event === 'TOKEN_REFRESHED') {
-          
-          setSession(session);
-          setUser(session?.user ?? null);
-        }
-        
+      (event, newSession) => {
+        if (!mounted) return;
+
         if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
@@ -125,29 +133,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSubscriptionEnd(null);
           setIsAdmin(false);
           setExtraProjects(0);
-          setLoading(false);
           return;
         }
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+
+        // For INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, etc.
+        // Only update if we actually have a session, to avoid wiping a valid one
+        // due to a transient null event during initialization.
+        if (newSession) {
+          setSession(newSession);
+          setUser(newSession.user ?? null);
+        }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('Session error:', error);
-        // Se houver erro, limpar token antigo do localStorage
-        const storageKey = `sb-ohwaygqxelyaytljbcsb-auth-token`;
-        localStorage.removeItem(storageKey);
-      }
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Check subscription when session changes
