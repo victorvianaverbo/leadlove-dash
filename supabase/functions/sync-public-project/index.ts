@@ -9,25 +9,14 @@ const corsHeaders = {
 const FIRST_SYNC_DAYS = 90;
 const INCREMENTAL_MARGIN_DAYS = 7;
 
-// Rate limiting: max 1 sync per project every 5 minutes
+// Rate limiting: max 1 sync per project every 5 minutes (persistent via project.last_sync_at)
 const RATE_LIMIT_MS = 5 * 60 * 1000;
-const rateLimitMap = new Map<string, number>();
 
-function isRateLimited(projectId: string): boolean {
-  const now = Date.now();
-  const lastSync = rateLimitMap.get(projectId);
-  if (lastSync && now - lastSync < RATE_LIMIT_MS) {
-    return true;
-  }
-  rateLimitMap.set(projectId, now);
-  // Clean old entries to prevent memory leak
-  if (rateLimitMap.size > 1000) {
-    const cutoff = now - RATE_LIMIT_MS;
-    for (const [key, ts] of rateLimitMap) {
-      if (ts < cutoff) rateLimitMap.delete(key);
-    }
-  }
-  return false;
+function isRateLimitedByLastSync(lastSyncAt: string | null): boolean {
+  if (!lastSyncAt) return false;
+  const lastSync = new Date(lastSyncAt).getTime();
+  if (Number.isNaN(lastSync)) return false;
+  return Date.now() - lastSync < RATE_LIMIT_MS;
 }
 
 // Helper to get date in Brasília timezone (UTC-3)
