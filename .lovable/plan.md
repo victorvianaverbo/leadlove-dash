@@ -1,46 +1,39 @@
 
-DNS está correto agora ✅
 
-## Configuração atual (válida)
+## Diagnóstico
 
-| Tipo | Nome | Valor | Status |
-|---|---|---|---|
-| A | @ | 185.158.133.1 | ✅ Lovable |
-| A | www | 185.158.133.1 | ✅ Lovable |
-| TXT | _lovable | lovable_verify=d4a0... | ✅ Verificação |
-| TXT | @ | facebook-domain-verification=... | ✅ Neutro |
-| TXT | @ | google-site-verification=... | ✅ Neutro |
-| A | medsimple | 185.158.133.1 | 🧹 Outro projeto (pode remover) |
-| TXT | _lovable.medsimple | lovable_verify=8ada... | 🧹 Outro projeto (pode remover) |
+A tela branca em `/dashboard` (preview e produção) **não tem erro de JS** — só um `<div className="min-h-screen bg-background" />` vazio do `Suspense fallback` do `App.tsx`. Isso é o sintoma clássico de **falha em carregar um chunk lazy**: o navegador pede um arquivo `Dashboard-[hash].js` que não existe mais (build nova invalidou o hash), o `import()` rejeita silenciosamente e o `Suspense` fica para sempre no fallback vazio.
 
-Os dois registros `medsimple` não atrapalham o `metrikapro.com.br`. Pode deixar ou apagar — escolha sua.
+Acontece tanto em preview quanto em produção porque:
+- O usuário tem o `index.html` antigo em cache (referenciando hashes antigos)
+- O servidor já serve a build nova (com hashes novos)
+- Os chunks antigos retornam 404 → Suspense fica eternamente carregando.
 
-## Próximos passos para o site funcionar em produção
+## Correção
 
-1. **Aguardar propagação DNS** (geralmente 5–30 min, raramente até 72h). Pode checar em https://dnschecker.org buscando `metrikapro.com.br` tipo A — deve retornar `185.158.133.1` em vários servidores globais.
+### 1) `src/App.tsx` — auto-recovery em chunk error
+- Criar um helper `lazyWithRetry(import)` que envolve cada `lazy(() => import(...))`.
+- Na primeira falha do `import()`:
+  - Se a página ainda não foi recarregada (controle via `sessionStorage`), faz `window.location.reload()` automaticamente — pega o `index.html` novo e os hashes novos.
+  - Se já recarregou, mostra fallback de erro com botão "Recarregar".
+- Trocar todos os `lazy(() => import(...))` por `lazyWithRetry(() => import(...))`.
+- Trocar o `Suspense fallback` (atualmente um div vazio) por um spinner real (Loader2 centralizado), assim mesmo em rede lenta o usuário vê algo, não tela branca.
 
-2. **Conferir no Lovable** em **Project Settings → Domains**:
-   - `metrikapro.com.br` deve estar listado
-   - `www.metrikapro.com.br` deve estar listado
-   - Ambos precisam aparecer com status **Active** (verde). Se estiver em "Verifying" ou "Setting up", aguarde mais alguns minutos.
-   - Se algum não estiver lá, clique em **Connect Domain** e adicione.
+### 2) `src/main.tsx` — listener global de chunk error
+- Adicionar `window.addEventListener('error', ...)` e `window.addEventListener('unhandledrejection', ...)` que detectam mensagens típicas (`Failed to fetch dynamically imported module`, `Loading chunk`, `ChunkLoadError`) e disparam o mesmo recovery (reload único protegido por sessionStorage).
+- Cobre o caso em que o erro acontece fora de um `Suspense` boundary.
 
-3. **Definir um como Primary** (ex.: `metrikapro.com.br`) — o outro vai redirecionar para o primário automaticamente.
+### 3) `index.html` — desabilitar cache do HTML
+- Adicionar `<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />`, `Pragma: no-cache`, `Expires: 0` no `<head>`.
+- Garante que o `index.html` **nunca** seja servido do cache do navegador, então o usuário sempre baixa o HTML mais novo (que aponta para os hashes corretos dos chunks). Os assets JS/CSS continuam com cache normal por causa do hash no nome.
 
-4. **Forçar o deploy do frontend** com as correções de auth:
-   - Clicar em **Publish → Update** no canto superior direito do Lovable.
-   - Sem isso, o domínio continua servindo a build antiga, mesmo com DNS certo.
+## Resultado esperado
+- Quem está com tela branca agora: ao recarregar uma vez, o `index.html` novo carrega, os chunks novos resolvem, dashboard volta.
+- Próximas vezes que houver deploy: o auto-retry recarrega sozinho na primeira falha de chunk, sem o usuário perceber.
+- O `Suspense` mostra spinner em vez de tela branca enquanto baixa o chunk em conexões lentas.
 
-5. **Testar:**
-   - Acessar `https://metrikapro.com.br` em aba anônima
-   - Hard refresh (Ctrl+Shift+R)
-   - Tentar login → deve estabilizar e abrir o dashboard normalmente
+## Arquivos alterados
+- `src/App.tsx` — `lazyWithRetry` + Suspense fallback com spinner.
+- `src/main.tsx` — listener global de chunk error.
+- `index.html` — meta tags anti-cache do HTML.
 
-## Se após publicar ainda não funcionar
-
-Possíveis causas a investigar:
-- Cache do navegador (testar em aba anônima ou outro navegador)
-- Domínio ainda em "Verifying" no Lovable (esperar SSL ser emitido)
-- Algum service worker antigo cacheado (limpar dados do site no DevTools → Application → Storage → Clear site data)
-
-Me avise o que aparece no painel **Settings → Domains** depois da propagação e eu sigo a partir daí.
