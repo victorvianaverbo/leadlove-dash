@@ -1,44 +1,82 @@
 
+## Diagnóstico revisado
 
-## Causa raiz real
+Você está certo em desconfiar da hipótese anterior.
 
-Confirmado pela screenshot do console e pela inspeção do projeto:
+Se `/dashboard` abre normalmente no preview dentro do Lovable, então a teoria de “`VITE_SUPABASE_*` ausente por causa de `.gitignore`” não é a melhor explicação para o problema atual. O app importa o cliente do backend logo no topo de `App.tsx`; se essa inicialização estivesse realmente quebrada de forma geral, o preview também falharia.
 
-- O `.env` **existe e está correto** no sandbox de preview (por isso o editor funciona).
-- Mas o `.env` está **listado no `.gitignore`** (linha 27).
-- Quando a Lovable faz o build de publish a partir do repositório git, o `.env` **não está lá** → Vite não substitui `import.meta.env.VITE_SUPABASE_*` → bundle sai com `undefined` → `createClient` lança `supabaseUrl is required` → tela branca.
+O que a evidência aponta agora:
+- O código da aplicação está funcional no preview.
+- Não há service worker no projeto, então não é um cache offline local do app.
+- O problema parece estar na camada de publicação/entrega do build, não na lógica principal do dashboard.
 
-O `env-guard` que adicionei não pegou porque o `client.ts` é importado por chunks lazy (Dashboard, Auth, etc.), não pelo `main.tsx` diretamente. O erro acontece quando o chunk lazy tenta resolver o módulo, depois do guard já ter passado.
+## O que vou corrigir/investigar em seguida
 
-## Por que o "Publish → Update" sozinho não resolve
+### 1) Parar de perseguir `.gitignore` / `.env`
+- Descartar a linha de investigação que dependia de editar `.gitignore`.
+- Não tratar isso como problema de código-fonte local enquanto o preview estiver saudável.
 
-Não tem como resolver: o pipeline de publish lê o git, e o `.env` nunca está lá. Cada publish vai gerar o mesmo bundle quebrado.
+### 2) Isolar em qual ambiente quebra
+Comparar o comportamento de:
+- preview do Lovable
+- URL publicada `.lovable.app`
+- domínio customizado `metrikapro.com.br`
 
-## Correção (recomendada pela própria base da Lovable para stack Vite)
+Objetivo:
+- descobrir se a falha acontece só no domínio customizado
+- ou se o build publicado inteiro está inconsistente
 
-### 1) Remover `.env` do `.gitignore`
-- Apagar a linha `.env` do `.gitignore` (mantendo `.env.local` e `.env.*.local` que são para overrides locais).
-- O `.env` passa a fazer parte do repositório e fica disponível no build de publish.
-- **Segurança**: as variáveis em questão (`VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`) são **públicas por definição** — o prefixo `VITE_` significa que vão para o bundle do navegador de qualquer forma. A anon key do Supabase é projetada para ser pública e protegida por RLS no banco. Não há vazamento de segredo.
+### 3) Verificar entrega dos assets do publish
+Inspecionar, no ambiente publicado:
+- carregamento do bundle principal
+- carregamento dos chunks lazy do `/dashboard`
+- status HTTP, content-type e possíveis 404/403
+- se o HTML publicado referencia assets válidos
+- se há mismatch entre HTML novo e chunks antigos no edge/cache
 
-### 2) Reforçar o guard para cobrir chunks lazy
-- O `env-guard.ts` atual cobre o boot do `main.tsx`, mas não os chunks lazy que importam `client.ts`.
-- Solução: envolver o `createClient` em `client.ts` num try/catch que, se falhar, dispare o mesmo guard de tela amigável que já existe.
-- Isso evita tela branca silenciosa caso o `.env` volte a sumir por qualquer motivo no futuro.
+### 4) Seguir o ramo correto da correção
+#### Se só o domínio customizado falhar
+Tratar como problema de entrega/cache do domínio:
+- forçar nova publicação
+- validar que o domínio customizado está servindo o mesmo build da URL `.lovable.app`
+- se continuar divergente, abrir suporte da plataforma como problema de cache/edge do domínio
 
-### 3) Republicar
-- Após o commit do `.env` (automático na próxima publicação), clicar em **Publish → Update**.
-- O novo bundle terá as credenciais inline.
+#### Se a `.lovable.app` publicada também falhar
+Tratar como problema do artefato de publish:
+- forçar rebuild limpo do frontend
+- validar novo hash de assets
+- confirmar que o `/dashboard` publicado está carregando os módulos corretos
 
-## Validação pós-publish
-Vou rodar `curl` no novo `index-[hash].js` e confirmar que contém `ohwaygqxelyaytljbcsb`. Se sim, dashboard volta.
+#### Se ambos publicados abrirem, mas o login/rota falhar
+Aí sim revisar comportamento de autenticação por domínio:
+- redirecionamentos com `window.location.origin`
+- callback de login
+- persistência de sessão entre domínios
 
-## Arquivos alterados
-- `.gitignore` — remover linha `.env` (manter `.env.local` e `.env.*.local`).
-- `src/integrations/supabase/client.ts` — try/catch ao redor do `createClient` que invoca o guard se falhar.
+### 5) Endurecimento opcional do app
+Depois de isolar a causa real, adicionar proteção de UX:
+- error boundary global visível
+- fallback com mensagem quando um chunk crítico falhar
+- tela de erro explícita para falha de bootstrap, em vez de branco silencioso
 
-## O que o usuário precisa fazer
-1. Aprovar este plano.
-2. Após eu aplicar as mudanças, clicar em **Publish → Update**.
-3. Aguardar ~1 min e abrir `metrikapro.com.br` em aba anônima.
+## Evidências técnicas que mudam o diagnóstico
+- `src/App.tsx` importa `supabase` de forma eager.
+- `src/contexts/AuthContext.tsx` depende desse cliente desde a inicialização.
+- O preview mostrado por você já está autenticado e renderizando projetos em `/dashboard`.
+- Não existe service worker registrado no código.
+- Portanto, o problema mais provável agora é publish/custom-domain/cache de entrega, não a base do app.
 
+## Arquivos possivelmente envolvidos depois da confirmação
+Se a falha for de UX/fallback:
+- `src/App.tsx`
+- `src/main.tsx`
+- `src/lib/env-guard.ts`
+
+Se a falha for só de publicação:
+- nenhuma mudança estrutural no app; correção operacional no publish/domínio
+
+## Resultado esperado
+Após essa revisão:
+- eliminamos a hipótese errada
+- identificamos exatamente se o bug está no build publicado ou só no domínio customizado
+- aplicamos a correção no lugar certo, sem mexer em partes saudáveis do app
