@@ -1,49 +1,44 @@
 
 
-## Diagnóstico confirmado ✅
+## Causa raiz real
 
-O Claude acertou na causa: o bundle de produção **não contém** as credenciais do Supabase. Verifiquei os 61 chunks JS publicados em `metrikapro.com.br` — zero ocorrências de `ohwaygqxelyaytljbcsb` ou de qualquer JWT. Quando o `client.ts` faz `createClient(undefined, undefined, ...)`, lança erro síncrono e o React nunca monta. Tela branca com `<title>` preservado é o sintoma exato disso.
+Confirmado pela screenshot do console e pela inspeção do projeto:
 
-**Detalhe interessante**: o `index.html` tem `<link rel="preconnect" href="https://ohwaygqxelyaytljbcsb.supabase.co">` (hardcoded, correto), mas o JS que usaria essa conexão não tem a URL nem a chave. Build inconsistente.
+- O `.env` **existe e está correto** no sandbox de preview (por isso o editor funciona).
+- Mas o `.env` está **listado no `.gitignore`** (linha 27).
+- Quando a Lovable faz o build de publish a partir do repositório git, o `.env` **não está lá** → Vite não substitui `import.meta.env.VITE_SUPABASE_*` → bundle sai com `undefined` → `createClient` lança `supabaseUrl is required` → tela branca.
 
-## Onde o Claude errou
+O `env-guard` que adicionei não pegou porque o `client.ts` é importado por chunks lazy (Dashboard, Auth, etc.), não pelo `main.tsx` diretamente. O erro acontece quando o chunk lazy tenta resolver o módulo, depois do guard já ter passado.
 
-A solução dele (`Project Settings → Environment Variables`) **não se aplica a Lovable Cloud**. Em projetos Cloud:
-- O arquivo `.env` é **gerado automaticamente** pela plataforma com `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e `VITE_SUPABASE_PROJECT_ID`.
-- Não há UI de "Environment Variables" para o usuário editar essas três — elas são gerenciadas pela própria Lovable.
-- "Build Secrets" do workspace existem, mas são para tokens de npm privado, não para essas variáveis.
+## Por que o "Publish → Update" sozinho não resolve
 
-Ou seja: o `.env` deveria estar correto automaticamente. Se o build saiu sem essas envs, é uma falha no pipeline de publish da Lovable, não algo que você configura manualmente.
+Não tem como resolver: o pipeline de publish lê o git, e o `.env` nunca está lá. Cada publish vai gerar o mesmo bundle quebrado.
 
-## Causas reais prováveis
+## Correção (recomendada pela própria base da Lovable para stack Vite)
 
-1. **Build de publish ficou cacheado/quebrado** — o último deploy gerou bundle antes do `.env` ser injetado, ou algo no pipeline falhou silenciosamente.
-2. **Drift entre o `.env` do preview e do publish** — preview funciona porque o Vite injeta as envs em runtime; publish congelou um build antigo.
+### 1) Remover `.env` do `.gitignore`
+- Apagar a linha `.env` do `.gitignore` (mantendo `.env.local` e `.env.*.local` que são para overrides locais).
+- O `.env` passa a fazer parte do repositório e fica disponível no build de publish.
+- **Segurança**: as variáveis em questão (`VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`) são **públicas por definição** — o prefixo `VITE_` significa que vão para o bundle do navegador de qualquer forma. A anon key do Supabase é projetada para ser pública e protegida por RLS no banco. Não há vazamento de segredo.
 
-## Plano de correção
+### 2) Reforçar o guard para cobrir chunks lazy
+- O `env-guard.ts` atual cobre o boot do `main.tsx`, mas não os chunks lazy que importam `client.ts`.
+- Solução: envolver o `createClient` em `client.ts` num try/catch que, se falhar, dispare o mesmo guard de tela amigável que já existe.
+- Isso evita tela branca silenciosa caso o `.env` volte a sumir por qualquer motivo no futuro.
 
-### Passo 1 — Republicar (ação do usuário, não-código)
-Clicar em **Publish → Update** no canto superior direito do Lovable. Isso força um novo build com o `.env` atualizado. Em 99% dos casos resolve sozinho.
+### 3) Republicar
+- Após o commit do `.env` (automático na próxima publicação), clicar em **Publish → Update**.
+- O novo bundle terá as credenciais inline.
 
-### Passo 2 — Validar o novo bundle
-Após publicar, verifico via curl se o novo `index-[hash].js` (hash mudará) contém `ohwaygqxelyaytljbcsb`. Se sim → fim, problema resolvido.
+## Validação pós-publish
+Vou rodar `curl` no novo `index-[hash].js` e confirmar que contém `ohwaygqxelyaytljbcsb`. Se sim, dashboard volta.
 
-### Passo 3 — Defesa em código (caso o publish volte a quebrar)
-Adicionar uma verificação defensiva em `src/integrations/supabase/client.ts` que:
-- Detecta se `VITE_SUPABASE_URL` ou `VITE_SUPABASE_PUBLISHABLE_KEY` estão vazias.
-- Em vez de deixar o `createClient` lançar erro síncrono e quebrar o React, renderiza uma tela de erro amigável: "Configuração indisponível. Recarregue a página ou contate o suporte."
-- Loga o erro no console com contexto claro.
+## Arquivos alterados
+- `.gitignore` — remover linha `.env` (manter `.env.local` e `.env.*.local`).
+- `src/integrations/supabase/client.ts` — try/catch ao redor do `createClient` que invoca o guard se falhar.
 
-Isso evita tela branca futura mesmo se o pipeline da Lovable falhar de novo. **Não toco no comportamento normal** — só adiciono fallback para o cenário de envs ausentes.
-
-### Passo 4 — Se o passo 1 não resolver
-Se republicar não corrigir (envs continuam fora do bundle), é bug do pipeline da Lovable e precisa abrir suporte. Nesse caso, o passo 3 ainda protege seus usuários enquanto o suporte resolve.
-
-## Arquivo alterado
-- `src/integrations/supabase/client.ts` — guard contra envs vazias + tela de erro amigável renderizada no `#root` se falhar.
-
-## O que você deve fazer agora
-1. Clicar em **Publish → Update**.
-2. Me avisar quando terminar — eu valido o bundle e confirmo se subiu correto.
-3. Se quiser que eu já adicione o guard defensivo do passo 3 mesmo assim (recomendo), aprove este plano e eu implemento.
+## O que o usuário precisa fazer
+1. Aprovar este plano.
+2. Após eu aplicar as mudanças, clicar em **Publish → Update**.
+3. Aguardar ~1 min e abrir `metrikapro.com.br` em aba anônima.
 
