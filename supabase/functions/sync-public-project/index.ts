@@ -87,14 +87,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Rate limit: max 1 sync per project every 5 minutes
-    if (isRateLimited(project_id)) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limited. Try again in a few minutes.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Fetch project and verify it's public
     const { data: project, error: projectError } = await supabase
       .from('projects')
@@ -122,6 +114,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Invalid share_token' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Persistent rate limit: based on project.last_sync_at (survives function restarts)
+    if (isRateLimitedByLastSync(project.last_sync_at)) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limited. Try again in a few minutes.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
