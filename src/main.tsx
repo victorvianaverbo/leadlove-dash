@@ -1,7 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { checkSupabaseEnv } from "./lib/env-guard";
+import { checkSupabaseEnv, installSupabaseErrorHandler } from "./lib/env-guard";
+
+// Catch lazy-chunk Supabase init errors (e.g., createClient throwing
+// "supabaseUrl is required" from a lazy route) and show friendly screen.
+installSupabaseErrorHandler();
 
 // Abort boot with friendly error screen if Supabase env vars missing from bundle.
 // checkSupabaseEnv() renders the error UI directly into #root and returns false.
