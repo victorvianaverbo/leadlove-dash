@@ -166,17 +166,34 @@ export function ProjectCard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Circle
-              className={cn(
-                "h-2 w-2 fill-current",
-                hasSynced ? "text-success" : "text-muted-foreground/40"
-              )}
-            />
-            {timeAgo ? `sincronizado ${timeAgo}` : 'nunca sincronizado'}
+        <div className="flex items-center justify-between mt-3 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {(() => {
+              const isActive = integrations.length > 0 && hasSynced;
+              return (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0",
+                    isActive
+                      ? "bg-success/10 text-success"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  <Circle
+                    className={cn(
+                      "h-1.5 w-1.5 fill-current",
+                      isActive ? "text-success" : "text-muted-foreground/60"
+                    )}
+                  />
+                  {isActive ? "Ativo" : "Inativo"}
+                </span>
+              );
+            })()}
+            <span className="text-[11px] text-muted-foreground truncate">
+              {timeAgo ? `sincronizado ${timeAgo}` : 'nunca sincronizado'}
+            </span>
           </div>
-          <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             Ver dashboard →
           </span>
         </div>
