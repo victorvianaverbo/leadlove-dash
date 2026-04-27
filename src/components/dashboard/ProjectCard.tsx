@@ -169,7 +169,10 @@ export function ProjectCard({
         <div className="flex items-center justify-between mt-3 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {(() => {
-              const isActive = integrations.length > 0 && hasSynced;
+              const daysSinceSync = project.last_sync_at
+                ? (Date.now() - new Date(project.last_sync_at).getTime()) / (1000 * 60 * 60 * 24)
+                : Infinity;
+              const isActive = integrations.length > 0 && hasSynced && daysSinceSync <= 7;
               return (
                 <span
                   className={cn(
