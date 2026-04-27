@@ -457,7 +457,20 @@ export default function Dashboard() {
                 />
               ) : (
                 <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {projects?.map((project, index) => (
+                  {[...(projects ?? [])]
+                    .sort((a, b) => {
+                      const isActive = (p: any) => {
+                        const hasIntegration = (projectIntegrations?.filter(i => i.project_id === p.id).length ?? 0) > 0;
+                        if (!hasIntegration || !p.last_sync_at) return false;
+                        const days = (Date.now() - new Date(p.last_sync_at).getTime()) / (1000 * 60 * 60 * 24);
+                        return days <= 7;
+                      };
+                      const aActive = isActive(a);
+                      const bActive = isActive(b);
+                      if (aActive !== bActive) return aActive ? -1 : 1;
+                      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                    })
+                    .map((project, index) => (
                     <ProjectCard
                       key={project.id}
                       project={project}
