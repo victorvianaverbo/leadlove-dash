@@ -106,9 +106,9 @@ serve(async (req) => {
       limit: 10,
     });
 
-    // Filter for valid subscription statuses (active or trialing)
+    // Filter for valid subscription statuses (active, trialing, or past_due as grace period)
     const validSubscription = subscriptions.data.find(
-      (sub: { status: string }) => sub.status === "active" || sub.status === "trialing"
+      (sub: { status: string }) => sub.status === "active" || sub.status === "trialing" || sub.status === "past_due"
     );
 
     const hasActiveSub = !!validSubscription;
