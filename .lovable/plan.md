@@ -1,33 +1,27 @@
-## Mudança
 
-No rodapé de cada `ProjectCard`, substituir a bolinha cinza/verde + texto "sincronizado há X" por um **badge "Ativo" / "Inativo"** mais visível, mantendo o tempo da última sincronização ao lado em cinza pequeno.
+## Objetivo
 
-### Critério de "Ativo"
-Um projeto é considerado **Ativo** quando:
-- tem ao menos 1 integração ativa (`integrations.length > 0`), **e**
-- já sincronizou pelo menos uma vez (`project.last_sync_at` existe)
+Liberar a assinatura do Bruno (cus_Toj5NRvfEGM1Vi) que está `past_due` por falta de saldo, e reagendar a próxima cobrança para 10/05/2026.
 
-Caso contrário → **Inativo**.
+## Passos
 
-### Visual
+### 1. Anular fatura aberta de R$997
+- Void invoice `in_1TThpLLGJ9uCQzbbQ5G0teOT` (cobrança atual do plano)
 
-**Ativo** (verde):
-```
-[● Ativo]  sincronizado há 2 dias
-```
-- Pill verde suave: fundo `bg-success/10`, texto `text-success`, dot verde sólido `bg-success`
-- Padding `px-2 py-0.5`, `rounded-full`, `text-[11px] font-medium`
+### 2. Anular fatura aberta de R$197
+- Void invoice `in_1TF1SxLGJ9uCQzbbAPLZzX1U` (cobrança pendente de plano anterior cancelado)
 
-**Inativo** (cinza):
-```
-[● Inativo]  nunca sincronizado
-```
-- Pill cinza: fundo `bg-muted`, texto `text-muted-foreground`, dot cinza
+### 3. Reagendar assinatura para 10/05
+- Atualizar o `billing_cycle_anchor` da assinatura `sub_1SxRNqLGJ9uCQzbbZz5hXVnU` para timestamp de 10/05/2026
+- Isso vai:
+  - Mudar o status de `past_due` para `active`
+  - Agendar a próxima cobrança automática para 10/05/2026
 
-O texto de tempo (`sincronizado há X`) continua à direita do pill, em `text-[11px] text-muted-foreground`, para não perder a informação.
+### Resultado esperado
+- Bruno volta a ter acesso imediato à plataforma
+- Próxima cobrança de R$997 acontece automaticamente em 10/05/2026
 
-## Arquivo afetado
-- `src/components/dashboard/ProjectCard.tsx` — apenas o bloco do footer (linhas 168-182). Nenhuma mudança em props, queries, ou lógica de métricas.
-
-## Resultado esperado
-Olhando a grade de projetos, em uma fração de segundo dá pra distinguir quais estão funcionando (badge verde "Ativo") dos que estão parados (badge cinza "Inativo"), sem precisar ler texto pequeno.
+## Detalhes técnicos
+- Usar Stripe API: `POST /v1/invoices/{id}/void` para anular faturas
+- Usar Stripe API: `POST /v1/subscriptions/{id}` com `billing_cycle_anchor` e `proration_behavior: none`
+- Nenhuma alteração de código necessária
